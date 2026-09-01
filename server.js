@@ -22,7 +22,9 @@ app.set('trust proxy', 1);
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
 function backendStatus() { return { ...backend, ai: aiStatus(), database: accountDbEnabled() }; }
 app.use(express.json({ limit: '20mb' }));
-app.get('/healthz', (req, res) => { const status = backendStatus(); const ok = status.proxy && status.chat && status.database; res.status(ok ? 200 : 503).json({ ok, service: 'ugs-desktop', https: req.secure, ...status }); });
+const healthHandler = (req, res) => { const status = backendStatus(); const ok = status.proxy && status.chat && status.database; res.status(ok ? 200 : 503).json({ ok, service: 'ugs-desktop', https: req.secure, ...status }); };
+app.get('/healthz', healthHandler);
+app.get('/api/health', healthHandler);
 setupRoutes(app);
 accountRoutes(app);
 app.get('/api/status', (req, res) => res.json({ ok: true, ...backendStatus() }));
