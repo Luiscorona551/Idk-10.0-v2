@@ -15,14 +15,17 @@ import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-se
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
-const uvServiceWorker = ["self.__uv$cookies = ''; importScripts('/uv/uv.bundle.js', '/uv/uv.config.js');",readFileSync(join(uvPath, 'uv.sw.js'), 'utf8'),"const uv = new self.UVServiceWorker();","self.addEventListener('fetch', event => {","  if (uv.route(event)) event.respondWith(uv.fetch(event));","});"].join('\n');
+const uvServiceWorker = ["self.__uv$cookies = ''; importScripts('/uv/uv.bundle.js', '/uv/uv.config.js');","const uv = new self.UVServiceWorker();","self.addEventListener('fetch', event => {","  if (uv.route(event)) event.respondWith(uv.fetch(event));","});"].join('\n');
 const root = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
 function backendStatus() { return { ...backend, ai: aiStatus(), database: accountDbEnabled() }; }
 app.use(express.json({ limit: '20mb' }));
-const healthHandler = (req, res) => { const status = backendStatus(); const ok = status.proxy && status.chat && status.database; res.status(ok ? 200 : 503).json({ ok, service: 'ugs-desktop', https: req.secure, ...status }); };
+
+// Railway liveness endpoints must return 200 whenever the Node process is alive.
+// Detailed dependency readiness remains available through /api/status.
+const healthHandler = (req, res) => res.status(200).json({ ok: true, service: 'ugs-desktop', https: req.secure, ...backendStatus() });
 app.get('/healthz', healthHandler);
 app.get('/api/health', healthHandler);
 setupRoutes(app);
