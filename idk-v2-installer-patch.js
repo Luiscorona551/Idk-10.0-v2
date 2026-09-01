@@ -3,19 +3,23 @@
   'use strict';
   const DESKTOP_LABEL = 'Desktop';
 
+  // The installer re-renders its wizard steps. A permanent MutationObserver
+  // is unsafe here because changing the installer DOM creates more mutations.
+  // Patch the destination once when that step exists, then disconnect.
+  let patched = false;
+  let observer = null;
+
   const apply = () => {
+    if (patched) return true;
+
     const destination = document.querySelector('.idk-install-destination');
-    if (!destination) return;
+    if (!destination) return false;
 
     const span = destination.querySelector('span');
     const name = destination.querySelector('#idk-destination-name');
     const programName = name?.textContent || 'Program';
     const desiredHTML = `${DESKTOP_LABEL}\\<b id="idk-destination-name">${programName}</b>`;
 
-    // IMPORTANT: do not rewrite the DOM when nothing changed. The old code
-    // rewrote innerHTML on every MutationObserver callback, which generated
-    // another mutation and caused an infinite observer loop that froze IDK
-    // as soon as the Program Installer was opened.
     if (span && span.innerHTML !== desiredHTML) {
       span.innerHTML = desiredHTML;
     }
@@ -32,14 +36,21 @@
         );
       }
     }
+
+    // Disconnect immediately after the installer destination has been
+    // patched. This prevents the patch itself from triggering an observer loop.
+    patched = true;
+    observer?.disconnect();
+    return true;
   };
 
-  const observer = new MutationObserver(() => apply());
+  observer = new MutationObserver(() => apply());
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  apply();
 
   document.addEventListener('input', event => {
-    if (event.target?.id === 'idk-program-name') setTimeout(apply, 0);
+    if (!patched && event.target?.id === 'idk-program-name') {
+      queueMicrotask(apply);
+    }
   });
-
-  apply();
 })();
