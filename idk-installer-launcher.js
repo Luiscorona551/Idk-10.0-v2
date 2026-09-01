@@ -1,16 +1,78 @@
 (() => {
   'use strict';
+
   const KEY = 'idkInstalledPrograms';
   const DB = 'idkInstalledProgramsDB';
   const STORE = 'programs';
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const read = (k, fallback) => { try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } };
-  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-  const db = () => new Promise((resolve, reject) => { const r = indexedDB.open(DB, 1); r.onupgradeneeded = () => r.result.createObjectStore(STORE); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
-  const save = async (id, file) => { const d = await db(); await new Promise((res, rej) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(file, id); t.oncomplete = res; t.onerror = () => rej(t.error); }); };
-  const load = async id => { const d = await db(); return new Promise((res, rej) => { const r = d.transaction(STORE).objectStore(STORE).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); };
-  const arrayBufferToBase64 = buffer => { const bytes = new Uint8Array(buffer); let binary = ''; const chunk = 0x8000; for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk)); return btoa(binary); };
-  const accountRequest = async (url, options = {}) => { try { const r = await fetch(url, { credentials: 'same-origin', ...options }); const data = await r.json().catch(() => ({})); return { ok: r.ok, ...data }; } catch { return { ok: false }; } };
+  let installerOpen = false;
+  let installerOpening = false;
+
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+
+  const read = (k, fallback) => {
+    try {
+      const v = localStorage.getItem(k);
+      return v == null ? fallback : JSON.parse(v);
+    } catch {
+      return fallback;
+    }
+  };
+
+  const write = (k, v) => {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  };
+
+  const db = () => new Promise((resolve, reject) => {
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE);
+    };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+
+  const save = async (id, file) => {
+    const d = await db();
+    await new Promise((res, rej) => {
+      const t = d.transaction(STORE, 'readwrite');
+      t.objectStore(STORE).put(file, id);
+      t.oncomplete = res;
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error || new Error('Database transaction aborted.'));
+    });
+    d.close();
+  };
+
+  const load = async id => {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const r = d.transaction(STORE).objectStore(STORE).get(id);
+      r.onsuccess = () => { res(r.result); d.close(); };
+      r.onerror = () => { rej(r.error); d.close(); };
+    });
+  };
+
+  const arrayBufferToBase64 = buffer => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  };
+
+  const accountRequest = async (url, options = {}) => {
+    try {
+      const r = await fetch(url, { credentials: 'same-origin', ...options });
+      const data = await r.json().catch(() => ({}));
+      return { ok: r.ok, ...data };
+    } catch {
+      return { ok: false };
+    }
+  };
 
   const launch = async p => {
     try {
@@ -25,7 +87,9 @@
       const w = window.open(u, '_blank', 'noopener,noreferrer');
       if (!w) alert('Allow pop-ups for IDK 10.0 to launch the program.');
       setTimeout(() => URL.revokeObjectURL(u), 60000);
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      alert(e.message || 'Unable to launch the program.');
+    }
   };
 
   async function syncCloudPrograms() {
@@ -38,51 +102,177 @@
     r.programs.forEach(addShortcut);
   }
 
+  function closeInstaller(overlay) {
+    if (!overlay) return;
+    overlay.remove();
+    installerOpen = false;
+    installerOpening = false;
+  }
+
   async function installer() {
-    const overlay = document.createElement('div'); overlay.className = 'idk-installer-overlay';
-    overlay.innerHTML = `<section class="idk-installer"><div class="idk-installer-titlebar"><strong>Program Installer Setup</strong><button class="idk-installer-close">×</button></div><div class="idk-installer-banner"><span class="idk-installer-logo">📦</span><div><strong>Program Installer</strong><small>Install an HTML game or program on your IDK 10.0 desktop.</small></div></div><div class="idk-installer-body"><div class="idk-installer-steps"><span class="active">1</span><span>2</span><span>3</span><span>✓</span></div><div class="idk-installer-main"><h3 id="pi-title">Select Program File</h3><p id="pi-help">Choose the HTML game or program you want to install.</p><div class="idk-install-card"><label class="idk-install-file"><input id="pi-file" type="file" accept=".html,.htm,text/html"><span>Choose HTML file…</span></label><div class="idk-install-path" id="pi-path">No file selected</div></div><div class="idk-install-options" id="pi-options" hidden><label>Program name<input id="pi-name" class="field" type="text"></label><label>Desktop icon<select id="pi-icon" class="field"><option>🎮</option><option>🕹️</option><option>🚀</option><option>⭐</option><option>🧩</option><option>🌐</option></select></label><label class="idk-check"><input id="pi-shortcut" type="checkbox" checked> Create desktop shortcut</label></div><div class="idk-install-destination" id="pi-dest" hidden><strong>Install location</strong><span>C:\\IDK\\Programs\\<b id="pi-dest-name">Program</b></span><button type="button">Browse…</button></div><div class="idk-install-status" id="pi-status"></div></div></div><div class="idk-installer-actions"><button class="btn tab" id="pi-back" disabled>&lt; Back</button><button class="btn" id="pi-next">Next &gt;</button><button class="btn tab" id="pi-cancel">Cancel</button></div></section>`;
-    document.body.appendChild(overlay);
-    const $ = id => overlay.querySelector(id), file = $('#pi-file'), path = $('#pi-path'), name = $('#pi-name'), icon = $('#pi-icon'), status = $('#pi-status'), next = $('#pi-next'), back = $('#pi-back'), opts = $('#pi-options'), dest = $('#pi-dest');
-    let selected = null, step = 1;
-    const render = () => { overlay.querySelectorAll('.idk-installer-steps span').forEach((s, i) => s.classList.toggle('active', i === step - 1)); opts.hidden = step < 2; dest.hidden = step < 3; back.disabled = step < 2; next.textContent = step === 3 ? 'Install' : 'Next >'; $('#pi-title').textContent = step === 1 ? 'Select Program File' : step === 2 ? 'Installation Options' : 'Select Destination Location'; $('#pi-help').textContent = step === 1 ? 'Choose the HTML game or program you want to install.' : step === 2 ? 'Choose a name and desktop icon for your program.' : 'Review the destination before installing.'; };
-    file.onchange = () => { selected = file.files?.[0] || null; if (!selected) return; if (!/\.html?$/i.test(selected.name)) { status.textContent = 'Please choose an HTML file.'; selected = null; return; } const n = selected.name.replace(/\.html?$/i, '').replace(/[-_]+/g, ' ').trim() || 'HTML Program'; name.value = n; path.textContent = selected.name; $('#pi-dest-name').textContent = n; status.textContent = `${(selected.size / 1024).toFixed(1)} KB · HTML program`; };
-    name.oninput = () => $('#pi-dest-name').textContent = name.value.trim() || 'Program';
-    back.onclick = () => { if (step > 1) { step--; render(); } };
-    $('#pi-cancel').onclick = () => overlay.remove();
-    $('.idk-installer-close').onclick = () => overlay.remove();
-    next.onclick = async () => {
-      if (step === 1) { if (!selected) { status.textContent = 'Select an HTML file first.'; return; } step = 2; render(); return; }
-      if (step === 2) { if (!name.value.trim()) { status.textContent = 'Enter a program name.'; return; } step = 3; render(); return; }
-      next.disabled = true; status.textContent = 'Installing…';
-      try {
-        const id = 'program-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-        const p = { id, name: name.value.trim(), icon: icon.value, fileName: selected.name, installedAt: Date.now() };
-        await save(id, selected);
-        const list = read(KEY, []).filter(x => x.name !== p.name); list.unshift(p); write(KEY, list);
-        let cloudSaved = false;
-        if (window.IDKAccount?.user) {
-          const base64 = arrayBufferToBase64(await selected.arrayBuffer());
-          const result = await accountRequest('/api/account/programs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...p, contentBase64: base64 }) });
-          cloudSaved = result.ok;
-          if (cloudSaved) write(KEY, [result.program, ...read(KEY, []).filter(x => x.id !== p.id && x.name !== p.name)]);
+    if (installerOpen || installerOpening) return;
+    const existing = document.querySelector('.idk-installer-overlay');
+    if (existing) {
+      installerOpen = true;
+      existing.querySelector('.idk-installer-close')?.focus();
+      return;
+    }
+
+    installerOpening = true;
+    try {
+      const overlay = document.createElement('div');
+      overlay.className = 'idk-installer-overlay';
+      overlay.innerHTML = `<section class="idk-installer" role="dialog" aria-modal="true" aria-label="Program Installer Setup"><div class="idk-installer-titlebar"><strong>Program Installer Setup</strong><button type="button" class="idk-installer-close" aria-label="Close installer">×</button></div><div class="idk-installer-banner"><span class="idk-installer-logo">📦</span><div><strong>Program Installer</strong><small>Install an HTML game or program on your IDK 10.0 desktop.</small></div></div><div class="idk-installer-body"><div class="idk-installer-steps"><span class="active">1</span><span>2</span><span>3</span><span>✓</span></div><div class="idk-installer-main"><h3 id="pi-title">Select Program File</h3><p id="pi-help">Choose the HTML game or program you want to install.</p><div class="idk-install-card"><label class="idk-install-file"><input id="pi-file" type="file" accept=".html,.htm,text/html"><span>Choose HTML file…</span></label><div class="idk-install-path" id="pi-path">No file selected</div></div><div class="idk-install-options" id="pi-options" hidden><label>Program name<input id="pi-name" class="field" type="text"></label><label>Desktop icon<select id="pi-icon" class="field"><option>🎮</option><option>🕹️</option><option>🚀</option><option>⭐</option><option>🧩</option><option>🌐</option></select></label><label class="idk-check"><input id="pi-shortcut" type="checkbox" checked> Create desktop shortcut</label></div><div class="idk-install-destination" id="pi-dest" hidden><strong>Install location</strong><span>C:\\IDK\\Programs\\<b id="pi-dest-name">Program</b></span><button type="button">Browse…</button></div><div class="idk-install-status" id="pi-status" role="status" aria-live="polite"></div></div></div><div class="idk-installer-actions"><button type="button" class="btn tab" id="pi-back" disabled>&lt; Back</button><button type="button" class="btn" id="pi-next">Next &gt;</button><button type="button" class="btn tab" id="pi-cancel">Cancel</button></div></section>`;
+      document.body.appendChild(overlay);
+      installerOpen = true;
+
+      const $ = id => overlay.querySelector(id);
+      const file = $('#pi-file');
+      const path = $('#pi-path');
+      const name = $('#pi-name');
+      const icon = $('#pi-icon');
+      const status = $('#pi-status');
+      const next = $('#pi-next');
+      const back = $('#pi-back');
+      const opts = $('#pi-options');
+      const dest = $('#pi-dest');
+      let selected = null;
+      let step = 1;
+      let installing = false;
+
+      const render = () => {
+        overlay.querySelectorAll('.idk-installer-steps span').forEach((s, i) => s.classList.toggle('active', i === step - 1));
+        opts.hidden = step < 2;
+        dest.hidden = step < 3;
+        back.disabled = step < 2 || installing;
+        next.disabled = installing;
+        next.textContent = step === 3 ? 'Install' : 'Next >';
+        $('#pi-title').textContent = step === 1 ? 'Select Program File' : step === 2 ? 'Installation Options' : 'Select Destination Location';
+        $('#pi-help').textContent = step === 1 ? 'Choose the HTML game or program you want to install.' : step === 2 ? 'Choose a name and desktop icon for your program.' : 'Review the destination before installing.';
+      };
+
+      file.onchange = () => {
+        selected = file.files?.[0] || null;
+        if (!selected) return;
+        if (!/\.html?$/i.test(selected.name)) {
+          status.textContent = 'Please choose an HTML file.';
+          selected = null;
+          return;
         }
-        if ($('#pi-shortcut').checked) addShortcut(p);
-        status.textContent = cloudSaved ? `${p.name} was installed and saved to your IDK account.` : `${p.name} was installed successfully.`;
-        next.textContent = 'Done'; next.disabled = false; next.onclick = () => overlay.remove();
-      } catch (e) { status.textContent = 'Installation failed: ' + e.message; next.disabled = false; }
-    };
-    render();
+        const n = selected.name.replace(/\.html?$/i, '').replace(/[-_]+/g, ' ').trim() || 'HTML Program';
+        name.value = n;
+        path.textContent = selected.name;
+        $('#pi-dest-name').textContent = n;
+        status.textContent = `${(selected.size / 1024).toFixed(1)} KB · HTML program`;
+      };
+
+      name.oninput = () => { $('#pi-dest-name').textContent = name.value.trim() || 'Program'; };
+      back.onclick = () => { if (!installing && step > 1) { step--; render(); } };
+      $('#pi-cancel').onclick = () => closeInstaller(overlay);
+      $('.idk-installer-close').onclick = () => closeInstaller(overlay);
+      overlay.addEventListener('click', event => { if (event.target === overlay) closeInstaller(overlay); });
+
+      next.onclick = async () => {
+        if (installing) return;
+        if (step === 1) {
+          if (!selected) { status.textContent = 'Select an HTML file first.'; return; }
+          step = 2; render(); return;
+        }
+        if (step === 2) {
+          if (!name.value.trim()) { status.textContent = 'Enter a program name.'; return; }
+          step = 3; render(); return;
+        }
+
+        installing = true;
+        next.disabled = true;
+        status.textContent = 'Installing…';
+        try {
+          const id = 'program-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+          const p = { id, name: name.value.trim(), icon: icon.value, fileName: selected.name, installedAt: Date.now() };
+          await save(id, selected);
+
+          const list = read(KEY, []).filter(x => x.name !== p.name);
+          list.unshift(p);
+          write(KEY, list);
+
+          let cloudSaved = false;
+          if (window.IDKAccount?.user) {
+            const base64 = arrayBufferToBase64(await selected.arrayBuffer());
+            const result = await accountRequest('/api/account/programs', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ ...p, contentBase64: base64 })
+            });
+            cloudSaved = result.ok;
+            if (cloudSaved && result.program) write(KEY, [result.program, ...read(KEY, []).filter(x => x.id !== p.id && x.name !== p.name)]);
+          }
+
+          if ($('#pi-shortcut').checked) addShortcut(cloudSaved ? read(KEY, [p])[0] : p);
+          status.textContent = cloudSaved ? `${p.name} was installed and saved to your IDK account.` : `${p.name} was installed successfully.`;
+          next.textContent = 'Done';
+          next.disabled = false;
+          next.onclick = () => closeInstaller(overlay);
+          installing = false;
+        } catch (e) {
+          status.textContent = 'Installation failed: ' + (e.message || 'Unknown error');
+          next.disabled = false;
+          installing = false;
+        }
+      };
+
+      render();
+      setTimeout(() => file.focus(), 0);
+    } catch (e) {
+      installerOpen = false;
+      installerOpening = false;
+      console.error('IDK Program Installer failed to open:', e);
+      alert('Program Installer could not be opened. Please refresh IDK 10.0 and try again.');
+    }
   }
 
   function addShortcut(p) {
-    const layer = document.getElementById('icons'); if (!layer || !p?.id) return;
+    const layer = document.getElementById('icons');
+    if (!layer || !p?.id) return;
     if (layer.querySelector(`[data-installer-program="${CSS.escape(p.id)}"]`)) return;
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'idk-installed-shortcut'; b.dataset.installerProgram = p.id; b.title = 'Open ' + p.name; b.innerHTML = `<span class="idk-installed-shortcut-icon">${esc(p.icon || '🎮')}</span><span>${esc(p.name)}</span>`; b.ondblclick = () => launch(p); layer.appendChild(b);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'idk-installed-shortcut';
+    b.dataset.installerProgram = p.id;
+    b.title = 'Open ' + p.name;
+    b.innerHTML = `<span class="idk-installed-shortcut-icon">${esc(p.icon || '🎮')}</span><span>${esc(p.name)}</span>`;
+    let lastLaunch = 0;
+    const openProgram = event => {
+      event?.preventDefault();
+      const now = Date.now();
+      if (now - lastLaunch < 500) return;
+      lastLaunch = now;
+      launch(p);
+    };
+    b.onclick = openProgram;
+    b.ondblclick = event => event.preventDefault();
+    layer.appendChild(b);
   }
 
   function addInstallerIcon() {
-    const layer = document.getElementById('icons'); if (!layer || layer.querySelector('.idk-program-installer-icon')) return;
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'idk-installed-shortcut idk-program-installer-icon'; b.title = 'Program Installer'; b.innerHTML = '<span class="idk-installed-shortcut-icon">📦</span><span>Program Installer</span>'; b.ondblclick = installer; b.onclick = () => b.classList.add('selected'); layer.appendChild(b);
+    const layer = document.getElementById('icons');
+    if (!layer || layer.querySelector('.idk-program-installer-icon')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'idk-installed-shortcut idk-program-installer-icon';
+    b.title = 'Program Installer';
+    b.innerHTML = '<span class="idk-installed-shortcut-icon">📦</span><span>Program Installer</span>';
+    let lastOpen = 0;
+    const openInstaller = event => {
+      event?.preventDefault();
+      event?.stopPropagation();
+      const now = Date.now();
+      if (now - lastOpen < 500 || installerOpen || installerOpening) return;
+      lastOpen = now;
+      installer();
+    };
+    b.onclick = openInstaller;
+    b.ondblclick = event => event.preventDefault();
+    layer.appendChild(b);
   }
 
   function init() {
@@ -91,5 +281,7 @@
     setTimeout(addInstallerIcon, 700);
     window.addEventListener('idk-account-restored', syncCloudPrograms);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
