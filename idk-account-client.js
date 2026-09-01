@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const ACCOUNT_KEY = 'idkAccountSession';
+  const HYDRATED_KEY = 'idkAccountHydrated';
   const skipKeys = new Set([ACCOUNT_KEY]);
   const readLocal = () => {
     const out = {};
@@ -99,9 +100,11 @@
       saveQueued = true;
       setTimeout(async () => { saveQueued = false; await sync(); }, 900);
     };
-    localStorage.setItem = (key, value) => { originalSet(key, value); if (!skipKeys.has(String(key))) queue(); };
-    localStorage.removeItem = key => { originalRemove(key); if (!skipKeys.has(String(key))) queue(); };
-    localStorage.clear = () => { originalClear(); queue(); };
+    try {
+      localStorage.setItem = (key, value) => { originalSet(key, value); if (!skipKeys.has(String(key))) queue(); };
+      localStorage.removeItem = key => { originalRemove(key); if (!skipKeys.has(String(key))) queue(); };
+      localStorage.clear = () => { originalClear(); queue(); };
+    } catch {}
   }
 
   async function startUser(nextUser) {
@@ -113,6 +116,10 @@
     clearInterval(timer);
     timer = setInterval(sync, 5000);
     window.addEventListener('beforeunload', sync, { capture: true });
+    if (!sessionStorage.getItem(HYDRATED_KEY)) {
+      sessionStorage.setItem(HYDRATED_KEY, '1');
+      location.reload();
+    }
   }
 
   async function auth() {
@@ -124,10 +131,8 @@
       return true;
     }
 
-    // Never carry another user's browser-local desktop into a new account.
     clearLocal();
     window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
-
     const o = modal();
     const form = o.querySelector('#idk-account-form');
     const toggle = o.querySelector('#idk-account-toggle');
@@ -164,10 +169,7 @@
     return true;
   }
 
-  function init() {
-    watchLocalStorage();
-    auth();
-  }
+  function init() { watchLocalStorage(); auth(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
   window.IDKAccount = { sync, restore, get user() { return user; } };
