@@ -1,0 +1,6 @@
+.env
+node_modules/
+.v3/
+assets/
+css/
+js/
