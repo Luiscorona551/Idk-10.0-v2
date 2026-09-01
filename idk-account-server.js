@@ -12,20 +12,18 @@ export async function initAccountDb() {
   await pool.query(`CREATE TABLE IF NOT EXISTS idk_users (id UUID PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, avatar TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await pool.query(`CREATE TABLE IF NOT EXISTS idk_state (user_id UUID PRIMARY KEY REFERENCES idk_users(id) ON DELETE CASCADE, desktop JSONB NOT NULL DEFAULT '{}'::jsonb, games JSONB NOT NULL DEFAULT '[]'::jsonb, files JSONB NOT NULL DEFAULT '[]'::jsonb, messenger JSONB NOT NULL DEFAULT '{}'::jsonb, sheets JSONB NOT NULL DEFAULT '{}'::jsonb, cards JSONB NOT NULL DEFAULT '[]'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await pool.query(`CREATE TABLE IF NOT EXISTS idk_programs (user_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, program_id TEXT NOT NULL, name TEXT NOT NULL, icon TEXT, file_name TEXT, content BYTEA NOT NULL, installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(user_id, program_id));`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS idk_files (user_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, file_id TEXT NOT NULL, name TEXT NOT NULL, mime TEXT, size BIGINT, content BYTEA NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(user_id, file_id));`);
 }
 
 function hashPassword(password, salt = randomBytes(16).toString('hex')) { return `${salt}:${scryptSync(String(password), salt, 64).toString('hex')}`; }
 function verifyPassword(password, stored) { const [salt, hex] = String(stored || '').split(':'); if (!salt || !hex) return false; try { return timingSafeEqual(scryptSync(String(password), salt, 64), Buffer.from(hex, 'hex')); } catch { return false; } }
-function makeToken(userId) { const exp = Date.now() + MAX_AGE; const body = `${userId}.${exp}`; const sig = createHmac('sha256', SECRET).update(body).digest('hex'); return `${body}.${sig}`; }
+function makeToken(userId) { const exp = Date.now() + MAX_AGE; const body = `${userId}.${exp}`; const sig = createHmac('sha256', SECRET).update(body).digest('hex'); return `${body}.${exp}.${sig}`.replace(`${body}.${exp}.${sig}`, `${userId}.${exp}.${sig}`); }
 function userFromReq(req) {
   const raw = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('idk_account='));
   if (!raw) return null;
-  let decoded = '';
-  try { decoded = decodeURIComponent(raw.slice('idk_account='.length)); } catch { return null; }
-  const parts = decoded.split('.');
-  if (parts.length !== 3) return null;
-  const [userId, exp, sig] = parts;
-  if (!userId || !Number.isFinite(Number(exp)) || Number(exp) < Date.now()) return null;
+  let decoded = ''; try { decoded = decodeURIComponent(raw.slice('idk_account='.length)); } catch { return null; }
+  const parts = decoded.split('.'); if (parts.length !== 3) return null;
+  const [userId, exp, sig] = parts; if (!userId || !Number.isFinite(Number(exp)) || Number(exp) < Date.now()) return null;
   const expected = createHmac('sha256', SECRET).update(`${userId}.${exp}`).digest('hex');
   try { return timingSafeEqual(Buffer.from(sig), Buffer.from(expected)) ? userId : null; } catch { return null; }
 }
@@ -36,12 +34,8 @@ export function accountUserId(req) { return userFromReq(req); }
 export function accountRoutes(app) {
   app.get('/api/account/status', async (req, res) => {
     if (!pool) return res.json({ ok: true, configured: false, authenticated: false });
-    try {
-      const id = userFromReq(req);
-      if (!id) return res.json({ ok: true, configured: true, authenticated: false });
-      const { rows } = await pool.query('SELECT id,username,avatar FROM idk_users WHERE id=$1', [id]);
-      res.json({ ok: true, configured: true, authenticated: Boolean(rows[0]), user: rows[0] || null });
-    } catch (error) { console.error('Account status failed:', error); res.status(500).json({ ok: false, error: 'Account service is temporarily unavailable.' }); }
+    try { const id = userFromReq(req); if (!id) return res.json({ ok: true, configured: true, authenticated: false }); const { rows } = await pool.query('SELECT id,username,avatar FROM idk_users WHERE id=$1', [id]); res.json({ ok: true, configured: true, authenticated: Boolean(rows[0]), user: rows[0] || null }); }
+    catch (error) { console.error('Account status failed:', error); res.status(500).json({ ok: false, error: 'Account service is temporarily unavailable.' }); }
   });
 
   app.post('/api/account/register', async (req, res) => {
@@ -50,87 +44,85 @@ export function accountRoutes(app) {
     if (!/^[\w .-]{2,32}$/u.test(username)) return res.status(400).json({ ok: false, error: 'Choose a username between 2 and 32 characters.' });
     if (password.length < 6) return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters.' });
     const id = randomUUID();
-    try {
-      await pool.query('INSERT INTO idk_users(id,username,password_hash,avatar) VALUES($1,$2,$3,$4)', [id, username, hashPassword(password), avatar]);
-      await pool.query('INSERT INTO idk_state(user_id) VALUES($1)', [id]);
-      setSession(res, id);
-      res.status(201).json({ ok: true, user: { id, username, avatar } });
-    } catch (error) {
-      if (error?.code === '23505') return res.status(409).json({ ok: false, error: 'That username is already in use.' });
-      console.error('Account registration failed:', error); res.status(500).json({ ok: false, error: 'Could not create the account.' });
-    }
+    try { await pool.query('INSERT INTO idk_users(id,username,password_hash,avatar) VALUES($1,$2,$3,$4)', [id, username, hashPassword(password), avatar]); await pool.query('INSERT INTO idk_state(user_id) VALUES($1)', [id]); setSession(res, id); res.status(201).json({ ok: true, user: { id, username, avatar } }); }
+    catch (error) { if (error?.code === '23505') return res.status(409).json({ ok: false, error: 'That username is already in use.' }); console.error('Account registration failed:', error); res.status(500).json({ ok: false, error: 'Could not create the account.' }); }
   });
 
   app.post('/api/account/login', async (req, res) => {
     if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
     const username = String(req.body?.username || '').trim(), password = String(req.body?.password || '');
-    try {
-      const { rows } = await pool.query('SELECT id,username,password_hash,avatar FROM idk_users WHERE lower(username)=lower($1)', [username]);
-      const u = rows[0];
-      if (!u || !verifyPassword(password, u.password_hash)) return res.status(401).json({ ok: false, error: 'Incorrect username or password.' });
-      setSession(res, u.id);
-      res.json({ ok: true, user: { id: u.id, username: u.username, avatar: u.avatar } });
-    } catch (error) { console.error('Account login failed:', error); res.status(500).json({ ok: false, error: 'Could not sign in right now.' }); }
+    try { const { rows } = await pool.query('SELECT id,username,password_hash,avatar FROM idk_users WHERE lower(username)=lower($1)', [username]); const u = rows[0]; if (!u || !verifyPassword(password, u.password_hash)) return res.status(401).json({ ok: false, error: 'Incorrect username or password.' }); setSession(res, u.id); res.json({ ok: true, user: { id: u.id, username: u.username, avatar: u.avatar } }); }
+    catch (error) { console.error('Account login failed:', error); res.status(500).json({ ok: false, error: 'Could not sign in right now.' }); }
   });
 
   app.post('/api/account/logout', (req, res) => { clearSession(res); res.json({ ok: true }); });
 
   app.get('/api/account/state', async (req, res) => {
-    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
-    const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
-    try {
-      const { rows } = await pool.query('SELECT desktop,games,files,messenger,sheets,cards,updated_at FROM idk_state WHERE user_id=$1', [id]);
-      res.json({ ok: true, state: rows[0] || {} });
-    } catch (error) { console.error('Account state read failed:', error); res.status(500).json({ ok: false, error: 'Could not load your IDK data.' }); }
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    try { const { rows } = await pool.query('SELECT desktop,games,files,messenger,sheets,cards,updated_at FROM idk_state WHERE user_id=$1', [id]); res.json({ ok: true, state: rows[0] || {} }); }
+    catch (error) { console.error('Account state read failed:', error); res.status(500).json({ ok: false, error: 'Could not load your IDK data.' }); }
   });
 
   app.put('/api/account/state', async (req, res) => {
-    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
-    const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
     const b = req.body || {}, j = (v, d) => JSON.stringify(v === undefined ? d : v);
-    try {
-      await pool.query(`UPDATE idk_state SET desktop=$2::jsonb,games=$3::jsonb,files=$4::jsonb,messenger=$5::jsonb,sheets=$6::jsonb,cards=$7::jsonb,updated_at=NOW() WHERE user_id=$1`, [id, j(b.desktop, {}), j(b.games, []), j(b.files, []), j(b.messenger, {}), j(b.sheets, {}), j(b.cards, [])]);
-      res.json({ ok: true });
-    } catch (error) { console.error('Account state write failed:', error); res.status(500).json({ ok: false, error: 'Could not save your IDK data.' }); }
+    try { await pool.query(`UPDATE idk_state SET desktop=$2::jsonb,games=$3::jsonb,files=$4::jsonb,messenger=$5::jsonb,sheets=$6::jsonb,cards=$7::jsonb,updated_at=NOW() WHERE user_id=$1`, [id, j(b.desktop, {}), j(b.games, []), j(b.files, []), j(b.messenger, {}), j(b.sheets, {}), j(b.cards, [])]); res.json({ ok: true }); }
+    catch (error) { console.error('Account state write failed:', error); res.status(500).json({ ok: false, error: 'Could not save your IDK data.' }); }
   });
 
   app.get('/api/account/programs', async (req, res) => {
-    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
-    const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
-    try {
-      const { rows } = await pool.query('SELECT program_id AS id,name,icon,file_name AS "fileName",installed_at AS "installedAt" FROM idk_programs WHERE user_id=$1 ORDER BY installed_at DESC', [id]);
-      res.json({ ok: true, programs: rows });
-    } catch (error) { console.error('Program list failed:', error); res.status(500).json({ ok: false, error: 'Could not load installed programs.' }); }
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    try { const { rows } = await pool.query('SELECT program_id AS id,name,icon,file_name AS "fileName",installed_at AS "installedAt" FROM idk_programs WHERE user_id=$1 ORDER BY installed_at DESC', [id]); res.json({ ok: true, programs: rows }); }
+    catch (error) { console.error('Program list failed:', error); res.status(500).json({ ok: false, error: 'Could not load installed programs.' }); }
   });
 
   app.post('/api/account/programs', async (req, res) => {
-    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
-    const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
     const programId = String(req.body?.id || '').slice(0, 120), name = String(req.body?.name || '').trim().slice(0, 120), icon = String(req.body?.icon || '🎮').slice(0, 16), fileName = String(req.body?.fileName || '').slice(0, 255), encoded = String(req.body?.contentBase64 || '');
     if (!programId || !name || !encoded) return res.status(400).json({ ok: false, error: 'Program metadata and HTML content are required.' });
-    let content;
-    try { content = Buffer.from(encoded, 'base64'); } catch { return res.status(400).json({ ok: false, error: 'Invalid program content.' }); }
+    let content; try { content = Buffer.from(encoded, 'base64'); } catch { return res.status(400).json({ ok: false, error: 'Invalid program content.' }); }
     if (!content.length || content.length > 15 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'HTML programs must be smaller than 15 MB.' });
-    try {
-      await pool.query(`INSERT INTO idk_programs(user_id,program_id,name,icon,file_name,content,installed_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW(),NOW()) ON CONFLICT(user_id,program_id) DO UPDATE SET name=EXCLUDED.name,icon=EXCLUDED.icon,file_name=EXCLUDED.file_name,content=EXCLUDED.content,updated_at=NOW()`, [id, programId, name, icon, fileName, content]);
-      res.status(201).json({ ok: true, program: { id: programId, name, icon, fileName } });
-    } catch (error) { console.error('Program upload failed:', error); res.status(500).json({ ok: false, error: 'Could not save the program.' }); }
+    try { await pool.query(`INSERT INTO idk_programs(user_id,program_id,name,icon,file_name,content,installed_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW(),NOW()) ON CONFLICT(user_id,program_id) DO UPDATE SET name=EXCLUDED.name,icon=EXCLUDED.icon,file_name=EXCLUDED.file_name,content=EXCLUDED.content,updated_at=NOW()`, [id, programId, name, icon, fileName, content]); res.status(201).json({ ok: true, program: { id: programId, name, icon, fileName } }); }
+    catch (error) { console.error('Program upload failed:', error); res.status(500).json({ ok: false, error: 'Could not save the program.' }); }
   });
 
   app.get('/api/account/programs/:programId/content', async (req, res) => {
-    if (!pool) return res.status(503).send('Persistent database is not configured.');
-    const id = userFromReq(req); if (!id) return res.status(401).send('Not signed in.');
-    try {
-      const { rows } = await pool.query('SELECT content,file_name FROM idk_programs WHERE user_id=$1 AND program_id=$2', [id, String(req.params.programId)]);
-      if (!rows[0]) return res.sendStatus(404);
-      res.type('html').set('Content-Disposition', `inline; filename="${String(rows[0].file_name || 'program.html').replace(/[^\w.-]/g, '_')}"`).send(rows[0].content);
-    } catch (error) { console.error('Program content read failed:', error); res.status(500).send('Could not load the program.'); }
+    if (!pool) return res.status(503).send('Persistent database is not configured.'); const id = userFromReq(req); if (!id) return res.status(401).send('Not signed in.');
+    try { const { rows } = await pool.query('SELECT content,file_name FROM idk_programs WHERE user_id=$1 AND program_id=$2', [id, String(req.params.programId)]); if (!rows[0]) return res.sendStatus(404); res.type('html').set('Content-Disposition', `inline; filename="${String(rows[0].file_name || 'program.html').replace(/[^\w.-]/g, '_')}"`).send(rows[0].content); }
+    catch (error) { console.error('Program content read failed:', error); res.status(500).send('Could not load the program.'); }
   });
 
   app.delete('/api/account/programs/:programId', async (req, res) => {
-    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' });
-    const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
     try { await pool.query('DELETE FROM idk_programs WHERE user_id=$1 AND program_id=$2', [id, String(req.params.programId)]); res.json({ ok: true }); }
     catch (error) { console.error('Program delete failed:', error); res.status(500).json({ ok: false, error: 'Could not remove the program.' }); }
+  });
+
+  app.get('/api/account/files', async (req, res) => {
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    try { const { rows } = await pool.query('SELECT file_id AS id,name,mime,size,updated_at AS updated FROM idk_files WHERE user_id=$1', [id]); res.json({ ok: true, files: rows }); }
+    catch (error) { console.error('File list failed:', error); res.status(500).json({ ok: false, error: 'Could not load your files.' }); }
+  });
+
+  app.post('/api/account/files', async (req, res) => {
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    const fileId = String(req.body?.id || '').slice(0, 160), name = String(req.body?.name || '').slice(0, 255), mime = String(req.body?.mime || 'application/octet-stream').slice(0, 160), encoded = String(req.body?.contentBase64 || '');
+    if (!fileId || !name || !encoded) return res.status(400).json({ ok: false, error: 'File metadata and content are required.' });
+    let content; try { content = Buffer.from(encoded, 'base64'); } catch { return res.status(400).json({ ok: false, error: 'Invalid file content.' }); }
+    if (content.length > 15 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'Files must be smaller than 15 MB.' });
+    try { await pool.query(`INSERT INTO idk_files(user_id,file_id,name,mime,size,content,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,file_id) DO UPDATE SET name=EXCLUDED.name,mime=EXCLUDED.mime,size=EXCLUDED.size,content=EXCLUDED.content,updated_at=NOW()`, [id, fileId, name, mime, content.length, content]); res.status(201).json({ ok: true }); }
+    catch (error) { console.error('File upload failed:', error); res.status(500).json({ ok: false, error: 'Could not save the file.' }); }
+  });
+
+  app.get('/api/account/files/:fileId/content', async (req, res) => {
+    if (!pool) return res.status(503).send('Persistent database is not configured.'); const id = userFromReq(req); if (!id) return res.status(401).send('Not signed in.');
+    try { const { rows } = await pool.query('SELECT content,mime,name FROM idk_files WHERE user_id=$1 AND file_id=$2', [id, String(req.params.fileId)]); if (!rows[0]) return res.sendStatus(404); res.type(rows[0].mime || 'application/octet-stream').set('Content-Disposition', `inline; filename="${String(rows[0].name || 'file').replace(/[^\w.-]/g, '_')}"`).send(rows[0].content); }
+    catch (error) { console.error('File content read failed:', error); res.status(500).send('Could not load the file.'); }
+  });
+
+  app.delete('/api/account/files/:fileId', async (req, res) => {
+    if (!pool) return res.status(503).json({ ok: false, error: 'Persistent database is not configured.' }); const id = userFromReq(req); if (!id) return res.status(401).json({ ok: false, error: 'Not signed in.' });
+    try { await pool.query('DELETE FROM idk_files WHERE user_id=$1 AND file_id=$2', [id, String(req.params.fileId)]); res.json({ ok: true }); }
+    catch (error) { console.error('File delete failed:', error); res.status(500).json({ ok: false, error: 'Could not remove the file.' }); }
   });
 }
