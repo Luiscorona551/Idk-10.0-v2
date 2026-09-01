@@ -334,11 +334,15 @@
   async function syncCloudPrograms() {
     const result = await apiRequest('/api/account/programs');
     if (!result.ok || !Array.isArray(result.programs)) return;
-    write(KEY, result.programs);
+    const merged = new Map();
+    read(KEY, []).forEach(program => { if (program?.id) merged.set(program.id, program); });
+    result.programs.forEach(program => { if (program?.id) merged.set(program.id, { ...merged.get(program.id), ...program }); });
+    const programs = [...merged.values()];
+    write(KEY, programs);
     const layer = document.getElementById('icons');
     if (!layer) return;
     layer.querySelectorAll('[data-installer-program]').forEach(node => node.remove());
-    result.programs.forEach(addShortcut);
+    programs.forEach(addShortcut);
   }
 
   function init() {
