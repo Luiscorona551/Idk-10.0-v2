@@ -32,7 +32,14 @@
   function profile() { if (!user) return; style(); document.getElementById('idk-account-profile')?.remove(); const p = document.createElement('div'); p.id = 'idk-account-profile'; p.innerHTML = `<img src="${esc(user.avatar || 'profile-1.jpg')}" alt=""><span>${esc(user.username)}</span>`; document.body.appendChild(p); }
 
   function localPayload() {
-    return { desktop: { localStorage: readLocal() }, games: readJSON('idkInstalledPrograms', []), cards: readJSON('idkDesktopCards', []), sheets: readJSON('idkSheetsData', {}), messenger: { chatName: readJSON('chatName', ''), profile: readJSON('idkProfile', null) } };
+    return {
+      desktop: { localStorage: readLocal() },
+      games: readJSON('idkInstalledPrograms', []),
+      cards: readJSON('idkDesktopCards', []),
+      sheets: readJSON('idkSheetsData', {}),
+      messenger: { chatName: readJSON('chatName', ''), profile: readJSON('idkProfile', null) },
+      featureState: readJSON('idkUltimateState', {})
+    };
   }
 
   async function syncFiles() {
@@ -88,6 +95,7 @@
     if (s.sheets) localStorage.setItem('idkSheetsData', JSON.stringify(s.sheets));
     if (s.messenger?.chatName !== undefined) localStorage.setItem('chatName', JSON.stringify(s.messenger.chatName));
     if (s.messenger?.profile !== undefined) localStorage.setItem('idkProfile', JSON.stringify(s.messenger.profile));
+    if (s.feature_state !== undefined) writeJSON('idkUltimateState', s.feature_state || {});
     restored = true;
     await restoreFiles();
     window.dispatchEvent(new CustomEvent('idk-account-restored', { detail: { user, state: s } }));
