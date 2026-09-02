@@ -3,7 +3,11 @@
 
   const POS_KEY = 'idkDesktopIconPositions';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
-  const VERSION = '4-original-two-column';
+  const VERSION = '5-clean-two-column-no-overlap';
+  const CELL_W = 122;
+  const CELL_H = 122;
+  const LEFT = 22;
+  const TOP = 176;
 
   function read(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
@@ -11,97 +15,86 @@
   function write(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   }
-
-  function getRoot() { return document.querySelector('#icons'); }
-
-  function getIcons(root) {
-    return [...root.children].filter(el => el instanceof HTMLElement && (
+  function root() { return document.querySelector('#icons'); }
+  function icons(r) {
+    return [...r.children].filter(el => el instanceof HTMLElement && (
       el.classList.contains('desktop-icon') || el.dataset.appId || el.dataset.app || el.dataset.id
     ));
   }
-
   function keyFor(el, index) {
-    return el.dataset.appId || el.dataset.app || el.dataset.id ||
-      el.getAttribute('aria-label') || el.title || `desktop-icon-${index}`;
+    return el.dataset.appId || el.dataset.app || el.dataset.id || el.getAttribute('aria-label') || el.title || `desktop-icon-${index}`;
   }
-
-  function isAppsShortcut(el) {
+  function isDuplicateApps(el) {
     const id = String(el.dataset.appId || el.dataset.app || el.dataset.id || '').toLowerCase();
-    const title = String(el.getAttribute('title') || '').trim().toLowerCase();
     const label = String(el.querySelector('.label')?.textContent || el.textContent || '').trim().toLowerCase();
-    return id === 'apps' || title === 'apps' || label === 'apps';
+    return id === 'apps' || label === 'apps';
+  }
+  function removeDuplicateApps(r) {
+    icons(r).filter(isDuplicateApps).forEach(el => el.remove());
   }
 
-  function removeDuplicateAppsShortcut(root) {
-    getIcons(root).filter(isAppsShortcut).forEach(el => el.remove());
-  }
+  function apply() {
+    const r = root();
+    if (!r) return false;
+    removeDuplicateApps(r);
+    const list = icons(r);
+    if (!list.length) return false;
 
-  function applyGrid() {
-    const root = getRoot();
-    if (!root) return false;
-    removeDuplicateAppsShortcut(root);
+    r.style.position = 'absolute';
+    r.style.left = '20px';
+    r.style.top = '106px';
+    r.style.display = 'block';
+    r.style.width = '280px';
+    r.style.maxHeight = 'calc(100% - 150px)';
+    r.style.overflow = 'visible';
 
-    const icons = getIcons(root);
-    if (!icons.length) return false;
-
-    root.style.position = 'relative';
-    root.style.overflow = 'visible';
-
-    // Match the original IDK desktop: two clean columns, then the next row.
-    const columns = 2;
-    const cellW = 122;
-    const cellH = 112;
-    const left = 22;
-    const top = 176;
     const positions = {};
-
-    icons.forEach((el, index) => {
-      const key = keyFor(el, index);
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      const x = left + col * cellW;
-      const y = top + row * cellH;
+    list.forEach((el, i) => {
+      // Never use the old broken saved coordinates for the initial reset.
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = LEFT + col * CELL_W;
+      const y = TOP + row * CELL_H;
+      const key = keyFor(el, i);
       positions[key] = { left: x, top: y };
 
-      el.style.position = 'absolute';
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
-      el.style.right = 'auto';
-      el.style.bottom = 'auto';
-      el.style.transform = 'none';
-      el.style.width = '96px';
-      el.style.minWidth = '96px';
-      el.style.height = '102px';
-      el.style.minHeight = '102px';
-      el.style.padding = '5px 2px';
-      el.style.margin = '0';
-      el.style.display = 'flex';
-      el.style.flexDirection = 'column';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'flex-start';
-      el.style.boxSizing = 'border-box';
-      el.style.overflow = 'visible';
+      el.style.setProperty('position', 'absolute', 'important');
+      el.style.setProperty('left', `${x}px`, 'important');
+      el.style.setProperty('top', `${y}px`, 'important');
+      el.style.setProperty('right', 'auto', 'important');
+      el.style.setProperty('bottom', 'auto', 'important');
+      el.style.setProperty('transform', 'none', 'important');
+      el.style.setProperty('width', '96px', 'important');
+      el.style.setProperty('min-width', '96px', 'important');
+      el.style.setProperty('height', '108px', 'important');
+      el.style.setProperty('min-height', '108px', 'important');
+      el.style.setProperty('padding', '4px 2px', 'important');
+      el.style.setProperty('margin', '0', 'important');
+      el.style.setProperty('display', 'flex', 'important');
+      el.style.setProperty('flex-direction', 'column', 'important');
+      el.style.setProperty('align-items', 'center', 'important');
+      el.style.setProperty('justify-content', 'flex-start', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
+      el.style.setProperty('overflow', 'visible', 'important');
 
       const glyph = el.querySelector('.glyph');
       if (glyph) {
-        glyph.style.width = '48px';
-        glyph.style.height = '48px';
-        glyph.style.flex = '0 0 48px';
-        glyph.style.margin = '0 auto 5px';
+        glyph.style.setProperty('width', '48px', 'important');
+        glyph.style.setProperty('height', '48px', 'important');
+        glyph.style.setProperty('flex', '0 0 48px', 'important');
+        glyph.style.setProperty('margin', '0 auto 5px', 'important');
       }
-
       const label = el.querySelector('.label');
       if (label) {
-        label.style.width = '96px';
-        label.style.maxWidth = '96px';
-        label.style.minHeight = '34px';
-        label.style.margin = '0';
-        label.style.textAlign = 'center';
-        label.style.whiteSpace = 'normal';
-        label.style.lineHeight = '1.15';
-        label.style.overflow = 'visible';
-        label.style.textOverflow = 'clip';
-        label.style.wordBreak = 'normal';
+        label.style.setProperty('width', '96px', 'important');
+        label.style.setProperty('max-width', '96px', 'important');
+        label.style.setProperty('min-height', '38px', 'important');
+        label.style.setProperty('margin', '0', 'important');
+        label.style.setProperty('text-align', 'center', 'important');
+        label.style.setProperty('white-space', 'normal', 'important');
+        label.style.setProperty('line-height', '1.15', 'important');
+        label.style.setProperty('overflow', 'visible', 'important');
+        label.style.setProperty('word-break', 'normal', 'important');
       }
     });
 
@@ -115,39 +108,20 @@
     return true;
   }
 
-  function boot() {
-    const root = getRoot();
-    if (!root) return;
-    const versionChanged = localStorage.getItem(VERSION_KEY) !== VERSION;
-    if (versionChanged) {
+  function resetOnce() {
+    if (localStorage.getItem(VERSION_KEY) !== VERSION) {
       write(POS_KEY, {});
       localStorage.setItem(VERSION_KEY, VERSION);
-      applyGrid();
-    } else if (!localStorage.getItem(POS_KEY)) {
-      applyGrid();
-    } else {
-      // Always remove the duplicate Apps shortcut, then enforce the two-column layout.
-      applyGrid();
+      return true;
     }
-  }
-
-  function watchForApps() {
-    const root = getRoot();
-    if (!root) return;
-    let timer = null;
-    const observer = new MutationObserver(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => applyGrid(), 60);
-    });
-    observer.observe(root, { childList: true });
-    window.addEventListener('resize', () => applyGrid());
+    return false;
   }
 
   function start() {
-    boot();
-    setTimeout(boot, 300);
-    setTimeout(boot, 1000);
-    setTimeout(watchForApps, 1200);
+    resetOnce();
+    apply();
+    setTimeout(apply, 500);
+    setTimeout(apply, 1500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
