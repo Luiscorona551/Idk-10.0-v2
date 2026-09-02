@@ -50,7 +50,7 @@ server.on('upgrade', (req, socket, head) => {
   else socket.destroy();
 });
 const port = Number(process.env.PORT) || 8080, host = process.env.HOST || '0.0.0.0', protocol = httpsKey && httpsCert ? 'https' : 'http';
-Promise.all([initAccountDb(), initFriendsDb()]).then(() => server.listen(port, host, () => {
+initAccountDb().then(() => initFriendsDb()).then(() => server.listen(port, host, () => {
   console.log(`UGS listening on ${protocol}://${host}:${port}`);
   console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
 })).catch(error => { console.error('IDK database initialization failed:', error); process.exit(1); });
