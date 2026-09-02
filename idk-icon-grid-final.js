@@ -3,7 +3,7 @@
 
   const POS_KEY = 'idkDesktopIconPositions';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
-  const VERSION = '3';
+  const VERSION = '4-original-two-column';
 
   function read(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
@@ -12,9 +12,7 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   }
 
-  function getRoot() {
-    return document.querySelector('#icons');
-  }
+  function getRoot() { return document.querySelector('#icons'); }
 
   function getIcons(root) {
     return [...root.children].filter(el => el instanceof HTMLElement && (
@@ -27,18 +25,31 @@
       el.getAttribute('aria-label') || el.title || `desktop-icon-${index}`;
   }
 
-  function applyGrid(forceReset = false) {
+  function isAppsShortcut(el) {
+    const id = String(el.dataset.appId || el.dataset.app || el.dataset.id || '').toLowerCase();
+    const title = String(el.getAttribute('title') || '').trim().toLowerCase();
+    const label = String(el.querySelector('.label')?.textContent || el.textContent || '').trim().toLowerCase();
+    return id === 'apps' || title === 'apps' || label === 'apps';
+  }
+
+  function removeDuplicateAppsShortcut(root) {
+    getIcons(root).filter(isAppsShortcut).forEach(el => el.remove());
+  }
+
+  function applyGrid() {
     const root = getRoot();
     if (!root) return false;
+    removeDuplicateAppsShortcut(root);
+
     const icons = getIcons(root);
     if (!icons.length) return false;
 
     root.style.position = 'relative';
     root.style.overflow = 'visible';
 
-    const isNarrow = window.innerWidth < 620;
-    const columns = isNarrow ? 2 : 3;
-    const cellW = isNarrow ? 94 : 108;
+    // Match the original IDK desktop: two clean columns, then the next row.
+    const columns = 2;
+    const cellW = 122;
     const cellH = 112;
     const left = 22;
     const top = 176;
@@ -58,10 +69,10 @@
       el.style.right = 'auto';
       el.style.bottom = 'auto';
       el.style.transform = 'none';
-      el.style.width = '88px';
-      el.style.minWidth = '88px';
-      el.style.height = '100px';
-      el.style.minHeight = '100px';
+      el.style.width = '96px';
+      el.style.minWidth = '96px';
+      el.style.height = '102px';
+      el.style.minHeight = '102px';
       el.style.padding = '5px 2px';
       el.style.margin = '0';
       el.style.display = 'flex';
@@ -73,15 +84,16 @@
 
       const glyph = el.querySelector('.glyph');
       if (glyph) {
-        glyph.style.width = '46px';
-        glyph.style.height = '46px';
-        glyph.style.flex = '0 0 46px';
+        glyph.style.width = '48px';
+        glyph.style.height = '48px';
+        glyph.style.flex = '0 0 48px';
         glyph.style.margin = '0 auto 5px';
       }
+
       const label = el.querySelector('.label');
       if (label) {
-        label.style.width = '88px';
-        label.style.maxWidth = '88px';
+        label.style.width = '96px';
+        label.style.maxWidth = '96px';
         label.style.minHeight = '34px';
         label.style.margin = '0';
         label.style.textAlign = 'center';
@@ -108,61 +120,27 @@
     if (!root) return;
     const versionChanged = localStorage.getItem(VERSION_KEY) !== VERSION;
     if (versionChanged) {
-      // Reset old, uneven positions once, then keep normal dragging afterward.
       write(POS_KEY, {});
       localStorage.setItem(VERSION_KEY, VERSION);
-      applyGrid(true);
+      applyGrid();
     } else if (!localStorage.getItem(POS_KEY)) {
-      applyGrid(true);
+      applyGrid();
+    } else {
+      // Always remove the duplicate Apps shortcut, then enforce the two-column layout.
+      applyGrid();
     }
   }
 
   function watchForApps() {
     const root = getRoot();
     if (!root) return;
+    let timer = null;
     const observer = new MutationObserver(() => {
-      const icons = getIcons(root);
-      if (!icons.length) return;
-      // Only place genuinely new icons; never rearrange existing dragged icons.
-      const positions = read(POS_KEY, {});
-      let changed = false;
-      icons.forEach((el, index) => {
-        const key = keyFor(el, index);
-        if (positions[key]) return;
-        const columns = window.innerWidth < 620 ? 2 : 3;
-        const used = Object.keys(positions).length;
-        const col = used % columns;
-        const row = Math.floor(used / columns);
-        positions[key] = { left: 22 + col * (window.innerWidth < 620 ? 94 : 108), top: 176 + row * 112 };
-        changed = true;
-      });
-      if (changed) {
-        write(POS_KEY, positions);
-        icons.forEach((el, index) => {
-          const p = positions[keyFor(el, index)];
-          if (p) { el.style.left = `${p.left}px`; el.style.top = `${p.top}px`; }
-        });
-      }
+      clearTimeout(timer);
+      timer = setTimeout(() => applyGrid(), 60);
     });
     observer.observe(root, { childList: true });
-    window.addEventListener('resize', () => {
-      // Keep the established grid; only reset on a major viewport change if icons would collide.
-      const icons = getIcons(root);
-      const columns = window.innerWidth < 620 ? 2 : 3;
-      icons.forEach((el, index) => {
-        const key = keyFor(el, index);
-        const positions = read(POS_KEY, {});
-        if (!positions[key]) return;
-        const p = positions[key];
-        const maxX = Math.max(0, root.clientWidth - el.offsetWidth);
-        if (p.left > maxX) {
-          p.left = Math.max(8, maxX);
-          positions[key] = p;
-          el.style.left = `${p.left}px`;
-        }
-      });
-      write(POS_KEY, read(POS_KEY, {}));
-    });
+    window.addEventListener('resize', () => applyGrid());
   }
 
   function start() {
