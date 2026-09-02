@@ -2,8 +2,9 @@
   'use strict';
 
   const removeLegacyLaunchers = () => {
+    // Only remove the old explicitly-marked launchers. The live Messenger
+    // desktop icon is intentionally kept.
     document.querySelectorAll('[data-final-app="chat"],[data-final-app="dm"]').forEach(el => el.remove());
-    document.querySelectorAll('.desktop-icon[data-app="chat"]').forEach(el => el.remove());
     document.querySelectorAll('.idk-chat-app,.idk-dm-app').forEach(el => el.closest('.idk-feature-overlay')?.remove());
   };
 
@@ -21,16 +22,33 @@
       .idk-live-dm .idk-live-message-meta{font-size:11px;opacity:.72;margin-bottom:3px}
       .idk-live-dm .idk-live-compose{padding:10px!important;border-top:1px solid rgba(255,255,255,.08)!important}
       .idk-live-dm .idk-live-compose .field{border-radius:18px!important}
+      .idk-live-dm .idk-live-main{min-width:0}
+      @media(max-width:700px){
+        .idk-live-body{grid-template-columns:1fr!important}
+        .idk-live-members{max-height:150px;overflow:auto}
+        .idk-live-compose{display:flex;gap:8px}
+        .idk-live-compose .field{min-width:0;flex:1}
+      }
     `;
     document.head.append(s);
   };
 
+  const openMessenger = () => window.IdkMessenger?.open?.();
+
   const routeStartMessenger = event => {
-    const target = event.target.closest('#start-apps .start-app, #start-recent .recent-app');
+    const target = event.target.closest?.('#start-apps .start-app, #start-recent .recent-app');
     if (!target || !/Idk Messenger/i.test(target.textContent || '')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    window.IdkMessenger?.open?.();
+    openMessenger();
+  };
+
+  const routeMessengerIcon = event => {
+    const target = event.target.closest?.('[data-live-messenger], .idk-final-desktop-icon');
+    if (!target || !/Idk Messenger/i.test(target.textContent || target.getAttribute('aria-label') || '')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openMessenger();
   };
 
   const refineMessenger = () => {
@@ -43,16 +61,12 @@
     const room = messenger.querySelector('[data-tab="room"]');
     if (room) room.textContent = '💬 Chat Room';
     const icon = document.querySelector('[data-live-messenger]');
-    if (icon && !icon.dataset.singleClick) {
-      icon.dataset.singleClick = '1';
-      icon.ondblclick = null;
-      icon.onclick = () => window.IdkMessenger?.open?.();
-      icon.setAttribute('aria-label', 'Open Idk Messenger');
-    }
+    if (icon) icon.setAttribute('aria-label', 'Open Idk Messenger');
   };
 
   const init = () => {
     document.addEventListener('click', routeStartMessenger, true);
+    document.addEventListener('click', routeMessengerIcon, true);
     removeLegacyLaunchers();
     style();
     const observer = new MutationObserver(refineMessenger);
