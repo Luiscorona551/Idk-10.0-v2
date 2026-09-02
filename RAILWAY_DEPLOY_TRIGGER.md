@@ -2,4 +2,4 @@
 
 Latest IDK 10.0 deployment is on the main branch.
 
-Restored the full desktop app set into organized columns with vertical scrolling so all installed desktop apps remain accessible without overlapping.
+Final desktop layout: Apps desktop shortcut removed completely; Messenger, IDK Sheets, and Program Installer are separated into their own dedicated top area, with the remaining desktop apps continuing in organized columns with vertical scrolling.
