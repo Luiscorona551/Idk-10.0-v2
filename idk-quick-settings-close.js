@@ -20,7 +20,6 @@
       }
     }
 
-    // Fallback: find the visible element that actually owns the Quick Settings heading.
     const heading = [...document.querySelectorAll('h1,h2,h3,h4,strong,b,div,section,aside')]
       .find(el => /IDK Quick Settings/i.test((el.textContent || '').trim()) && el.children.length < 8);
     if (!heading) return null;
@@ -49,25 +48,12 @@
     close.setAttribute('aria-label', 'Close Quick Settings');
     close.title = 'Close Quick Settings';
     close.style.cssText = [
-      'position:absolute!important',
-      'top:8px!important',
-      'right:8px!important',
-      'z-index:2147483647!important',
-      'width:36px!important',
-      'height:36px!important',
-      'padding:0!important',
-      'margin:0!important',
-      'border:2px solid rgba(255,255,255,.8)!important',
-      'border-radius:8px!important',
-      'background:#17366f!important',
-      'color:#fff!important',
-      'font:700 26px/30px Arial,sans-serif!important',
-      'cursor:pointer!important',
-      'display:grid!important',
-      'place-items:center!important',
-      'box-sizing:border-box!important'
+      'position:absolute!important','top:8px!important','right:8px!important','z-index:2147483647!important',
+      'width:36px!important','height:36px!important','padding:0!important','margin:0!important',
+      'border:2px solid rgba(255,255,255,.8)!important','border-radius:8px!important',
+      'background:#17366f!important','color:#fff!important','font:700 26px/30px Arial,sans-serif!important',
+      'cursor:pointer!important','display:grid!important','place-items:center!important','box-sizing:border-box!important'
     ].join(';');
-
     close.addEventListener('pointerdown', e => e.stopPropagation());
     close.addEventListener('click', e => {
       e.preventDefault();
@@ -76,13 +62,31 @@
       panel.setAttribute('aria-hidden', 'true');
       panel.dataset.idkQuickClosed = '1';
     });
-
     panel.appendChild(close);
+  }
+
+  // Remove only the duplicate desktop shortcut named exactly "Apps".
+  // The main Apps program remains available and is not modified.
+  function removeDuplicateAppsShortcut() {
+    const root = document.querySelector('#icons');
+    if (!root) return;
+    [...root.children].forEach(el => {
+      if (!(el instanceof HTMLElement)) return;
+      const label = el.querySelector('.label');
+      const text = (label?.textContent || el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text === 'Apps') {
+        el.remove();
+      }
+    });
   }
 
   function boot() {
     install();
-    const observer = new MutationObserver(install);
+    removeDuplicateAppsShortcut();
+    const observer = new MutationObserver(() => {
+      install();
+      removeDuplicateAppsShortcut();
+    });
     observer.observe(document.body, {
       childList: true,
       subtree: true,
@@ -90,8 +94,11 @@
       attributeFilter: ['style', 'class', 'hidden']
     });
     setTimeout(install, 250);
+    setTimeout(removeDuplicateAppsShortcut, 250);
     setTimeout(install, 750);
+    setTimeout(removeDuplicateAppsShortcut, 750);
     setTimeout(install, 1500);
+    setTimeout(removeDuplicateAppsShortcut, 1500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
