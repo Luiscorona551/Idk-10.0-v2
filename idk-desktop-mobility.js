@@ -4,7 +4,6 @@
   const POS_KEY = 'idkDesktopIconPositions';
   const SUITE_KEY = 'idkCompleteSuiteState';
   let dragState = null;
-  let initialized = false;
 
   const readJSON = (key, fallback) => {
     try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
@@ -32,10 +31,9 @@
   }
 
   function desktopIcons(root) {
-    return [...root.children].filter(el => {
-      if (!(el instanceof HTMLElement)) return false;
-      return el.classList.contains('desktop-icon') || !!el.dataset.appId || !!el.dataset.app || !!el.getAttribute('data-id');
-    });
+    return [...root.children].filter(el => el instanceof HTMLElement && (
+      el.classList.contains('desktop-icon') || el.dataset.appId || el.dataset.app || el.getAttribute('data-id')
+    ));
   }
 
   function applySaved(el, root, positions) {
@@ -110,7 +108,6 @@
 
     el.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
-      if (e.target.closest('button,input,textarea,select,a') && e.target !== el) return;
       const rootRect = root.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       dragState = {
@@ -133,17 +130,14 @@
       el.style.cursor = 'grabbing';
       const maxX = Math.max(0, root.clientWidth - el.offsetWidth);
       const maxY = Math.max(0, root.clientHeight - el.offsetHeight);
-      const left = Math.max(0, Math.min(maxX, e.clientX - dragState.rootLeft - dragState.offsetX));
-      const top = Math.max(0, Math.min(maxY, e.clientY - dragState.rootTop - dragState.offsetY));
-      el.style.left = `${left}px`;
-      el.style.top = `${top}px`;
+      el.style.left = `${Math.max(0, Math.min(maxX, e.clientX - dragState.rootLeft - dragState.offsetX))}px`;
+      el.style.top = `${Math.max(0, Math.min(maxY, e.clientY - dragState.rootTop - dragState.offsetY))}px`;
       e.preventDefault();
     });
 
     const finish = e => {
       if (!dragState || dragState.el !== el || dragState.pointerId !== e.pointerId) return;
-      const wasMoved = dragState.moved;
-      if (wasMoved) {
+      if (dragState.moved) {
         positions[key] = { left: parseInt(el.style.left, 10) || 0, top: parseInt(el.style.top, 10) || 0 };
         savePositions(positions);
         el.dataset.idkDragged = '1';
@@ -170,7 +164,6 @@
     root.style.overflow = 'visible';
     const positions = normalizePositions(root, icons);
     icons.forEach(el => makeDraggable(el, root, positions));
-    initialized = true;
     return true;
   }
 
@@ -192,7 +185,6 @@
       e.preventDefault();
       e.stopPropagation();
       panel.style.display = 'none';
-      panel.setAttribute('hidden', '');
     });
     panel.appendChild(btn);
   }
@@ -215,12 +207,6 @@
     icon.style.position = 'absolute';
     icon.style.width = '84px';
     icon.style.minWidth = '84px';
-    if (!icon.style.left && !icon.style.top) {
-      const occupied = desktopIcons(root).filter(x => x !== icon);
-      const index = Math.min(occupied.length, 6);
-      icon.style.left = `${20 + (index % 2) * 92}px`;
-      icon.style.top = `${20 + Math.floor(index / 2) * 92}px`;
-    }
   }
 
   function observe() {
@@ -231,7 +217,7 @@
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class','hidden'] });
     window.addEventListener('resize', () => { setupDragging(); normalizeTV(); });
-    window.addEventListener('idk-account-restored', () => setTimeout(() => { initialized = false; setupDragging(); closeQuickSettings(); }, 100));
+    window.addEventListener('idk-account-restored', () => setTimeout(() => { setupDragging(); closeQuickSettings(); }, 100));
   }
 
   function boot() {
@@ -239,7 +225,6 @@
     run();
     setTimeout(run, 250);
     setTimeout(run, 1000);
-  
     observe();
   }
 
