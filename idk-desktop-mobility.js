@@ -34,10 +34,7 @@
   function desktopIcons(root) {
     return [...root.children].filter(el => {
       if (!(el instanceof HTMLElement)) return false;
-      if (el.matches('[data-window], .window, .taskbar, .dock, .start-menu')) return false;
-      return !!(el.dataset.appId || el.dataset.app || el.getAttribute('data-id') ||
-        el.querySelector('.icon-label,.label,.desktop-icon-label') ||
-        /^(app|icon|desktop)/i.test(el.className || ''));
+      return el.classList.contains('desktop-icon') || !!el.dataset.appId || !!el.dataset.app || !!el.getAttribute('data-id');
     });
   }
 
@@ -75,13 +72,45 @@
     el.style.cursor = 'grab';
     el.style.userSelect = 'none';
     el.style.position = 'absolute';
+    el.style.width = '84px';
+    el.style.minWidth = '84px';
+    el.style.minHeight = '78px';
+    el.style.height = 'auto';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'flex-start';
+    el.style.padding = '6px 4px 5px';
+    el.style.textAlign = 'center';
+    el.style.lineHeight = '1.15';
+    el.style.overflow = 'visible';
+
+    const glyph = el.querySelector('.glyph');
+    const label = el.querySelector('.label');
+    if (glyph) {
+      glyph.style.display = 'block';
+      glyph.style.width = '44px';
+      glyph.style.height = '44px';
+      glyph.style.flex = '0 0 44px';
+      glyph.style.margin = '0 auto 4px';
+    }
+    if (label) {
+      label.style.display = 'block';
+      label.style.width = '100%';
+      label.style.maxWidth = '84px';
+      label.style.minHeight = '30px';
+      label.style.whiteSpace = 'normal';
+      label.style.overflow = 'visible';
+      label.style.textOverflow = 'clip';
+      label.style.wordBreak = 'normal';
+    }
 
     const key = iconKey(el);
     applySaved(el, root, positions);
 
     el.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
-      if (e.target.closest('button,input,textarea,select,a')) return;
+      if (e.target.closest('button,input,textarea,select,a') && e.target !== el) return;
       const rootRect = root.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       dragState = {
@@ -118,7 +147,7 @@
         positions[key] = { left: parseInt(el.style.left, 10) || 0, top: parseInt(el.style.top, 10) || 0 };
         savePositions(positions);
         el.dataset.idkDragged = '1';
-        setTimeout(() => { delete el.dataset.idkDragged; }, 80);
+        setTimeout(() => { delete el.dataset.idkDragged; }, 120);
       }
       el.classList.remove('idk-dragging');
       el.style.cursor = 'grab';
@@ -138,7 +167,7 @@
     const icons = desktopIcons(root);
     if (!icons.length) return false;
     if (getComputedStyle(root).position === 'static') root.style.position = 'relative';
-    root.style.overflow = 'hidden';
+    root.style.overflow = 'visible';
     const positions = normalizePositions(root, icons);
     icons.forEach(el => makeDraggable(el, root, positions));
     initialized = true;
@@ -146,35 +175,46 @@
   }
 
   function closeQuickSettings() {
-    const candidates = [...document.querySelectorAll('[role="dialog"], .quick-settings, .quick-settings-panel, .idk-quick-settings, .control-center, .idk-control-center')];
-    const panel = candidates.find(el => /quick settings|control center/i.test(el.textContent || '') && el.offsetParent !== null);
+    const direct = document.querySelector('#idk-complete-quick');
+    const candidates = direct ? [direct] : [...document.querySelectorAll('[role="dialog"], .quick-settings, .quick-settings-panel, .idk-quick-settings, .control-center, .idk-control-center')];
+    const panel = candidates.find(el => el && el.offsetParent !== null && (el.id === 'idk-complete-quick' || /quick settings|control center/i.test(el.textContent || '')));
     if (!panel || panel.querySelector('.idk-qs-close')) return;
-    const header = panel.querySelector('header,.panel-header,.title,.quick-settings-header') || panel.firstElementChild || panel;
+
+    panel.style.position = panel.style.position || 'fixed';
     const btn = document.createElement('button');
     btn.className = 'idk-qs-close';
     btn.type = 'button';
     btn.setAttribute('aria-label', 'Close Quick Settings');
+    btn.title = 'Close Quick Settings';
     btn.textContent = '×';
-    btn.style.cssText = 'float:right;margin:0 0 0 8px;border:0;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:7px;';
-    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); panel.style.display = 'none'; });
-    header.appendChild(btn);
+    btn.style.cssText = 'position:absolute;top:8px;right:8px;z-index:20;width:32px;height:32px;padding:0;border:1px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(10,25,55,.78);color:#fff;font:700 24px/28px Arial,sans-serif;cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);';
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      panel.style.display = 'none';
+      panel.setAttribute('hidden', '');
+    });
+    panel.appendChild(btn);
   }
 
   function normalizeTV() {
-    const els = [...document.querySelectorAll('#icons *')].filter(el => el instanceof HTMLElement);
+    const root = getIconsRoot();
+    if (!root) return;
+    const els = [...root.querySelectorAll('*')].filter(el => el instanceof HTMLElement);
     const tv = els.find(el => {
       const text = (el.textContent || '').trim();
       const label = `${el.getAttribute('aria-label') || ''} ${el.title || ''}`;
       return /\bTV\b|television/i.test(text) || /\bTV\b|television/i.test(label);
     });
     if (!tv) return;
-    let icon = tv.closest('[data-app-id],[data-app],[data-id]') || tv.closest('.desktop-icon,.app-icon,.icon') || tv;
-    const root = getIconsRoot();
-    if (!root || !root.contains(icon)) return;
+    const icon = tv.closest('.desktop-icon,[data-app-id],[data-app],[data-id]') || tv;
+    if (!root.contains(icon)) return;
     icon.style.right = 'auto';
     icon.style.bottom = 'auto';
     icon.style.transform = 'none';
     icon.style.position = 'absolute';
+    icon.style.width = '84px';
+    icon.style.minWidth = '84px';
     if (!icon.style.left && !icon.style.top) {
       const occupied = desktopIcons(root).filter(x => x !== icon);
       const index = Math.min(occupied.length, 6);
@@ -187,11 +227,11 @@
     const observer = new MutationObserver(() => {
       closeQuickSettings();
       normalizeTV();
-      if (!initialized) setupDragging();
+      setupDragging();
     });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
-    window.addEventListener('resize', () => { if (setupDragging()) normalizeTV(); });
-    window.addEventListener('idk-account-restored', () => setTimeout(() => { initialized = false; setupDragging(); }, 100));
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class','hidden'] });
+    window.addEventListener('resize', () => { setupDragging(); normalizeTV(); });
+    window.addEventListener('idk-account-restored', () => setTimeout(() => { initialized = false; setupDragging(); closeQuickSettings(); }, 100));
   }
 
   function boot() {
@@ -199,11 +239,12 @@
     run();
     setTimeout(run, 250);
     setTimeout(run, 1000);
+  
     observe();
   }
 
   const style = document.createElement('style');
-  style.textContent = '#icons .idk-dragging{z-index:9999!important;filter:brightness(1.08);transform:scale(1.03);transition:none!important}.idk-qs-close:hover{background:rgba(127,127,127,.18)!important}';
+  style.textContent = '#icons .desktop-icon.idk-dragging{z-index:9999!important;filter:brightness(1.08);transform:scale(1.03);transition:none!important}.idk-qs-close:hover{background:rgba(60,110,190,.95)!important}.idk-qs-close:focus-visible{outline:2px solid #7eb8ff;outline-offset:2px}';
   document.head.appendChild(style);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true }); else boot();
 })();
