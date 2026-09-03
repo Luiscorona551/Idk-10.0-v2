@@ -79,6 +79,6 @@
   }
   function shortcuts(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openHub()}if(e.key==='Escape'){document.querySelectorAll('.idk-u-window,.idk-u-context').forEach(x=>x.remove())}if(e.altKey&&e.key.toLowerCase()==='t'){e.preventDefault();openTerminal()}}
   function addLauncher(){if(document.querySelector('#idk-ultimate-launcher'))return;const b=document.createElement('button');b.id='idk-ultimate-launcher';b.title='IDK Applications';b.innerHTML='<span>◈</span><small>Apps</small>';b.onclick=openHub;document.body.append(b)}
-  function init(){applyTheme();applyDesktop();addLauncher();document.addEventListener('contextmenu',e=>{if(e.target.closest('#desktop')||e.target.id==='desktop')contextMenu(e)});document.addEventListener('keydown',shortcuts);window.IDKUltimate={openHub,openSettings,openStore,openNotes,openCalendar,openTerminal,openPaint,openMedia,openControl,openTasks};}
+  function init(){applyTheme();applyDesktop();document.addEventListener('contextmenu',e=>{if(e.target.closest('#desktop')||e.target.id==='desktop')contextMenu(e)});document.addEventListener('keydown',shortcuts);window.IDKUltimate={openHub,openSettings,openStore,openNotes,openCalendar,openTerminal,openPaint,openMedia,openControl,openTasks};}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

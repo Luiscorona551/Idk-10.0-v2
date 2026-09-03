@@ -85,6 +85,9 @@ html, body {
   position: absolute;
   top: 14px;
   left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
   padding: 10px 14px 11px;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 16px;
@@ -93,6 +96,20 @@ html, body {
   box-shadow: 0 12px 28px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .08);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
   pointer-events: none;
+}
+
+#clock-info { min-width: 188px; }
+#idk-battery-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(84, 119, 173, .8);
+  border-radius: 7px;
+  color: var(--text);
+  background: rgba(16, 31, 58, .82);
+  font: 11px system-ui, sans-serif;
+  white-space: nowrap;
 }
 
 #clock-time { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 2px; line-height: 1; }
@@ -849,7 +866,9 @@ html, body {
 #desktop[data-motion="off"] *, #desktop[data-motion="off"] *::before, #desktop[data-motion="off"] *::after { animation: none !important; transition: none !important; }
 
 @media (max-width: 700px) {
-  #clock { top: 10px; left: 12px; padding: 8px 11px 9px; }
+  #clock { top: 10px; left: 12px; gap: 9px; padding: 8px 11px 9px; }
+  #clock-info { min-width: 0; }
+  #idk-battery-indicator { padding: 6px 8px; font-size: 10px; }
   #clock-time { font-size: 29px; }
   #clock-date { font-size: 12px; }
   .desktop-icon { width: 76px; }
