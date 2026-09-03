@@ -247,7 +247,7 @@
   }
 
   function scan() {
-    document.querySelectorAll('.speaker-app').forEach(mount);
+    document.querySelectorAll('.speaker-app, .player-app').forEach(mount);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan, { once: true });
