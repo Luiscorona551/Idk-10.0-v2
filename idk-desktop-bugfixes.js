@@ -22,9 +22,7 @@
     if (!dock) return;
     [...dock.children].forEach(item => {
       const text = textOf(item);
-      if (/^apps$/i.test(text) || /\b(?:battery|\d{1,3}%)(?:\b|$)/i.test(text)) {
-        if (item.style.display !== 'none') item.style.setProperty('display', 'none', 'important');
-      }
+      if (/^apps$/i.test(text) || /\b(?:battery|\d{1,3}%)(?:\b|$)/i.test(text)) item.style.setProperty('display', 'none', 'important');
     });
   }
 
@@ -39,14 +37,9 @@
       badge.setAttribute('aria-label', 'IDK battery status');
       badge.innerHTML = '<span class="idk-battery-dot">🔋</span><span>--%</span>';
       const time = document.getElementById('clock-time');
-      if (time) time.appendChild(badge);
-      else clock.appendChild(badge);
+      if (time) time.appendChild(badge); else clock.appendChild(badge);
     }
-
-    if (badge.dataset.idkBatteryBound === '1' || !navigator.getBattery) {
-      if (!navigator.getBattery) badge.querySelector('span:last-child').textContent = 'Battery N/A';
-      return;
-    }
+    if (!navigator.getBattery || badge.dataset.idkBatteryBound === '1') return;
     badge.dataset.idkBatteryBound = '1';
     navigator.getBattery().then(battery => {
       const update = () => {
@@ -57,9 +50,7 @@
       update();
       battery.addEventListener('levelchange', update);
       battery.addEventListener('chargingchange', update);
-    }).catch(() => {
-      badge.querySelector('span:last-child').textContent = 'Battery N/A';
-    });
+    }).catch(() => { badge.querySelector('span:last-child').textContent = 'Battery N/A'; });
   }
 
   function ensureFriendsIcon() {
@@ -76,42 +67,26 @@
     const openFriends = event => {
       event.preventDefault();
       event.stopPropagation();
-      if (window.IdkFriends?.open) {
-        window.IdkFriends.open();
-        setTimeout(() => document.querySelector('.idk-friends-button')?.click(), 250);
-      } else {
-        window.IdkMessenger?.open?.();
-      }
+      if (window.IdkFriends?.open) window.IdkFriends.open();
+      else window.IdkMessenger?.open?.();
     };
     icon.addEventListener('click', openFriends);
     icon.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openFriends(e); });
     root.appendChild(icon);
   }
 
-  function fixDock() { hideOldDockControls(); }
-  function fixClock() { ensureBattery(); }
-  function fixDesktop() { ensureFriendsIcon(); }
-
   function boot() {
     style();
-    fixDock();
-    fixClock();
-    fixDesktop();
-
-    const dock = document.getElementById('dock');
-    const icons = document.getElementById('icons');
-    const clock = document.getElementById('clock');
-
-    if (dock) new MutationObserver(fixDock).observe(dock, { childList: true });
-    if (icons) new MutationObserver(fixDesktop).observe(icons, { childList: true });
-    if (clock) new MutationObserver(fixClock).observe(clock, { childList: true });
-
-    window.addEventListener('resize', fixDesktop, { passive: true });
-    [500, 1500, 3000].forEach(ms => setTimeout(() => {
-      fixDock();
-      fixClock();
-      fixDesktop();
-    }, ms));
+    hideOldDockControls();
+    ensureBattery();
+    ensureFriendsIcon();
+    // One delayed pass lets asynchronously-created desktop controls settle,
+    // without keeping a MutationObserver alive for the entire desktop.
+    setTimeout(() => {
+      hideOldDockControls();
+      ensureBattery();
+      ensureFriendsIcon();
+    }, 1200);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
