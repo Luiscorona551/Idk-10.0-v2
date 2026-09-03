@@ -8,8 +8,10 @@
     const s = document.createElement('style');
     s.id = 'idk-desktop-bugfix-style';
     s.textContent = `
-      #idk-clock-battery{display:inline-flex!important;align-items:center;gap:5px;margin-left:10px;padding:4px 8px;border:1px solid rgba(145,190,255,.38);border-radius:9px;background:rgba(12,35,76,.72);color:#fff;font:700 11px/1 system-ui,sans-serif;vertical-align:middle;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.12)}
+      #idk-clock-battery{display:inline-flex!important;align-items:center;gap:5px;margin-left:10px;padding:4px 8px;border:1px solid rgba(145,190,255,.38);border-radius:9px;background:rgba(12,35,76,.72);color:#fff;font:700 11px/1 system-ui,sans-serif;vertical-align:middle;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.12);position:relative;z-index:3}
       #idk-clock-battery .idk-battery-dot{font-size:12px;line-height:1}
+      #dock .dock-btn[data-app="apps"],#dock .dock-btn[data-id="apps"],#dock .dock-btn[aria-label="Apps"],#dock [title="Apps"],#dock [aria-label="Apps"]{display:none!important}
+      #dock [data-app="apps"],#dock [data-app-id="apps"],#dock [data-id="apps"]{display:none!important}
       @media(max-width:600px){#idk-clock-battery{margin-left:6px;padding:3px 6px;font-size:10px}}
     `;
     document.head.appendChild(s);
@@ -22,7 +24,10 @@
     if (!dock) return;
     [...dock.children].forEach(item => {
       const text = textOf(item);
-      if (/^apps$/i.test(text) || /\b(?:battery|\d{1,3}%)(?:\b|$)/i.test(text)) item.style.setProperty('display', 'none', 'important');
+      const meta = `${item.getAttribute('aria-label') || ''} ${item.getAttribute('title') || ''} ${item.dataset.app || ''} ${item.dataset.appId || ''} ${item.dataset.id || ''} ${item.className || ''}`;
+      const isApps = /^apps$/i.test(text) || /(?:^|[\s_-])apps(?:$|[\s_-])/i.test(meta);
+      const isBattery = /battery|battery-status|battery-percent/i.test(meta) || /(?:^|\s)\d{1,3}%(?:\s|$)/.test(text);
+      if (isApps || isBattery) item.remove();
     });
   }
 
@@ -36,8 +41,7 @@
       badge.id = 'idk-clock-battery';
       badge.setAttribute('aria-label', 'IDK battery status');
       badge.innerHTML = '<span class="idk-battery-dot">🔋</span><span>--%</span>';
-      const time = document.getElementById('clock-time');
-      if (time) time.appendChild(badge); else clock.appendChild(badge);
+      clock.appendChild(badge);
     }
     if (!navigator.getBattery || badge.dataset.idkBatteryBound === '1') return;
     badge.dataset.idkBatteryBound = '1';
@@ -80,8 +84,6 @@
     hideOldDockControls();
     ensureBattery();
     ensureFriendsIcon();
-    // One delayed pass lets asynchronously-created desktop controls settle,
-    // without keeping a MutationObserver alive for the entire desktop.
     setTimeout(() => {
       hideOldDockControls();
       ensureBattery();
