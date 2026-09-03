@@ -2,8 +2,6 @@
   'use strict';
 
   const removeLegacyLaunchers = () => {
-    // Only remove the old explicitly-marked launchers. The live Messenger
-    // desktop icon is intentionally kept.
     document.querySelectorAll('[data-final-app="chat"],[data-final-app="dm"]').forEach(el => el.remove());
     document.querySelectorAll('.idk-chat-app,.idk-dm-app').forEach(el => el.closest('.idk-feature-overlay')?.remove());
   };
@@ -23,12 +21,7 @@
       .idk-live-dm .idk-live-compose{padding:10px!important;border-top:1px solid rgba(255,255,255,.08)!important}
       .idk-live-dm .idk-live-compose .field{border-radius:18px!important}
       .idk-live-dm .idk-live-main{min-width:0}
-      @media(max-width:700px){
-        .idk-live-body{grid-template-columns:1fr!important}
-        .idk-live-members{max-height:150px;overflow:auto}
-        .idk-live-compose{display:flex;gap:8px}
-        .idk-live-compose .field{min-width:0;flex:1}
-      }
+      @media(max-width:700px){.idk-live-body{grid-template-columns:1fr!important}.idk-live-members{max-height:150px;overflow:auto}.idk-live-compose{display:flex;gap:8px}.idk-live-compose .field{min-width:0;flex:1}}
     `;
     document.head.append(s);
   };
@@ -53,7 +46,6 @@
 
   const refineMessenger = () => {
     removeLegacyLaunchers();
-    style();
     const messenger = document.querySelector('.idk-live-messenger');
     if (!messenger) return;
     const dm = messenger.querySelector('[data-tab="dm"]');
@@ -69,10 +61,10 @@
     document.addEventListener('click', routeMessengerIcon, true);
     removeLegacyLaunchers();
     style();
-    const observer = new MutationObserver(refineMessenger);
-    observer.observe(document.body, { childList: true, subtree: true });
     refineMessenger();
-    setTimeout(() => observer.disconnect(), 15000);
+    // Give the live Messenger one follow-up pass after its own UI has mounted,
+    // instead of observing every mutation on the whole document.
+    setTimeout(refineMessenger, 1200);
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
