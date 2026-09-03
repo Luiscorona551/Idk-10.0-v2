@@ -2,12 +2,8 @@
   'use strict';
 
   function removeLegacyInstaller() {
-    // The rebuilt installer is owned by idk-installer-launcher.js.
-    // Remove the legacy apps.js installer entry/controls so there is only one path.
-    try {
-      if (window.APPS && window.APPS.installer) delete window.APPS.installer;
-    } catch {}
-
+    // Keep the shared APPS registry intact. The rebuilt installer owns the
+    // visible installer shortcut; only remove the legacy desktop/start-menu UI.
     document.querySelectorAll('[data-app="installer"]').forEach(node => node.remove());
     document.querySelectorAll('#start-apps .start-app, #start-recent .recent-app').forEach(node => {
       const text = node.textContent || '';
