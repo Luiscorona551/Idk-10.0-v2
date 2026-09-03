@@ -1,0 +1,42 @@
+/* IDK 10.0 bottom-area remodel — preserve the existing visual language. */
+
+/* Start lives on the opposite side of the desktop dock. */
+#start-toggle {
+  left: 16px !important;
+  right: auto !important;
+}
+
+#start-menu {
+  left: 16px !important;
+  right: auto !important;
+}
+
+/* The Apps launcher is already available from Start/Search; don't show a dock copy. */
+#dock .dock-btn[data-app="apps"],
+#dock .dock-btn[data-id="apps"],
+#dock .dock-btn[aria-label="Apps"] {
+  display: none !important;
+}
+
+/* Keep the desktop Apps shortcut hidden too if another script recreates it. */
+#icons .desktop-icon[data-app="apps"],
+#icons .desktop-icon[data-app-id="apps"],
+#icons .desktop-icon[data-id="apps"] {
+  display: none !important;
+}
+
+/* Lift Echo slightly so it doesn't crowd the bottom controls. */
+#echo-companion {
+  bottom: 112px !important;
+}
+
+#desktop[data-dock="right"] #echo-companion {
+  right: 110px !important;
+  bottom: 112px !important;
+}
+
+@media (max-width: 600px) {
+  #start-toggle { left: 10px !important; right: auto !important; }
+  #start-menu { left: 10px !important; right: auto !important; }
+  #echo-companion { bottom: 104px !important; }
+}
