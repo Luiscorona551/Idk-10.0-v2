@@ -1,11 +1,11 @@
 (() => {
   'use strict';
 
-  // Final desktop icon layout: keep the special apps safely below the clock,
-  // and put regular desktop icons into a horizontally scrollable row.
+  // Keep desktop apps anchored to the side. Icons fill downward first;
+  // when there is no more vertical room, they continue in the next column.
   const ROOT = '#icons';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
-  const VERSION = '11-horizontal-scroll-row-safe';
+  const VERSION = '12-side-column-wrap';
   const COL_W = 108;
   const ROW_H = 122;
   const START_X = 8;
@@ -55,7 +55,6 @@
     });
     if (messengers.length <= 1) return;
 
-    // Prefer the live Messenger launcher. Any older/finalized duplicate is removed.
     const keeper = messengers.find(el => el.hasAttribute('data-live-messenger')) || messengers[messengers.length - 1];
     messengers.forEach(el => { if (el !== keeper) el.remove(); });
   }
@@ -72,19 +71,45 @@
     const all = [...r.children].filter(isDesktopIcon);
     const specials = all.filter(isSpecial);
     const regular = all.filter(el => !isSpecial(el));
-    const mobile = window.innerWidth < 700;
-    const specialSlots = mobile ? 2 : 3;
-    const specialRows = Math.max(1, Math.ceil(specials.length / specialSlots));
-    const regularRow = specialRows + 1;
-    const regularCount = Math.max(1, regular.length);
 
-    const contentWidth = Math.max(
-      window.innerWidth,
-      START_X + regularCount * COL_W + 24,
-      START_X + specialSlots * COL_W + 24
+    // Leave a safe gap below the clock. Fill the available vertical space
+    // before creating another column, so icons stay against the side.
+    const availableHeight = Math.max(window.innerHeight - START_Y - 118, ROW_H);
+    const rowsPerColumn = Math.max(1, Math.floor(availableHeight / ROW_H));
+    const mobile = window.innerWidth < 700;
+    const usableRows = mobile ? Math.max(1, Math.min(rowsPerColumn, 4)) : rowsPerColumn;
+
+    const specialRows = Math.max(1, Math.min(usableRows, Math.ceil(specials.length / Math.max(1, Math.floor((window.innerWidth - START_X) / COL_W)))));
+    const specialCols = Math.max(1, Math.ceil(specials.length / specialRows));
+    const regularStartRow = Math.min(usableRows, specialRows);
+    const regularRows = Math.max(1, usableRows - regularStartRow);
+
+    // Specials occupy the first side columns. Regular apps continue below
+    // them and automatically wrap into the next column when the column fills.
+    specials.forEach((el, i) => {
+      const col = Math.floor(i / usableRows);
+      const row = i % usableRows;
+      positionIcon(el, col, row);
+    });
+
+    regular.forEach((el, i) => {
+      const rowOffset = regularStartRow;
+      const row = rowOffset + (i % Math.max(1, regularRows));
+      const col = Math.floor(i / Math.max(1, regularRows));
+      positionIcon(el, col, row);
+    });
+
+    const maxCol = Math.max(
+      0,
+      ...all.map(el => Math.round((parseFloat(el.style.left) - START_X) / COL_W))
     );
+    const maxRow = Math.max(
+      0,
+      ...all.map(el => Math.round((parseFloat(el.style.top) - START_Y) / ROW_H))
+    );
+    const contentWidth = Math.max(window.innerWidth, START_X + (maxCol + 1) * COL_W + 24);
+    const contentHeight = Math.max(window.innerHeight - 112, START_Y + (maxRow + 1) * ROW_H + 32);
     const viewportHeight = Math.max(window.innerHeight - 112, 300);
-    const contentHeight = Math.max(viewportHeight, START_Y + (regularRow + 1) * ROW_H + 32);
 
     r.style.setProperty('position', 'absolute', 'important');
     r.style.setProperty('left', '0', 'important');
@@ -94,8 +119,8 @@
     r.style.setProperty('max-width', '100%', 'important');
     r.style.setProperty('max-height', `${viewportHeight}px`, 'important');
     r.style.setProperty('overflow-x', 'auto', 'important');
-    r.style.setProperty('overflow-y', 'hidden', 'important');
-    r.style.setProperty('touch-action', 'pan-x', 'important');
+    r.style.setProperty('overflow-y', 'auto', 'important');
+    r.style.setProperty('touch-action', 'pan-x pan-y', 'important');
     r.style.setProperty('box-sizing', 'border-box', 'important');
     r.style.setProperty('padding-bottom', '24px', 'important');
     r.style.setProperty('scrollbar-width', 'thin', 'important');
@@ -113,12 +138,6 @@
     spacer.style.setProperty('width', `${contentWidth}px`, 'important');
     spacer.style.setProperty('height', `${contentHeight}px`, 'important');
     spacer.style.setProperty('pointer-events', 'none', 'important');
-
-    specials.forEach((el, i) => {
-      positionIcon(el, i % specialSlots, Math.floor(i / specialSlots));
-    });
-
-    regular.forEach((el, i) => positionIcon(el, i, regularRow));
 
     try {
       localStorage.setItem(VERSION_KEY, VERSION);
