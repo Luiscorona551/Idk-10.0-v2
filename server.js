@@ -13,6 +13,7 @@ import { aiRequest, aiStatus } from './ai.js';
 import { hasSession, setupRoutes } from './setup-gate.js';
 import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-server.js';
 import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
+import { databaseStatus } from './idk-db-health.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
@@ -21,15 +22,15 @@ const root = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
-function backendStatus() { return { ...backend, ai: aiStatus(), database: accountDbEnabled() }; }
+async function backendStatus() { return { ...backend, ai: aiStatus(), database: await databaseStatus() }; }
 app.use(express.json({ limit: '20mb' }));
-const healthHandler = (req, res) => res.status(200).json({ ok: true, service: 'ugs-desktop', https: req.secure, ...backendStatus() });
+const healthHandler = async (req, res) => res.status(200).json({ ok: true, service: 'ugs-desktop', https: req.secure, ...(await backendStatus()) });
 app.get('/healthz', healthHandler);
 app.get('/api/health', healthHandler);
 setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
-app.get('/api/status', (req, res) => res.json({ ok: true, ...backendStatus() }));
+app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));
@@ -37,7 +38,7 @@ app.get('/uv/uv.sw.js', (req, res) => res.type('js').send(uvServiceWorker));
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
-const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-account-server\.js|idk-friends-server\.js|Dockerfile|render\.yaml|\.env)/;
+const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-account-server\.js|idk-friends-server\.js|idk-db-health\.js|Dockerfile|render\.yaml|\.env)/;
 app.use((req, res, next) => (PRIVATE.test(req.path) ? res.sendStatus(404) : next()));
 app.use(express.static(root, { extensions: ['html'], dotfiles: 'ignore' }));
 const httpsKey = process.env.HTTPS_KEY_FILE, httpsCert = process.env.HTTPS_CERT_FILE;
