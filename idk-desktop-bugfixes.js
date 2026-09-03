@@ -20,7 +20,8 @@
   function hideOldDockControls() {
     const dock = document.getElementById('dock');
     if (!dock) return;
-    [...dock.children].forEach(item => {
+    const candidates = dock.querySelectorAll('button,[role="button"],.dock-btn,.dock-item');
+    candidates.forEach(item => {
       const text = textOf(item);
       if (/^apps$/i.test(text) || /\b(?:battery|\d{1,3}%)(?:\b|$)/i.test(text)) {
         item.style.setProperty('display', 'none', 'important');
