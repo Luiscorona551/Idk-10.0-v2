@@ -1,15 +1,15 @@
 (() => {
   'use strict';
 
-  // Final desktop icon layout: keep the special apps at the top, and put
-  // regular desktop icons into a horizontally scrollable row.
+  // Final desktop icon layout: keep the special apps safely below the clock,
+  // and put regular desktop icons into a horizontally scrollable row.
   const ROOT = '#icons';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
-  const VERSION = '10-horizontal-scroll-row';
-  const COL_W = 112;
-  const ROW_H = 118;
-  const START_X = 16;
-  const START_Y = 88;
+  const VERSION = '11-horizontal-scroll-row-safe';
+  const COL_W = 108;
+  const ROW_H = 122;
+  const START_X = 8;
+  const START_Y = 156;
   const SPECIAL = ['messenger', 'idk messenger', 'sheets', 'idk sheets', 'program installer'];
   let applying = false;
   let timer = 0;
@@ -46,6 +46,20 @@
     });
   }
 
+  function removeDuplicateMessengers(r) {
+    const all = [...r.children].filter(isDesktopIcon);
+    const messengers = all.filter(el => {
+      const key = keyOf(el);
+      const text = textOf(el).toLowerCase();
+      return key === 'chat' || key === 'messenger' || key === 'idk messenger' || text === 'messenger' || text === 'idk messenger';
+    });
+    if (messengers.length <= 1) return;
+
+    // Prefer the live Messenger launcher. Any older/finalized duplicate is removed.
+    const keeper = messengers.find(el => el.hasAttribute('data-live-messenger')) || messengers[messengers.length - 1];
+    messengers.forEach(el => { if (el !== keeper) el.remove(); });
+  }
+
   function arrange() {
     if (applying) return;
     const r = getRoot();
@@ -53,6 +67,7 @@
 
     applying = true;
     removeAppsShortcuts(r);
+    removeDuplicateMessengers(r);
 
     const all = [...r.children].filter(isDesktopIcon);
     const specials = all.filter(isSpecial);
@@ -63,8 +78,6 @@
     const regularRow = specialRows + 1;
     const regularCount = Math.max(1, regular.length);
 
-    // The viewport stays screen-width; the spacer establishes the horizontal
-    // scroll width so additional desktop icons can be swiped into view.
     const contentWidth = Math.max(
       window.innerWidth,
       START_X + regularCount * COL_W + 24,
@@ -105,7 +118,6 @@
       positionIcon(el, i % specialSlots, Math.floor(i / specialSlots));
     });
 
-    // Regular icons stay in one row and can be swiped horizontally.
     regular.forEach((el, i) => positionIcon(el, i, regularRow));
 
     try {
@@ -174,9 +186,7 @@
     const r = getRoot();
     if (r) {
       new MutationObserver(mutations => {
-        if (!applying && mutations.some(m => m.type === 'childList' && (m.addedNodes.length || m.removedNodes.length))) {
-          schedule();
-        }
+        if (!applying && mutations.some(m => m.type === 'childList' && (m.addedNodes.length || m.removedNodes.length))) schedule();
       }).observe(r, { childList: true });
     }
     window.addEventListener('resize', schedule, { passive: true });
