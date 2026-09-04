@@ -23,6 +23,7 @@
     return el instanceof HTMLElement && (
       el.classList.contains('desktop-icon') ||
       el.classList.contains('idk-installed-shortcut') ||
+      el.classList.contains('idk-final-desktop-icon') ||
       el.dataset.appId || el.dataset.app || el.dataset.id
     );
   }
@@ -108,14 +109,14 @@
     icon.style.setProperty('justify-content', 'flex-start', 'important');
     icon.style.setProperty('overflow', 'visible', 'important');
 
-    const glyph = icon.querySelector('.glyph,.idk-installed-shortcut-icon');
+    const glyph = icon.querySelector('.glyph,.idk-installed-shortcut-icon,:scope > span:first-child');
     if (glyph) {
       glyph.style.setProperty('width', '48px', 'important');
       glyph.style.setProperty('height', '48px', 'important');
       glyph.style.setProperty('flex', '0 0 48px', 'important');
       glyph.style.setProperty('margin', '0 0 6px', 'important');
     }
-    const label = icon.querySelector('.label,.icon-label,.desktop-icon-label') || icon.querySelector(':scope > span:last-child');
+    const label = icon.querySelector('.label,.icon-label,.desktop-icon-label,:scope > label') || icon.querySelector(':scope > span:last-child');
     if (label) {
       label.style.setProperty('width', '100px', 'important');
       label.style.setProperty('max-width', '100px', 'important');
