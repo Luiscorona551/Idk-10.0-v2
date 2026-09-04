@@ -357,7 +357,7 @@ const OS = (() => {
       audioState = { ...audioState, ...(event.detail || {}) };
       const audio = audioState.audio;
       const youtube = audioState.type === 'youtube';
-      const active = Boolean(audio || youtube);
+      const active = Boolean((audio && (audio.currentSrc || audio.src)) || youtube || audioState.track);
       toggle.textContent = active && audioState.playing ? '❚❚' : '▶';
       toggle.setAttribute('aria-label', active && audioState.playing ? 'Pause music' : 'Play music');
       previous.disabled = !active;
@@ -370,11 +370,12 @@ const OS = (() => {
     };
     toggle.addEventListener('click', () => {
       const audio = audioState.audio;
-      if (window.IDK_MUSIC_PLAYER) {
+      const active = Boolean((audio && (audio.currentSrc || audio.src)) || audioState.type === 'youtube' || audioState.track);
+      if (window.IDK_MUSIC_PLAYER && active) {
         window.IDK_MUSIC_PLAYER.toggle();
         return;
       }
-      if (!audio) {
+      if (!audio || !active) {
         launch('music');
         return;
       }
