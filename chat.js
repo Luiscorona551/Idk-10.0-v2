@@ -77,6 +77,17 @@ chat.on('connection', (socket, req) => {
       send(socket, payload); send(targetSocket, payload); return;
     }
 
+    if (data.type === 'typing' && socket.code) {
+      const current = rooms.get(socket.code);
+      const targetUserId = String(data.targetUserId || '').slice(0, 64);
+      const targetId = String(data.targetId || '').slice(0, 64);
+      const targetSocket = [...(current?.clients ?? [])].find(client => (targetUserId && client.userId === targetUserId) || (!targetUserId && targetId && client.peerId === targetId));
+      const payload = { type: 'typing', private: Boolean(data.private), fromId: socket.peerId, fromUserId: socket.userId || null, name: socket.nick, typing: Boolean(data.typing) };
+      if (payload.private) { if (targetSocket && targetSocket !== socket) send(targetSocket, payload); }
+      else current?.clients.forEach(client => { if (client !== socket) send(client, payload); });
+      return;
+    }
+
     if (data.type === 'moderation' && socket.code) {
       const current = rooms.get(socket.code), actor = current?.members.get(socket.peerId), canModerate = actor?.role === 'owner' || actor?.role === 'moderator';
       if (!current || !canModerate) return send(socket, { type: 'error', text: 'Only the owner or a moderator can moderate members.' });

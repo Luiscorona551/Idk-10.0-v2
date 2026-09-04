@@ -113,6 +113,7 @@
       { label: 'Switch to Desktop 1', action: () => window.IDKFeaturePack?.switchSpace(1) },
       { label: 'Switch to Desktop 2', action: () => window.IDKFeaturePack?.switchSpace(2) },
       { label: 'Switch to Desktop 3', action: () => window.IDKFeaturePack?.switchSpace(3) },
+      { label: 'Backup & Restore', action: () => window.IDKBackup?.open?.() },
       { label: document.body.classList.contains('idk-high-contrast') ? 'Turn off high contrast' : 'Turn on high contrast', action: toggleContrast },
       { label: 'Reset desktop layout', action: () => { localStorage.removeItem('desktopOrder'); localStorage.removeItem('idkDesktopIconPositions'); location.reload(); } }
     ]);
@@ -125,7 +126,7 @@
     panel.innerHTML = '<div class="idk-upgrade-editor-head"><strong>Command palette</strong><button type="button" data-close aria-label="Close">×</button></div><input class="field" data-query placeholder="Search apps or actions…" autocomplete="off"><div class="idk-command-results"></div>';
     const query = panel.querySelector('[data-query]'); const results = panel.querySelector('.idk-command-results');
     const actions = [
-      { title: 'Open widgets', run: renderWidgets }, { title: 'Edit widgets', run: openWidgetEditor }, { title: 'Open Settings', run: () => window.OS?.open('settings') },
+      { title: 'Open widgets', run: renderWidgets }, { title: 'Edit widgets', run: openWidgetEditor }, { title: 'Backup & Restore', run: () => window.IDKBackup?.open?.() }, { title: 'Open Settings', run: () => window.OS?.open('settings') },
       { title: 'Open Files', run: () => window.OS?.open('files') }, { title: 'Open Browser', run: () => window.OS?.open('proxy') }, { title: 'Toggle high contrast', run: toggleContrast },
       ...Object.entries(APPS).filter(([id]) => id !== 'player').map(([id, app]) => ({ title: `Open ${app.title}`, run: () => window.OS?.open(id) }))
     ];
@@ -148,7 +149,8 @@
     const members = root.querySelector('.idk-live-members'); const dmTab = root.querySelector('[data-tab="dm"]'); const dmPane = root.querySelector('[data-pane="dm"]');
     if (!members || !dmTab || !dmPane) return;
     const search = document.createElement('input'); search.className = 'field idk-dm-search'; search.placeholder = 'Find a person…'; search.setAttribute('aria-label', 'Find a person'); members.insertBefore(search, members.querySelector('[data-members]'));
-    const badge = document.createElement('b'); badge.className = 'idk-dm-unread'; badge.hidden = true; badge.textContent = '0'; dmTab.append(badge);
+      if (dmTab.querySelector('[data-badge="dm"], [data-tab-badge="dm"]')) return;
+     const badge = document.createElement('b'); badge.className = 'idk-dm-unread'; badge.hidden = true; badge.textContent = '0'; dmTab.append(badge);
     const filter = () => { const q = search.value.toLowerCase(); members.querySelectorAll('.idk-live-member').forEach(item => { item.hidden = !item.textContent.toLowerCase().includes(q); }); }; search.addEventListener('input', filter);
     let unread = 0; dmTab.addEventListener('click', () => { unread = 0; badge.hidden = true; });
     const decorate = () => { dmPane.querySelectorAll('.idk-live-message').forEach(message => { if (message.querySelector('.idk-reaction')) return; const reaction = button('♡ 0', () => { const active = reaction.classList.toggle('active'); reaction.textContent = `${active ? '♥' : '♡'} ${active ? 1 : 0}`; }, 'idk-reaction'); message.append(reaction); }); if (dmPane.hidden && dmPane.querySelector('.idk-live-message')) { unread += 1; badge.textContent = String(unread); badge.hidden = false; } };

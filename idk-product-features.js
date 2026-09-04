@@ -103,7 +103,7 @@
   }
 
   function dockUtilities() {
-    const dock = document.getElementById('dock'); if (!dock || dock.querySelector('[data-idk-product="store"]')) return; [['store', '🛍️', 'App Store', appCenter], ['update', '⬆️', 'System Updates', updateCenter], ['audio', '🔊', 'Audio Center', audioCenter], ['theme', '🎨', 'Share theme', themeShare]].forEach(([id, icon, title, action]) => { const b = button(icon, action, 'dock-btn idk-product-dock'); b.dataset.idkProduct = id; b.title = title; b.setAttribute('aria-label', title); dock.prepend(b); }); }
+    const dock = document.getElementById('dock'); if (!dock || dock.querySelector('[data-idk-product="store"]')) return; [['store', '🛍️', 'App Store', appCenter], ['update', '⬆️', 'System Updates', updateCenter], ['audio', '🔊', 'Audio Center', audioCenter], ['theme', '🎨', 'Share theme', themeShare], ['backup', '💾', 'Backup & Restore', () => window.IDKBackup?.open?.()]].forEach(([id, icon, title, action]) => { const b = button(icon, action, 'dock-btn idk-product-dock'); b.dataset.idkProduct = id; b.title = title; b.setAttribute('aria-label', title); dock.prepend(b); }); }
 
   function install() { appRail(); installGridControls(); dockUtilities(); applyAudio(); applySafeMode(); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 600); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();

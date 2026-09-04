@@ -1598,9 +1598,11 @@ const APPS = {
       ]);
 
       const log = el('div', { className: 'chat-log' });
-      const text = el('input', { className: 'field', type: 'text', placeholder: 'Message', disabled: true });
-      const send = el('button', { className: 'btn tab', type: 'button', textContent: 'Send', disabled: true });
-      const composer = el('div', { className: 'toolbar' }, [text, send]);
+       const text = el('input', { className: 'field', type: 'text', placeholder: 'Message', disabled: true });
+       const send = el('button', { className: 'btn tab', type: 'button', textContent: 'Send', disabled: true });
+       const typingStatus = el('span', { className: 'count chat-typing', hidden: true, textContent: '' });
+       const dmUnread = el('span', { className: 'count chat-unread', hidden: true, textContent: '0', title: 'Unread personal messages' });
+       const composer = el('div', { className: 'toolbar' }, [text, send, typingStatus, dmUnread]);
 
        let socket = null;
        let currentUserId = '';
@@ -1612,7 +1614,9 @@ const APPS = {
         let connectionId = 0;
         let reconnectAllowed = true;
         let hasJoined = false;
-        let roomUsers = [];
+         let roomUsers = [];
+         let typingTimer = null;
+         let unreadDirect = 0;
 
       const line = (className, body) => {
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -1624,16 +1628,30 @@ const APPS = {
         value.replace(/[&<>"']/g, char =>
           ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
-      const message = (data, announce = false) => {
-        const personal = data.private === true;
-        const prefix = personal ? '<span class="chat-private-label">Personal</span> ' : '';
-        line(`chat-line${personal ? ' private' : ''}`, `${prefix}<b>${escape(data.name)}</b> ${escape(data.text)}`);
-        if (announce && data.name !== name.value.trim()) window.OS?.notify(personal ? 'Idk Messenger · Personal chat' : 'Idk Messenger', `${data.name}: ${data.text}`, 'chat');
-      };
+         const message = (data, announce = false) => {
+           const personal = data.private === true;
+           const prefix = personal ? '<span class="chat-private-label">Personal</span> ' : '';
+           line(`chat-line${personal ? ' private' : ''}`, `${prefix}<b>${escape(data.name)}</b> ${escape(data.text)}`);
+           if (personal && conversation.value !== 'direct') { unreadDirect += 1; dmUnread.textContent = String(unreadDirect); dmUnread.hidden = false; }
+           if (announce && data.name !== name.value.trim()) window.OS?.notify(personal ? 'Idk Messenger · Personal chat' : 'Idk Messenger', `${data.name}: ${data.text}`, 'chat');
+         };
 
-       const sendSocket = payload => {
-         if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload));
-       };
+        const sendSocket = payload => {
+          if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload));
+        };
+
+        const showTyping = (who, active) => {
+          clearTimeout(typingTimer);
+          typingStatus.hidden = !active;
+          typingStatus.textContent = active ? `${who || 'Someone'} is typing…` : '';
+          if (active) typingTimer = setTimeout(() => showTyping('', false), 1600);
+        };
+        const emitTyping = active => {
+          if (!hasJoined || socket?.readyState !== WebSocket.OPEN) return;
+          const personal = conversation.value === 'direct';
+          if (personal && !recipient.value) return;
+          sendSocket({ type: 'typing', private: personal, targetId: personal ? recipient.value : '', typing: Boolean(active) });
+        };
 
        const updateComposer = () => {
          const connected = hasJoined && socket?.readyState === WebSocket.OPEN;
@@ -1764,9 +1782,12 @@ const APPS = {
                 updateConversationStatus();
                setMuted(0);
               text.focus();
-            } else if (data.type === 'message') {
-              message(data, true);
-           } else if (data.type === 'presence') {
+             } else if (data.type === 'message') {
+               message(data, true);
+             } else if (data.type === 'typing') {
+               const relevant = !data.private || conversation.value === 'direct' && (!recipient.value || data.fromId === recipient.value);
+               if (relevant) showTyping(data.name, data.typing);
+            } else if (data.type === 'presence') {
              line('chat-line system', `${escape(data.text)} · ${data.users.length} here`);
              updateMembers(data.users);
               if (data.text && !data.text.startsWith(`${name.value.trim()} joined`)) window.OS?.notify('Idk Messenger', data.text, 'chat');
@@ -1802,9 +1823,10 @@ const APPS = {
           });
        };
 
-       const post = () => {
-         if (!text.value.trim() || mutedUntil > Date.now() || socket?.readyState !== WebSocket.OPEN || (conversation.value === 'direct' && !recipient.value)) return;
-         socket.send(conversation.value === 'direct'
+         const post = () => {
+           if (!text.value.trim() || mutedUntil > Date.now() || socket?.readyState !== WebSocket.OPEN || (conversation.value === 'direct' && !recipient.value)) return;
+           emitTyping(false);
+           socket.send(conversation.value === 'direct'
            ? JSON.stringify({ type: 'direct-message', targetId: recipient.value, text: text.value })
            : JSON.stringify({ type: 'message', text: text.value }));
          text.value = '';
@@ -1834,8 +1856,9 @@ const APPS = {
         }
       };
 
-        conversation.addEventListener('change', () => {
-          updateDirectTargets(roomUsers);
+         conversation.addEventListener('change', () => {
+           if (conversation.value === 'direct') { unreadDirect = 0; dmUnread.textContent = '0'; dmUnread.hidden = true; }
+           updateDirectTargets(roomUsers);
           updateConversationStatus();
         });
         recipient.addEventListener('change', () => {
@@ -1845,8 +1868,9 @@ const APPS = {
         join.addEventListener('click', connect);
        share.addEventListener('click', copyInvite);
        room.addEventListener('keydown', event => { if (event.key === 'Enter') connect(); });
-       send.addEventListener('click', post);
-       text.addEventListener('keydown', event => { if (event.key === 'Enter') post(); });
+        send.addEventListener('click', post);
+        text.addEventListener('input', () => { if (!text.value.trim()) { emitTyping(false); return; } emitTyping(true); clearTimeout(typingTimer); typingTimer = setTimeout(() => emitTyping(false), 1400); });
+        text.addEventListener('keydown', event => { if (event.key === 'Enter') post(); });
        muteMember.addEventListener('click', () => moderate('mute'));
        kickMember.addEventListener('click', () => moderate('kick'));
        banMember.addEventListener('click', () => moderate('ban'));
@@ -1857,8 +1881,9 @@ const APPS = {
 
        root.cleanup = () => {
          reconnectAllowed = false;
-         clearTimeout(reconnectTimer);
-         clearTimeout(muteTimer);
+          clearTimeout(reconnectTimer);
+          clearTimeout(muteTimer);
+          clearTimeout(typingTimer);
          socket?.close();
        };
 
