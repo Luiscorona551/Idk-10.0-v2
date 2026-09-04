@@ -1,7 +1,8 @@
 import { Pool } from 'pg';
 import { createHmac, randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
+const databaseURL = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_PRIVATE_URL;
+const pool = databaseURL ? new Pool({ connectionString: databaseURL, ssl: { rejectUnauthorized: false } }) : null;
 const SECRET = process.env.SESSION_SECRET || 'idk-account-change-me';
 const MAX_AGE = 1000 * 60 * 60 * 24 * 30;
 
