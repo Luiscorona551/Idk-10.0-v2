@@ -20,10 +20,52 @@
     root.innerHTML = `<header class="idk-live-title"><strong>Idk Messenger</strong><span class="idk-live-status">Offline</span><button class="idk-live-close" type="button" aria-label="Close Messenger">×</button></header><div class="idk-live-connect"><input class="field" data-m-name maxlength="24" placeholder="Your name" value="${esc(accountUser?.username || profile.name || '')}" ${accountUser ? 'readonly' : ''}><input class="field" data-m-room maxlength="32" placeholder="Room name" value="${esc(profile.room || 'general')}"><button class="btn" data-m-connect type="button">Connect</button></div><nav class="idk-live-tabs"><button class="active" data-tab="room" type="button">💬 Chat Room <b class="idk-live-tab-badge" data-tab-badge="room" hidden>0</b></button><button data-tab="dm" type="button">💙 Direct DMs <b class="idk-live-tab-badge" data-tab-badge="dm" hidden>0</b></button></nav><div class="idk-live-body"><aside class="idk-live-members"><strong>People in room</strong><input class="field idk-dm-search" data-member-search placeholder="Find a person…" aria-label="Find a person"><div data-members><span class="muted">Connect to see people.</span></div></aside><main class="idk-live-main"><div class="idk-live-room" data-pane="room"><div class="idk-live-heading"><strong># <span data-room-title>general</span></strong><small>Messages are shared with everyone in this room.</small></div><div class="idk-live-messages" data-room-messages></div><div class="idk-live-typing" data-room-typing hidden></div><form class="idk-live-compose" data-room-form><input class="field" placeholder="Message the room…" autocomplete="off"><button class="btn" type="submit">Send</button></form></div><div class="idk-live-dm" data-pane="dm" hidden><div class="idk-live-heading"><strong data-dm-title>Direct messages</strong><small>Private messages are saved to your IDK account.</small></div><div class="idk-live-messages" data-dm-messages><div class="idk-live-empty">Select someone from the room to start a private conversation.</div></div><div class="idk-live-typing" data-dm-typing hidden></div><form class="idk-live-compose" data-dm-form><input class="field" placeholder="Write a private message…" autocomplete="off" disabled><button class="btn" type="submit" disabled>Send</button></form></div></main></div>`;
     overlay.append(root); document.body.append(overlay);
     const status = root.querySelector('.idk-live-status'), name = root.querySelector('[data-m-name]'), room = root.querySelector('[data-m-room]'), members = root.querySelector('[data-members]'), memberSearch = root.querySelector('[data-member-search]'), roomMessages = root.querySelector('[data-room-messages]'), dmMessages = root.querySelector('[data-dm-messages]'), roomTyping = root.querySelector('[data-room-typing]'), dmTyping = root.querySelector('[data-dm-typing]'), dmTitle = root.querySelector('[data-dm-title]'), dmInput = root.querySelector('[data-dm-form] input'), dmButton = root.querySelector('[data-dm-form] button'), roomTitle = root.querySelector('[data-room-title]'), roomBadge = root.querySelector('[data-tab-badge="room"]'), dmBadge = root.querySelector('[data-tab-badge="dm"]'), tabs = [...root.querySelectorAll('[data-tab]')], panes = [...root.querySelectorAll('[data-pane]')];
-    const state = { users: [], room: '', me: '', mePeerId: null, meUserId: null, selected: null, selectedUserId: null, selectedName: '', unreadRoom: 0, unreadDm: 0, joined: false, typingTimers: {}, localTyping: { room: false, dm: false } };
-    let connectionId = 0;
+     const state = { users: [], room: '', me: '', mePeerId: null, meUserId: null, selected: null, selectedUserId: null, selectedName: '', unreadRoom: 0, unreadDm: 0, joined: false, typingTimers: {}, localTyping: { room: false, dm: false } };
+     let connectionId = 0;
     const setBadge = (badge, value) => { badge.textContent = String(value); badge.hidden = value < 1; };
-    const activePane = pane => root.querySelector(`[data-pane="${pane}"]`)?.hidden === false;
+     const activePane = pane => root.querySelector(`[data-pane="${pane}"]`)?.hidden === false;
+     const dmHeading = root.querySelector('[data-pane="dm"] .idk-live-heading');
+     const dmAvatar = document.createElement('span');
+     dmAvatar.className = 'idk-imessage-avatar';
+     dmAvatar.dataset.dmAvatar = 'true';
+     dmAvatar.setAttribute('aria-hidden', 'true');
+     dmAvatar.textContent = '♡';
+     dmHeading?.classList.add('idk-imessage-header');
+     dmHeading?.prepend(dmAvatar);
+     const dmForm = root.querySelector('[data-dm-form]');
+     dmForm?.classList.add('idk-imessage-compose');
+     const dmAdd = document.createElement('button');
+     dmAdd.className = 'idk-imessage-add';
+     dmAdd.type = 'button';
+     dmAdd.setAttribute('aria-label', 'Add attachment');
+     dmAdd.title = 'Add attachment';
+     dmAdd.textContent = '+';
+     dmAdd.onclick = () => dmInput.focus();
+     dmForm?.prepend(dmAdd);
+     dmButton.textContent = '↑';
+     dmButton.setAttribute('aria-label', 'Send message');
+     const memberHeading = root.querySelector('.idk-live-members > strong');
+     const syncSidebarHeading = () => { if (memberHeading) memberHeading.textContent = activePane('dm') ? 'Messages' : 'People in room'; };
+     tabs.forEach(tab => tab.addEventListener('click', syncSidebarHeading));
+     syncSidebarHeading();
+     const syncDmAvatar = () => {
+       const label = dmTitle.textContent.trim();
+       dmAvatar.textContent = label && label !== 'Direct messages' ? label.slice(0, 1).toUpperCase() : '♡';
+     };
+     new MutationObserver(syncDmAvatar).observe(dmTitle, { childList: true, characterData: true, subtree: true });
+     syncDmAvatar();
+     const decorateMemberRows = () => members.querySelectorAll('.idk-live-member').forEach(button => {
+       if (button.querySelector('[data-dm-list-avatar]')) return;
+       const name = button.querySelector('strong')?.textContent?.trim() || '?';
+       const avatar = document.createElement('span');
+       avatar.className = 'idk-imessage-list-avatar';
+       avatar.dataset.dmListAvatar = 'true';
+       avatar.setAttribute('aria-hidden', 'true');
+       avatar.textContent = name.slice(0, 1).toUpperCase();
+       button.prepend(avatar);
+     });
+     new MutationObserver(decorateMemberRows).observe(members, { childList: true });
+     decorateMemberRows();
     const send = payload => { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); };
     const showTyping = (kind, who, active) => { const target = kind === 'dm' ? dmTyping : roomTyping; clearTimeout(state.typingTimers[kind]); target.hidden = !active; target.textContent = active ? `${who || 'Someone'} is typing…` : ''; if (active) state.typingTimers[kind] = setTimeout(() => showTyping(kind, '', false), 1800); };
 
@@ -42,7 +84,7 @@
     }
 
     function addMessage(target, payload, privateMessage = false) {
-      const item = document.createElement('article'), mine = payload.userId === state.meUserId || (!payload.userId && payload.name === state.me); item.className = `idk-live-message${mine ? ' mine' : ''}`; item.innerHTML = `<div class="idk-live-message-meta"><strong>${esc(payload.name || 'anon')}</strong><time>${new Date(payload.at || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</time>${privateMessage ? ' · private' : ''}</div><div>${esc(payload.text)}</div>`; target.querySelector('.idk-live-empty')?.remove(); target.append(item); target.scrollTop = target.scrollHeight;
+       const item = document.createElement('article'), mine = payload.userId === state.meUserId || (!payload.userId && payload.name === state.me); item.className = `idk-live-message${mine ? ' mine' : ''}`; item.innerHTML = `<div class="idk-live-message-meta"><strong>${esc(payload.name || 'anon')}</strong><time>${new Date(payload.at || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</time>${privateMessage ? '<span class="idk-live-private-label"> · private</span>' : ''}</div><div>${esc(payload.text)}</div>`; target.querySelector('.idk-live-empty')?.remove(); target.append(item); target.scrollTop = target.scrollHeight;
     }
 
     function handleMessage(data) {
