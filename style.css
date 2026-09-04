@@ -905,6 +905,13 @@ html, body {
 
 #desktop[data-motion="off"] *, #desktop[data-motion="off"] *::before, #desktop[data-motion="off"] *::after { animation: none !important; transition: none !important; }
 
+#desktop[data-game-active]::before,
+#desktop[data-game-active]::after,
+#desktop[data-game-active] .tv-static,
+#desktop[data-game-active] .tv-screen.live::after {
+  animation-play-state: paused;
+}
+
 @media (max-width: 700px) {
   #clock { top: 10px; left: 12px; gap: 9px; padding: 8px 11px 9px; }
   #clock-info { min-width: 0; }

@@ -391,6 +391,13 @@ const OS = (() => {
     store.set('desktopOrder', [...iconLayer.querySelectorAll('.desktop-icon')].map(icon => icon.dataset.app));
   }
 
+  function updateGamePerformanceMode() {
+    document.getElementById('desktop')?.toggleAttribute(
+      'data-game-active',
+      Boolean(document.querySelector('#windows .window[data-app="player"]'))
+    );
+  }
+
   function makeIconDraggable(icon) {
     let moved = false;
     let suppressClick = false;
@@ -496,6 +503,7 @@ const OS = (() => {
     titlebar.querySelector('.controls')?.insertBefore(snapButton, titlebar.querySelector('.close'));
 
     open.set(key, win);
+    updateGamePerformanceMode();
     markDock();
 
     win.addEventListener('pointerdown', () => focus(win), true);
@@ -506,6 +514,7 @@ const OS = (() => {
       if (frame && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
       win.remove();
       open.delete(key);
+      updateGamePerformanceMode();
       markDock();
       scheduleWorkspaceSave();
     });

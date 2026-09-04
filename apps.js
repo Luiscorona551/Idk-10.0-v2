@@ -1,5 +1,6 @@
 const GAME_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
 const GAME_ICON_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/';
+const gameSourceCache = new Map();
 
 const store = {
   get(key, fallback) {
@@ -100,10 +101,23 @@ function gameIconURL(path) {
 }
 
 async function gameBlobURL(name) {
-  const url = `${GAME_CDN}${encodeURIComponent(gameFileName(name))}?t=${Date.now()}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not fetch "${name}" (${res.status})`);
-  const html = await res.text();
+  const file = gameFileName(name);
+  let source = gameSourceCache.get(file);
+  if (!source) {
+    const url = `${GAME_CDN}${encodeURIComponent(file)}`;
+    source = fetch(url, { cache: 'force-cache' }).then(async res => {
+      if (!res.ok) throw new Error(`Could not fetch "${name}" (${res.status})`);
+      return res.text();
+    });
+    gameSourceCache.set(file, source);
+  }
+  let html;
+  try {
+    html = await source;
+  } catch (error) {
+    gameSourceCache.delete(file);
+    throw error;
+  }
   return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }
 
@@ -2047,6 +2061,7 @@ const APPS = {
       const frame = el('iframe', {
         src: opts.src,
         allow: 'autoplay; fullscreen; gamepad; clipboard-write',
+        sandbox: 'allow-forms allow-modals allow-pointer-lock allow-scripts',
         allowFullscreen: true
       });
       return frame;
