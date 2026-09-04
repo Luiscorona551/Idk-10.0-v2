@@ -92,7 +92,10 @@
   function iconMenu(icon, event) {
     const app = icon.dataset.app;
     const finalApp = icon.dataset.finalApp;
-    const items = [{ label: 'Open', action: () => app ? window.OS?.open(app) : finalApp === 'sheets' ? window.IDKSheets?.open?.() : window.IdkMessenger?.open?.() }, { label: 'Rename', action: () => renameIcon(icon) }];
+    const key = String(app || finalApp || icon.dataset.id || icon.textContent || '').trim().toLowerCase();
+    const favorites = read('idkDesktopFavorites', []);
+    const pinned = favorites.includes(key);
+    const items = [{ label: 'Open', action: () => app ? window.OS?.open(app) : finalApp === 'sheets' ? window.IDKSheets?.open?.() : window.IdkMessenger?.open?.() }, { label: pinned ? 'Unpin from favorites' : 'Pin to favorites', action: () => { const next = pinned ? favorites.filter(item => item !== key) : [key, ...favorites.filter(item => item !== key)]; write('idkDesktopFavorites', next); location.reload(); } }, { label: 'Rename', action: () => renameIcon(icon) }];
     if (icon.classList.contains('idk-installed-shortcut')) items.push({ label: 'Remove shortcut', action: () => { icon.remove(); notify('Desktop', 'Shortcut removed.'); } });
     showMenu(event.clientX, event.clientY, items);
   }
@@ -116,6 +119,7 @@
   }
 
   function openPalette() {
+    if (window.IDKUnifiedSearch?.open) return window.IDKUnifiedSearch.open();
     document.getElementById('idk-command-palette')?.remove();
     const panel = document.createElement('section'); panel.id = 'idk-command-palette'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Command palette');
     panel.innerHTML = '<div class="idk-upgrade-editor-head"><strong>Command palette</strong><button type="button" data-close aria-label="Close">×</button></div><input class="field" data-query placeholder="Search apps or actions…" autocomplete="off"><div class="idk-command-results"></div>';

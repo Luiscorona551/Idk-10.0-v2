@@ -64,6 +64,36 @@
     }
   }
 
+  async function removeProgram(id) {
+    if (window.IDKAccount?.user) {
+      const response = await fetch(`/api/account/programs/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' });
+      if (!response.ok && response.status !== 404) throw new Error('The program could not be removed from your account.');
+    }
+    const db = await openDb();
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Unable to remove the program.'));
+      });
+    } finally { db.close(); }
+    write(KEY, read(KEY, []).filter(program => program.id !== id));
+    document.querySelectorAll(`[data-installer-program="${CSS.escape(id)}"]`).forEach(node => node.remove());
+  }
+
+  async function repairProgram(program) {
+    let blob = await loadProgramFile(program.id);
+    if (!blob && window.IDKAccount?.user) {
+      const response = await fetch(`/api/account/programs/${encodeURIComponent(program.id)}/content`, { credentials: 'same-origin' });
+      if (response.ok) blob = await response.blob();
+    }
+    if (!blob) throw new Error('The saved program file is missing. Reinstall it to repair this app.');
+    await saveProgramFile(program.id, blob);
+    addShortcut(program);
+    return true;
+  }
+
   async function apiRequest(url, options = {}) {
     try {
       const response = await fetch(url, { credentials: 'same-origin', ...options });
@@ -354,4 +384,5 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
+  window.IDKInstaller = { open: openInstaller, remove: removeProgram, repair: repairProgram, refresh: syncCloudPrograms };
 })();

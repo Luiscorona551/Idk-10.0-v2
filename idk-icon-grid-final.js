@@ -3,8 +3,8 @@
   const ROOT = '#icons';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
   const VERSION = '10-two-by-two-scrollable';
-  const COL_W = 112;
-  const ROW_H = 116;
+  const DEFAULT_COL_W = 112;
+  const DEFAULT_ROW_H = 116;
   const ROWS = 2;
   const VISIBLE_COLUMNS = 2;
   const START_X = 12;
@@ -20,12 +20,22 @@
     return String(el.dataset.appId || el.dataset.app || el.dataset.id || textOf(el)).trim().toLowerCase();
   }
   function isDesktopIcon(el) {
-    return el instanceof HTMLElement && (
+    if (!(el instanceof HTMLElement) || el.classList.contains('idk-program-installer-icon')) return false;
+    return (
       el.classList.contains('desktop-icon') ||
       el.classList.contains('idk-installed-shortcut') ||
       el.classList.contains('idk-final-desktop-icon') ||
       el.dataset.appId || el.dataset.app || el.dataset.id
     );
+  }
+  function layoutConfig() {
+    try {
+      return localStorage.getItem('idkGridDensity') === 'compact'
+        ? { colW: 98, rowH: 108, iconW: 90 }
+        : localStorage.getItem('idkGridDensity') === 'spacious'
+          ? { colW: 124, rowH: 126, iconW: 112 }
+          : { colW: DEFAULT_COL_W, rowH: DEFAULT_ROW_H, iconW: 104 };
+    } catch { return { colW: DEFAULT_COL_W, rowH: DEFAULT_ROW_H, iconW: 104 }; }
   }
   function isAppsShortcut(el) {
     return keyOf(el) === 'apps' || textOf(el).toLowerCase() === 'apps';
@@ -44,14 +54,19 @@
     applying = true;
     removeAppsShortcuts(root);
 
-    const icons = [...root.children].filter(isDesktopIcon);
+    const config = layoutConfig();
+    const favorites = (() => { try { return JSON.parse(localStorage.getItem('idkDesktopFavorites') || '[]'); } catch { return []; } })();
+    const recent = (() => { try { return JSON.parse(localStorage.getItem('recentApps') || '[]'); } catch { return []; } })();
+    const order = (() => { try { return JSON.parse(localStorage.getItem('desktopOrder') || '[]'); } catch { return []; } })();
+    const score = key => favorites.includes(key) ? order.indexOf(key) >= 0 ? order.indexOf(key) / 1000 : 0 : recent.indexOf(key) >= 0 ? 10 + recent.indexOf(key) : order.indexOf(key) >= 0 ? 50 + order.indexOf(key) : 100;
+    const icons = [...root.children].filter(isDesktopIcon).sort((a, b) => score(keyOf(a)) - score(keyOf(b)));
     const columns = Math.max(1, Math.ceil(icons.length / ROWS));
     const viewportHeight = Math.min(
-      Math.max(START_Y + ROWS * ROW_H + 24, 300),
+      Math.max(START_Y + ROWS * config.rowH + 24, 300),
       Math.max(window.innerHeight - 120, 300)
     );
-    const contentWidth = START_X + columns * COL_W + 18;
-    const viewportWidth = START_X + VISIBLE_COLUMNS * COL_W + 18;
+    const contentWidth = START_X + columns * config.colW + 18;
+    const viewportWidth = START_X + VISIBLE_COLUMNS * config.colW + 18;
 
     root.style.setProperty('position', 'absolute', 'important');
     root.style.setProperty('left', '0', 'important');
@@ -78,7 +93,7 @@
     spacer.style.setProperty('height', '2px', 'important');
     spacer.style.setProperty('pointer-events', 'none', 'important');
 
-    icons.forEach((icon, index) => positionIcon(icon, Math.floor(index / ROWS), index % ROWS));
+    icons.forEach((icon, index) => positionIcon(icon, Math.floor(index / ROWS), index % ROWS, config));
 
     try {
       localStorage.setItem(VERSION_KEY, VERSION);
@@ -87,19 +102,19 @@
     applying = false;
   }
 
-  function positionIcon(icon, column, row) {
-    const x = START_X + column * COL_W;
-    const y = START_Y + row * ROW_H;
+  function positionIcon(icon, column, row, config) {
+    const x = START_X + column * config.colW;
+    const y = START_Y + row * config.rowH;
     icon.style.setProperty('position', 'absolute', 'important');
     icon.style.setProperty('left', `${x}px`, 'important');
     icon.style.setProperty('top', `${y}px`, 'important');
     icon.style.setProperty('right', 'auto', 'important');
     icon.style.setProperty('bottom', 'auto', 'important');
     icon.style.setProperty('transform', 'none', 'important');
-    icon.style.setProperty('width', '104px', 'important');
-    icon.style.setProperty('height', `${ROW_H - 4}px`, 'important');
-    icon.style.setProperty('min-width', '104px', 'important');
-    icon.style.setProperty('min-height', `${ROW_H - 4}px`, 'important');
+    icon.style.setProperty('width', `${config.iconW}px`, 'important');
+    icon.style.setProperty('height', `${config.rowH - 4}px`, 'important');
+    icon.style.setProperty('min-width', `${config.iconW}px`, 'important');
+    icon.style.setProperty('min-height', `${config.rowH - 4}px`, 'important');
     icon.style.setProperty('margin', '0', 'important');
     icon.style.setProperty('padding', '3px 2px', 'important');
     icon.style.setProperty('box-sizing', 'border-box', 'important');
@@ -108,6 +123,7 @@
     icon.style.setProperty('align-items', 'center', 'important');
     icon.style.setProperty('justify-content', 'flex-start', 'important');
     icon.style.setProperty('overflow', 'visible', 'important');
+    icon.style.setProperty('scroll-snap-align', 'start', 'important');
 
     const glyph = icon.querySelector('.glyph,.idk-installed-shortcut-icon,:scope > span:first-child');
     if (glyph) {

@@ -39,6 +39,18 @@ app.get('/api/browser/scope', async (req, res) => res.json({
   scope: '/uv/',
   transport: backend.proxy ? 'Ultraviolet + Wisp' : 'Unavailable'
 }));
+app.get('/api/update', async (req, res) => res.json({
+  ok: true,
+  version: '10.0.0',
+  channel: 'stable',
+  build: 'final product batch',
+  changelog: [
+    'Two-row scrollable app desktop with favorites and density controls.',
+    'Welcome tour, App Store lifecycle tools, and recovery controls.',
+    'Theme, widget, audio, search, and accessibility improvements.'
+  ],
+  health: await backendStatus()
+}));
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));

@@ -296,9 +296,9 @@ window.SYSTEM_APPS = (() => {
            ]),
            actions
          );
-         const openEntry = () => {
-           if (entry.type === 'folder') { current = entry.id; renderFolder(); } else openEditor(entry);
-         };
+          const openEntry = () => {
+            if (entry.type === 'folder') { current = entry.id; renderFolder(); } else if (!window.IDKFileAssociations?.open?.(entry)) openEditor(entry);
+          };
          open.addEventListener('click', event => { event.stopPropagation(); openEntry(); });
          row.addEventListener('dblclick', openEntry);
          row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEntry(); } });
