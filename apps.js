@@ -1132,7 +1132,6 @@ const APPS = {
     title: 'Apps',
     glyph: '<span class="apps-glyph">▦</span>',
     desktop: true,
-    dock: false,
     width: 700,
     height: 520,
     render: appsHub
