@@ -14,6 +14,7 @@ import { hasSession, setupRoutes } from './setup-gate.js';
 import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-server.js';
 import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
 import { databaseStatus } from './idk-db-health.js';
+import { publicStoreRoutes } from './idk-public-store-server.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
@@ -30,6 +31,7 @@ app.get('/api/health', healthHandler);
 setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
+publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/browser/scope', async (req, res) => res.json({
   ok: true,
@@ -47,7 +49,9 @@ app.get('/api/update', async (req, res) => res.json({
   changelog: [
     'Two-row scrollable app desktop with favorites and density controls.',
     'Welcome tour, App Store lifecycle tools, and recovery controls.',
-    'Theme, widget, audio, search, and accessibility improvements.'
+    'Theme, widget, audio, search, and accessibility improvements.',
+    'Public HTML app publishing with versions, ratings, installs, and reports.',
+    'Files backup and restore plus the IDK System Self-Test.'
   ],
   health: await backendStatus()
 }));
