@@ -558,10 +558,24 @@ function audioPlayer() {
   const visualizer = el('div', { className: 'audio-visualizer', 'aria-hidden': 'true' });
   const visualizerBars = Array.from({ length: 18 }, () => el('i', { className: 'audio-bar' }));
   visualizer.append(...visualizerBars);
+  const queueList = el('div', { className: 'player-queue-list' });
+  const queueCount = el('span', { className: 'player-queue-count' });
   let meterFrame = 0;
-  let activeObjectURL = '';
+  const objectURLs = new Set();
   let youtubeActive = false;
   let youtubePlaying = false;
+  let youtubeStopRequested = false;
+  let tracks = [];
+  let currentIndex = -1;
+  let shuffle = false;
+  let repeat = 'off';
+
+  const trackOf = track => ({
+    id: String(track?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    title: String(track?.title || track?.name || track?.url || 'Untitled track'),
+    url: String(track?.url || '')
+  });
+  const currentTrack = () => tracks[currentIndex] || null;
 
   const visualLevel = () => {
     const time = audio.currentTime || 0;
@@ -569,6 +583,7 @@ function audioPlayer() {
     return .16 + beat * .84;
   };
   const syncSpeaker = (type, level = visualLevel()) => {
+    const track = currentTrack();
     const detail = {
       type,
       name: now.textContent,
@@ -577,7 +592,12 @@ function audioPlayer() {
       duration: Number.isFinite(audio.duration) ? audio.duration : 0,
       volume: audio.volume,
       level,
-      audio
+      audio,
+      track,
+      queue: tracks.map(item => ({ ...item })),
+      queueIndex: currentIndex,
+      shuffle,
+      repeat
     };
     window.IDK_AUDIO_STATE = detail;
     window.dispatchEvent(new CustomEvent('idk-audio-state', { detail }));
@@ -600,13 +620,151 @@ function audioPlayer() {
     cancelAnimationFrame(meterFrame);
     meterFrame = requestAnimationFrame(animateMeter);
   };
-  ['play', 'pause', 'ended', 'loadedmetadata', 'timeupdate', 'volumechange'].forEach(type => audio.addEventListener(type, () => {
+  const renderQueue = () => {
+    queueCount.textContent = `${tracks.length} song${tracks.length === 1 ? '' : 's'}`;
+    queueList.replaceChildren();
+    if (!tracks.length) {
+      queueList.innerHTML = '<div class="player-queue-empty">Add a link or choose local files to build your queue.</div>';
+      return;
+    }
+    tracks.forEach((track, index) => {
+      const row = el('div', { className: `player-queue-row${index === currentIndex ? ' active' : ''}` });
+      const play = el('button', { className: 'player-queue-track', type: 'button', textContent: `${index + 1}. ${track.title}` });
+      const remove = el('button', { className: 'player-queue-remove', type: 'button', textContent: 'Remove', 'aria-label': `Remove ${track.title} from queue` });
+      play.addEventListener('click', () => setCurrent(index, true));
+      remove.addEventListener('click', () => removeFromQueue(index));
+      row.append(play, remove);
+      queueList.append(row);
+    });
+  };
+  const syncControls = () => {
+    playToggle.textContent = audio.paused && !youtubePlaying ? 'Play' : 'Pause';
+    playToggle.setAttribute('aria-label', audio.paused && !youtubePlaying ? 'Play music' : 'Pause music');
+    shuffleButton.textContent = `Shuffle: ${shuffle ? 'On' : 'Off'}`;
+    repeatButton.textContent = `Repeat: ${repeat === 'one' ? 'One' : repeat === 'all' ? 'All' : 'Off'}`;
+  };
+
+  const emitQueueState = () => syncSpeaker('queue', 0);
+  const stopPlayback = () => {
+    if (youtubeActive) {
+      youtubeStopRequested = true;
+      sendYouTubeCommand('stopVideo');
+      youtubePlaying = false;
+      syncYouTube();
+      return;
+    }
+    audio.pause();
+    audio.currentTime = 0;
+    syncSpeaker('stop');
+  };
+  const advanceTrack = () => {
+    if (!tracks.length || currentIndex < 0) return;
+    if (repeat === 'one') {
+      setCurrent(currentIndex, true);
+      return;
+    }
+    let nextIndex = -1;
+    if (shuffle && tracks.length > 1) {
+      const choices = tracks.map((_, index) => index).filter(index => index !== currentIndex);
+      nextIndex = choices[Math.floor(Math.random() * choices.length)];
+    } else if (currentIndex + 1 < tracks.length) {
+      nextIndex = currentIndex + 1;
+    } else if (repeat === 'all') {
+      nextIndex = 0;
+    }
+    if (nextIndex < 0) {
+      youtubePlaying = false;
+      syncSpeaker('ended', 0);
+      syncControls();
+      return;
+    }
+    setCurrent(nextIndex, true);
+  };
+  const previousTrack = () => {
+    if (!tracks.length || currentIndex < 0) return;
+    if (!youtubeActive && audio.currentTime > 3) {
+      audio.currentTime = 0;
+      syncSpeaker('seek');
+      return;
+    }
+    const previousIndex = currentIndex > 0 ? currentIndex - 1 : (repeat === 'all' ? tracks.length - 1 : 0);
+    setCurrent(previousIndex, true);
+  };
+  const togglePlayback = () => {
+    if (youtubeActive) {
+      window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'toggle' } }));
+      return;
+    }
+    if (!currentTrack()) return;
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
+  };
+  const removeFromQueue = index => {
+    if (!tracks[index]) return;
+    tracks.splice(index, 1);
+    if (currentIndex === index) {
+      if (tracks.length) {
+        currentIndex = Math.min(index, tracks.length - 1);
+        setCurrent(currentIndex, false);
+      } else {
+        currentIndex = -1;
+        audio.pause();
+        audio.removeAttribute('src');
+        youtubeActive = false;
+        youtubePlaying = false;
+        youtube.hidden = true;
+        youtube.src = 'about:blank';
+        audio.hidden = false;
+        now.textContent = 'Nothing loaded yet.';
+        syncSpeaker('source', 0);
+      }
+    } else if (currentIndex > index) currentIndex -= 1;
+    renderQueue();
+    emitQueueState();
+  };
+
+  const setCurrent = (index, autoplay = true) => {
+    const track = tracks[index];
+    if (!track) return;
+    currentIndex = index;
+    const videoId = youtubeVideoId(track.url);
+    youtubeStopRequested = false;
+    if (videoId) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.hidden = true;
+      youtubeActive = true;
+      youtubePlaying = Boolean(autoplay);
+      youtube.hidden = false;
+      youtube.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${autoplay ? 1 : 0}&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+      now.textContent = track.title;
+      syncYouTube();
+    } else {
+      youtubeActive = false;
+      youtubePlaying = false;
+      youtube.hidden = true;
+      youtube.src = 'about:blank';
+      audio.hidden = false;
+      audio.src = driveDirectURL(track.url);
+      audio.dataset.name = track.title;
+      now.textContent = track.title;
+      syncSpeaker('source');
+      if (autoplay) audio.play().catch(() => { now.textContent = `Click play to start ${track.title}.`; syncSpeaker('pause'); });
+    }
+    renderQueue();
+    syncControls();
+  };
+
+  ['play', 'pause', 'loadedmetadata', 'timeupdate', 'volumechange'].forEach(type => audio.addEventListener(type, () => {
     syncSpeaker(type);
     if (type === 'play') startMeter();
-    if (type === 'pause' || type === 'ended') cancelAnimationFrame(meterFrame);
+    if (type === 'pause') cancelAnimationFrame(meterFrame);
+    syncControls();
   }));
+  audio.addEventListener('ended', () => { syncSpeaker('ended'); cancelAnimationFrame(meterFrame); advanceTrack(); });
 
   const syncYouTube = () => {
+    const track = currentTrack();
     const detail = {
       type: 'youtube',
       name: now.textContent,
@@ -615,7 +773,12 @@ function audioPlayer() {
       duration: 0,
       volume: 1,
       level: youtubePlaying ? .72 : 0,
-      audio: null
+      audio: null,
+      track,
+      queue: tracks.map(item => ({ ...item })),
+      queueIndex: currentIndex,
+      shuffle,
+      repeat
     };
     window.IDK_AUDIO_STATE = detail;
     window.dispatchEvent(new CustomEvent('idk-audio-state', { detail }));
@@ -628,8 +791,17 @@ function audioPlayer() {
     let data;
     try { data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
     if (data?.event !== 'onStateChange') return;
+    if (data.info === 0) {
+      if (youtubeStopRequested) {
+        youtubeStopRequested = false;
+        youtubePlaying = false;
+        syncYouTube();
+      } else advanceTrack();
+      return;
+    }
     youtubePlaying = data.info === 1;
     syncYouTube();
+    syncControls();
   };
   const onYouTubeControl = event => {
     if (!youtubeActive) return;
@@ -639,9 +811,7 @@ function audioPlayer() {
       youtubePlaying = !youtubePlaying;
       syncYouTube();
     } else if (action === 'stop') {
-      sendYouTubeCommand('stopVideo');
-      youtubePlaying = false;
-      syncYouTube();
+      stopPlayback();
     }
   };
   window.addEventListener('message', onYouTubeMessage);
@@ -652,51 +822,100 @@ function audioPlayer() {
   play.addEventListener('click', () => {
     const value = url.value.trim();
     if (!value) return;
-    const videoId = youtubeVideoId(value);
-    if (activeObjectURL) {
-      URL.revokeObjectURL(activeObjectURL);
-      activeObjectURL = '';
-    }
-    if (videoId) {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.hidden = true;
-      youtubeActive = true;
-      youtubePlaying = true;
-      youtube.hidden = false;
-      youtube.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
-      now.textContent = `YouTube · ${value}`;
-      syncYouTube();
-      return;
-    }
+    setQueue([{ title: youtubeVideoId(value) ? `YouTube · ${value}` : value, url: value }], 0, true);
+  });
+
+  const picker = el('input', { type: 'file', accept: 'audio/*', multiple: true, className: 'field' });
+  const fileTiles = el('div', { className: 'tile-grid' });
+  picker.addEventListener('change', () => {
+    fileTiles.replaceChildren();
+    const selected = Array.from(picker.files).map(file => {
+      const source = URL.createObjectURL(file);
+      objectURLs.add(source);
+      return { title: file.name, url: source };
+    });
+    selected.forEach((track, index) => {
+      const tile = el('button', { className: 'tile', type: 'button', textContent: track.title });
+      tile.addEventListener('click', () => setCurrent(index, true));
+      fileTiles.append(tile);
+    });
+    setQueue(selected, 0, true);
+  });
+
+  const playToggle = el('button', { className: 'player-control', type: 'button', textContent: 'Play' });
+  const previous = el('button', { className: 'player-control', type: 'button', textContent: 'Prev' });
+  const next = el('button', { className: 'player-control', type: 'button', textContent: 'Next' });
+  const shuffleButton = el('button', { className: 'player-control', type: 'button', textContent: 'Shuffle: Off' });
+  const repeatButton = el('button', { className: 'player-control', type: 'button', textContent: 'Repeat: Off' });
+  const clearQueue = el('button', { className: 'player-control', type: 'button', textContent: 'Clear queue' });
+  playToggle.addEventListener('click', togglePlayback);
+  previous.addEventListener('click', previousTrack);
+  next.addEventListener('click', advanceTrack);
+  shuffleButton.addEventListener('click', () => { shuffle = !shuffle; renderQueue(); emitQueueState(); syncControls(); });
+  repeatButton.addEventListener('click', () => { repeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'; renderQueue(); emitQueueState(); syncControls(); });
+  clearQueue.addEventListener('click', () => {
+    tracks = [];
+    currentIndex = -1;
+    audio.pause();
+    audio.removeAttribute('src');
     youtubeActive = false;
     youtubePlaying = false;
     youtube.hidden = true;
     youtube.src = 'about:blank';
     audio.hidden = false;
-    audio.src = driveDirectURL(value);
-    now.textContent = value;
-    syncSpeaker('source');
-    audio.play().catch(() => { now.textContent = 'That link could not be played directly.'; syncSpeaker('pause'); });
+    now.textContent = 'Nothing loaded yet.';
+    renderQueue();
+    syncSpeaker('source', 0);
+    syncControls();
   });
+  const controls = el('div', { className: 'player-controls' }, [previous, playToggle, next, shuffleButton, repeatButton]);
+  const queuePanel = el('section', { className: 'player-queue' }, [
+    el('div', { className: 'player-queue-head' }, [el('strong', { textContent: 'Up Next' }), queueCount, clearQueue]),
+    queueList
+  ]);
 
-  const picker = el('input', { type: 'file', accept: 'audio/*', multiple: true, className: 'field' });
-  const queue = el('div', { className: 'tile-grid' });
-  picker.addEventListener('change', () => {
-    queue.replaceChildren();
-    Array.from(picker.files).forEach(file => {
-      const tile = el('button', { className: 'tile', type: 'button', textContent: file.name });
-      tile.addEventListener('click', () => {
-        if (activeObjectURL) URL.revokeObjectURL(activeObjectURL);
-        activeObjectURL = URL.createObjectURL(file);
-        audio.src = activeObjectURL;
-        now.textContent = file.name;
-        syncSpeaker('source');
-        audio.play().catch(() => { now.textContent = 'Click play to start this file.'; syncSpeaker('pause'); });
-      });
-      queue.append(tile);
-    });
-  });
+  const setQueue = (nextTracks, index = 0, autoplay = true) => {
+    tracks = nextTracks.map(trackOf).filter(track => track.url);
+    currentIndex = tracks.length ? Math.min(Math.max(index, 0), tracks.length - 1) : -1;
+    if (currentIndex >= 0) setCurrent(currentIndex, autoplay);
+    else {
+      audio.pause();
+      youtubeActive = false;
+      youtubePlaying = false;
+      youtube.hidden = true;
+      youtube.src = 'about:blank';
+      audio.hidden = false;
+      now.textContent = 'Nothing loaded yet.';
+      renderQueue();
+      syncSpeaker('source', 0);
+      syncControls();
+    }
+  };
+  const playerAPI = {
+    setQueue,
+    playTrack(track, options = {}) {
+      if (options.enqueue) {
+        const item = trackOf(track);
+        tracks.push(item);
+        renderQueue();
+        emitQueueState();
+        if (currentIndex < 0) setCurrent(tracks.length - 1, true);
+        return item;
+      }
+      setQueue([track], 0, true);
+      return currentTrack();
+    },
+    enqueue(track) { return this.playTrack(track, { enqueue: true }); },
+    remove(index) { removeFromQueue(index); },
+    next: advanceTrack,
+    previous: previousTrack,
+    toggle: togglePlayback,
+    stop: stopPlayback,
+    getState: () => ({ track: currentTrack(), queue: tracks.map(item => ({ ...item })), queueIndex: currentIndex, shuffle, repeat })
+  };
+  window.IDK_MUSIC_PLAYER = playerAPI;
+  renderQueue();
+  syncControls();
 
   root.append(
     el('h2', { textContent: 'Player' }),
@@ -712,7 +931,9 @@ function audioPlayer() {
       el('label', { textContent: 'Or play files from this device' }),
       picker
     ]),
-    queue
+    controls,
+    queuePanel,
+    fileTiles
   );
   root.cleanup = () => {
     cancelAnimationFrame(meterFrame);
@@ -722,7 +943,8 @@ function audioPlayer() {
     youtube.src = 'about:blank';
     window.removeEventListener('message', onYouTubeMessage);
     window.removeEventListener('idk-youtube-control', onYouTubeControl);
-    if (activeObjectURL) URL.revokeObjectURL(activeObjectURL);
+    objectURLs.forEach(url => URL.revokeObjectURL(url));
+    if (window.IDK_MUSIC_PLAYER === playerAPI) delete window.IDK_MUSIC_PLAYER;
     if (window.IDK_AUDIO_STATE?.audio === audio || window.IDK_AUDIO_STATE?.type === 'youtube') syncSpeaker('closed', 0);
   };
   return root;
