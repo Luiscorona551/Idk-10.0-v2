@@ -28,7 +28,6 @@
     const playlists = load();
     let activeId = playlists[0]?.id || null;
     let currentIndex = -1;
-    let audio = null;
 
     const panel = document.createElement('section');
     panel.className = 'idk-playlists-panel';
@@ -55,17 +54,6 @@
 
     function active() { return playlists.find(p => p.id === activeId) || null; }
 
-    function ensureAudio() {
-      if (audio) return audio;
-      audio = document.createElement('audio');
-      audio.controls = true;
-      audio.preload = 'metadata';
-      audio.className = 'idk-playlist-audio';
-      toolbar.append(audio);
-      audio.addEventListener('ended', nextTrack);
-      return audio;
-    }
-
     function addTrack(track) {
       const playlist = active();
       if (!playlist || !track.url) return;
@@ -80,10 +68,7 @@
       if (!playlist?.tracks?.[index]) return;
       const track = playlist.tracks[index];
       currentIndex = index;
-      const player = ensureAudio();
-      player.src = track.url;
-      player.dataset.trackId = track.id;
-      player.play().catch(() => {});
+      window.IDK_MUSIC_PLAYER?.setQueue(playlist.tracks, index, true);
       renderTracks();
     }
 
@@ -100,8 +85,7 @@
       if (removed?.url?.startsWith('blob:')) objectUrls.delete(removed.url);
       playlist.tracks.splice(index, 1);
       if (currentIndex === index) {
-        audio?.pause();
-        if (audio) audio.removeAttribute('src');
+        window.IDK_MUSIC_PLAYER?.stop();
         currentIndex = -1;
       } else if (currentIndex > index) currentIndex -= 1;
       save(playlists);
@@ -122,7 +106,7 @@
         button.addEventListener('click', () => {
           activeId = playlist.id;
           currentIndex = -1;
-          audio?.pause();
+          window.IDK_MUSIC_PLAYER?.stop();
           render();
         });
         listEl.append(button);
@@ -141,9 +125,9 @@
         const actions = document.createElement('div');
         actions.className = 'idk-track-actions';
         const play = document.createElement('button');
-        play.type = 'button'; play.className = 'idk-play-btn'; play.textContent = index === currentIndex && audio && !audio.paused ? 'Pause' : 'Play';
+        play.type = 'button'; play.className = 'idk-play-btn'; play.textContent = index === currentIndex && window.IDK_AUDIO_STATE?.playing ? 'Pause' : 'Play';
         play.addEventListener('click', () => {
-          if (index === currentIndex && audio && !audio.paused) audio.pause();
+          if (index === currentIndex && window.IDK_AUDIO_STATE?.playing) window.IDK_MUSIC_PLAYER?.toggle();
           else playTrack(index);
           renderTracks();
         });
@@ -179,7 +163,7 @@
         if (!confirm(`Delete playlist “${playlist.name}”?`)) return;
         playlists.splice(playlists.indexOf(playlist), 1);
         activeId = playlists[0]?.id || null;
-        audio?.pause(); currentIndex = -1;
+        window.IDK_MUSIC_PLAYER?.stop(); currentIndex = -1;
         save(playlists); render();
       });
       name.append(rename, del);
@@ -194,13 +178,20 @@
         add.reset();
       });
 
+      const playAll = document.createElement('button');
+      playAll.type = 'button'; playAll.className = 'idk-play-all'; playAll.textContent = 'Play all';
+      playAll.addEventListener('click', () => { if (playlist.tracks?.length) playTrack(0); });
+      const queueAll = document.createElement('button');
+      queueAll.type = 'button'; queueAll.className = 'idk-queue-all'; queueAll.textContent = 'Add all to Up Next';
+      queueAll.addEventListener('click', () => playlist.tracks?.forEach(track => window.IDK_MUSIC_PLAYER?.enqueue(track)));
+
       const current = document.createElement('button');
       current.type = 'button'; current.className = 'idk-add-current'; current.textContent = '＋ Add current song';
       current.addEventListener('click', () => {
         const state = window.IDK_AUDIO_STATE;
         const liveAudio = state?.audio;
-        const url = liveAudio?.currentSrc || liveAudio?.src || '';
-        const title = state?.name || liveAudio?.dataset?.name || '';
+        const url = state?.track?.url || liveAudio?.currentSrc || liveAudio?.src || '';
+        const title = state?.track?.title || state?.name || liveAudio?.dataset?.name || '';
         if (!url || url === window.location.href) {
           alert('Play a song first, then use “Add current song”.');
           return;
@@ -223,8 +214,7 @@
       });
       local.append(file);
 
-      toolbar.append(name, add, current, local);
-      if (audio) toolbar.append(audio);
+      toolbar.append(name, playAll, queueAll, add, current, local);
     }
 
     function render() {
@@ -244,10 +234,33 @@
     });
 
     render();
+    let lastAudioTrack = '';
+    let lastAudioPlaying = false;
+    const onAudio = event => {
+      const detail = event.detail || {};
+      const id = detail.track?.id || '';
+      const playing = Boolean(detail.playing);
+      const index = playlistForTrack(id);
+      if (index >= 0) currentIndex = index;
+      if (id === lastAudioTrack && playing === lastAudioPlaying) return;
+      lastAudioTrack = id;
+      lastAudioPlaying = playing;
+      renderTracks();
+    };
+    const playlistForTrack = id => {
+      const playlist = active();
+      return id && playlist?.tracks ? playlist.tracks.findIndex(track => track.id === id) : -1;
+    };
+    window.addEventListener('idk-audio-state', onAudio);
+    const cleanup = root.cleanup;
+    root.cleanup = () => {
+      window.removeEventListener('idk-audio-state', onAudio);
+      cleanup?.();
+    };
   }
 
   function scan() {
-    document.querySelectorAll('.speaker-app').forEach(mount);
+    document.querySelectorAll('.player-app').forEach(mount);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan, { once: true });
