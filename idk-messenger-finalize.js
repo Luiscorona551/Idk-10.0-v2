@@ -57,9 +57,9 @@
     const messenger = document.querySelector('.idk-live-messenger');
     if (!messenger) return;
     const dm = messenger.querySelector('[data-tab="dm"]');
-    if (dm) dm.textContent = 'DM';
+    if (dm && !dm.querySelector('[data-tab-badge]') && dm.textContent !== 'DM') dm.textContent = 'DM';
     const room = messenger.querySelector('[data-tab="room"]');
-    if (room) room.textContent = '💬 Chat Room';
+    if (room && !room.querySelector('[data-tab-badge]') && room.textContent !== '💬 Chat Room') room.textContent = '💬 Chat Room';
     const icon = document.querySelector('[data-live-messenger]');
     if (icon) icon.setAttribute('aria-label', 'Open Idk Messenger');
   };
