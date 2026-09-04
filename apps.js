@@ -1986,11 +1986,12 @@ const APPS = {
           clock24
         ]),
         el('div', { className: 'settings-row settings-grid' }, [
-          el('label', { textContent: 'Theme' }), theme,
-          el('label', { textContent: 'Desktop icon size' }), iconSize,
-          el('label', { textContent: 'Dock position' }), dockPosition,
-          el('label', { textContent: 'Animations' }), motion
-        ]),
+           el('label', { textContent: 'Theme' }), theme,
+           el('label', { textContent: 'Desktop icon size' }), iconSize,
+           el('label', { textContent: 'Dock position' }), dockPosition,
+           el('label', { textContent: 'Animations' }), motion
+         ]),
+        customTheme,
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Power button redirects to' }),
           panic
