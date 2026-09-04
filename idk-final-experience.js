@@ -17,6 +17,8 @@
       const heading = sidebar.querySelector(':scope > strong');
       const friendButton = messenger.querySelector('.idk-friends-button');
       if (friendButton && friendButton.parentElement !== sidebar) heading?.after(friendButton);
+      const memberSearches = [...sidebar.querySelectorAll('input.idk-dm-search')];
+      memberSearches.slice(1).forEach(input => input.remove());
       const panel = messenger.querySelector('.idk-friends-panel');
       if (panel && panel.parentElement !== sidebar) sidebar.append(panel);
     };
