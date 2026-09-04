@@ -51,7 +51,9 @@ app.get('/api/update', async (req, res) => res.json({
     'Welcome tour, App Store lifecycle tools, and recovery controls.',
     'Theme, widget, audio, search, and accessibility improvements.',
     'Public HTML app publishing with versions, ratings, installs, and reports.',
-    'Files backup and restore plus the IDK System Self-Test.'
+    'Files backup and restore plus the IDK System Self-Test.',
+    'Smart Workspaces, Universal Clipboard, Share Sheet, and System Timeline.',
+    'Drag-and-drop desktop widgets for weather, news, calendar, stocks, and sports.'
   ],
   health: await backendStatus()
 }));

@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const STORAGE_KEYS = ['theme', 'idkCustomTheme', 'wallpaper', 'iconSize', 'dockPosition', 'motion', 'idkDesktopWidgets', 'idkWidgetConfig', 'idkFileSystem', 'idkDropzone', 'idkInstalledPrograms', 'idkMailMessages', 'idkMessengerProfile', 'idkTodos', 'idkCalendarEvents', 'idkRichNotes', 'idkAudioSettings', 'idkAccessibility'];
+  const STORAGE_KEYS = ['theme', 'idkCustomTheme', 'wallpaper', 'iconSize', 'dockPosition', 'motion', 'idkDesktopWidgets', 'idkWidgetConfig', 'idkFileSystem', 'idkDropzone', 'idkInstalledPrograms', 'idkMailMessages', 'idkMessengerProfile', 'idkTodos', 'idkCalendarEvents', 'idkRichNotes', 'idkAudioSettings', 'idkAccessibility', 'idkSmartWorkspaces', 'idkClipboardHistory', 'idkSystemTimeline'];
   const read = (key, fallback) => { try { const value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } };
   const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   const notify = (title, message) => window.OS?.notify?.(title, message);
