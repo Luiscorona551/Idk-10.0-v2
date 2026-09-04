@@ -326,6 +326,16 @@ const OS = (() => {
     toggle.className = 'dock-media-btn';
     toggle.type = 'button';
     toggle.setAttribute('aria-label', 'Play music');
+    const previous = document.createElement('button');
+    previous.className = 'dock-media-btn';
+    previous.type = 'button';
+    previous.textContent = '|<';
+    previous.setAttribute('aria-label', 'Previous song');
+    const next = document.createElement('button');
+    next.className = 'dock-media-btn';
+    next.type = 'button';
+    next.textContent = '>|';
+    next.setAttribute('aria-label', 'Next song');
     const stop = document.createElement('button');
     stop.className = 'dock-media-btn';
     stop.type = 'button';
@@ -350,6 +360,8 @@ const OS = (() => {
       const active = Boolean(audio || youtube);
       toggle.textContent = active && audioState.playing ? '❚❚' : '▶';
       toggle.setAttribute('aria-label', active && audioState.playing ? 'Pause music' : 'Play music');
+      previous.disabled = !active;
+      next.disabled = !active;
       volume.value = String(audio ? audio.volume : audioState.volume ?? 1);
       volume.disabled = youtube;
       label.textContent = audioState.name && audioState.name !== 'Nothing loaded yet.'
@@ -358,32 +370,31 @@ const OS = (() => {
     };
     toggle.addEventListener('click', () => {
       const audio = audioState.audio;
-      if (audioState.type === 'youtube') {
-        window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'toggle' } }));
+      if (window.IDK_MUSIC_PLAYER) {
+        window.IDK_MUSIC_PLAYER.toggle();
         return;
       }
       if (!audio) {
         launch('music');
         return;
       }
-      if (audio.paused) audio.play().catch(() => {});
+      if (audioState.type === 'youtube') window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'toggle' } }));
+      else if (audio.paused) audio.play().catch(() => {});
       else audio.pause();
     });
     stop.addEventListener('click', () => {
-      if (audioState.type === 'youtube') {
-        window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'stop' } }));
-        return;
-      }
-      if (!audioState.audio) return;
-      audioState.audio.pause();
-      audioState.audio.currentTime = 0;
+      if (window.IDK_MUSIC_PLAYER) window.IDK_MUSIC_PLAYER.stop();
+      else if (audioState.type === 'youtube') window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'stop' } }));
+      else if (audioState.audio) { audioState.audio.pause(); audioState.audio.currentTime = 0; }
     });
+    previous.addEventListener('click', () => window.IDK_MUSIC_PLAYER?.previous());
+    next.addEventListener('click', () => window.IDK_MUSIC_PLAYER?.next());
     volume.addEventListener('input', () => {
       if (audioState.audio) audioState.audio.volume = Number(volume.value);
     });
     window.addEventListener('idk-audio-state', update);
     update({ detail: audioState });
-    media.append(toggle, stop, volume, label);
+    media.append(previous, toggle, next, stop, volume, label);
     dock.append(media);
   }
 
