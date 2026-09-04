@@ -2,12 +2,13 @@
   'use strict';
   const ROOT = '#icons';
   const VERSION_KEY = 'idkDesktopLayoutVersion';
-  const VERSION = '9-special-apps-separated-no-apps-shortcut';
+  const VERSION = '10-two-by-two-scrollable';
   const COL_W = 112;
-  const ROW_H = 118;
-  const START_X = 16;
-  const START_Y = 88;
-  const SPECIAL = ['messenger', 'idk messenger', 'sheets', 'idk sheets', 'program installer'];
+  const ROW_H = 116;
+  const ROWS = 2;
+  const VISIBLE_COLUMNS = 2;
+  const START_X = 12;
+  const START_Y = 146;
   let applying = false;
   let timer = 0;
 
@@ -19,74 +20,64 @@
     return String(el.dataset.appId || el.dataset.app || el.dataset.id || textOf(el)).trim().toLowerCase();
   }
   function isDesktopIcon(el) {
-    return el instanceof HTMLElement && (el.classList.contains('desktop-icon') || el.dataset.appId || el.dataset.app || el.dataset.id);
+    return el instanceof HTMLElement && (
+      el.classList.contains('desktop-icon') ||
+      el.classList.contains('idk-installed-shortcut') ||
+      el.dataset.appId || el.dataset.app || el.dataset.id
+    );
   }
   function isAppsShortcut(el) {
     return keyOf(el) === 'apps' || textOf(el).toLowerCase() === 'apps';
   }
-  function isSpecial(el) {
-    const key = keyOf(el);
-    const text = textOf(el).toLowerCase();
-    return SPECIAL.includes(key) || SPECIAL.includes(text);
-  }
 
-  // The Apps program may remain available from Start/Search, but its desktop shortcut is removed completely.
-  function removeAppsShortcuts(r) {
-    [...r.children].filter(isDesktopIcon).forEach(el => {
+  function removeAppsShortcuts(root) {
+    [...root.children].filter(isDesktopIcon).forEach(el => {
       if (isAppsShortcut(el)) el.remove();
     });
   }
 
   function arrange() {
     if (applying) return;
-    const r = getRoot();
-    if (!r) return;
+    const root = getRoot();
+    if (!root) return;
     applying = true;
-    removeAppsShortcuts(r);
+    removeAppsShortcuts(root);
 
-    const all = [...r.children].filter(isDesktopIcon);
-    const specials = all.filter(isSpecial);
-    const regular = all.filter(el => !isSpecial(el));
-    const mobile = window.innerWidth < 700;
-    const columns = mobile ? 2 : 4;
+    const icons = [...root.children].filter(isDesktopIcon);
+    const columns = Math.max(1, Math.ceil(icons.length / ROWS));
+    const viewportHeight = Math.min(
+      Math.max(START_Y + ROWS * ROW_H + 24, 300),
+      Math.max(window.innerHeight - 120, 300)
+    );
+    const contentWidth = START_X + columns * COL_W + 18;
+    const viewportWidth = START_X + VISIBLE_COLUMNS * COL_W + 18;
 
-    // Give Messenger, Sheets, and Program Installer their own top area.
-    // Regular apps begin on a fresh row so they never get mixed into that area.
-    const specialSlots = mobile ? 2 : 3;
-    const specialRows = Math.max(1, Math.ceil(specials.length / specialSlots));
-    const regularStartRow = specialRows + 1;
-    const rows = regularStartRow + Math.ceil(regular.length / columns);
-    const viewportHeight = Math.max(window.innerHeight - 112, 300);
-    const contentHeight = Math.max(viewportHeight, START_Y + rows * ROW_H + 32);
+    root.style.setProperty('position', 'absolute', 'important');
+    root.style.setProperty('left', '0', 'important');
+    root.style.setProperty('top', '0', 'important');
+    root.style.setProperty('width', `${viewportWidth}px`, 'important');
+    root.style.setProperty('height', `${viewportHeight}px`, 'important');
+    root.style.setProperty('max-height', `${viewportHeight}px`, 'important');
+    root.style.setProperty('overflow-x', 'auto', 'important');
+    root.style.setProperty('overflow-y', 'hidden', 'important');
+    root.style.setProperty('box-sizing', 'border-box', 'important');
+    root.style.setProperty('padding-bottom', '24px', 'important');
 
-    r.style.setProperty('position', 'absolute', 'important');
-    r.style.setProperty('left', '0', 'important');
-    r.style.setProperty('top', '0', 'important');
-    r.style.setProperty('width', `${columns * COL_W + 24}px`, 'important');
-    r.style.setProperty('height', `${viewportHeight}px`, 'important');
-    r.style.setProperty('max-height', `${viewportHeight}px`, 'important');
-    r.style.setProperty('overflow-x', 'hidden', 'important');
-    r.style.setProperty('overflow-y', contentHeight > viewportHeight ? 'auto' : 'hidden', 'important');
-    r.style.setProperty('box-sizing', 'border-box', 'important');
-    r.style.setProperty('padding-bottom', '24px', 'important');
-
-    // Create scrollable height even though icons are absolutely positioned.
-    let spacer = r.querySelector('#idk-icon-scroll-spacer');
+    let spacer = root.querySelector('#idk-icon-scroll-spacer');
     if (!spacer) {
       spacer = document.createElement('div');
       spacer.id = 'idk-icon-scroll-spacer';
       spacer.setAttribute('aria-hidden', 'true');
-      r.appendChild(spacer);
+      root.appendChild(spacer);
     }
     spacer.style.setProperty('position', 'absolute', 'important');
-    spacer.style.setProperty('left', '0', 'important');
-    spacer.style.setProperty('top', `${contentHeight - 2}px`, 'important');
+    spacer.style.setProperty('left', `${contentWidth - 2}px`, 'important');
+    spacer.style.setProperty('top', '0', 'important');
     spacer.style.setProperty('width', '1px', 'important');
     spacer.style.setProperty('height', '2px', 'important');
     spacer.style.setProperty('pointer-events', 'none', 'important');
 
-    specials.forEach((el, i) => positionIcon(el, i % specialSlots, Math.floor(i / specialSlots)));
-    regular.forEach((el, i) => positionIcon(el, i % columns, regularStartRow + Math.floor(i / columns)));
+    icons.forEach((icon, index) => positionIcon(icon, Math.floor(index / ROWS), index % ROWS));
 
     try {
       localStorage.setItem(VERSION_KEY, VERSION);
@@ -95,36 +86,36 @@
     applying = false;
   }
 
-  function positionIcon(el, col, row) {
-    const x = START_X + col * COL_W;
+  function positionIcon(icon, column, row) {
+    const x = START_X + column * COL_W;
     const y = START_Y + row * ROW_H;
-    el.style.setProperty('position', 'absolute', 'important');
-    el.style.setProperty('left', `${x}px`, 'important');
-    el.style.setProperty('top', `${y}px`, 'important');
-    el.style.setProperty('right', 'auto', 'important');
-    el.style.setProperty('bottom', 'auto', 'important');
-    el.style.setProperty('transform', 'none', 'important');
-    el.style.setProperty('width', '100px', 'important');
-    el.style.setProperty('height', '106px', 'important');
-    el.style.setProperty('min-width', '100px', 'important');
-    el.style.setProperty('min-height', '106px', 'important');
-    el.style.setProperty('margin', '0', 'important');
-    el.style.setProperty('padding', '3px 2px', 'important');
-    el.style.setProperty('box-sizing', 'border-box', 'important');
-    el.style.setProperty('display', 'flex', 'important');
-    el.style.setProperty('flex-direction', 'column', 'important');
-    el.style.setProperty('align-items', 'center', 'important');
-    el.style.setProperty('justify-content', 'flex-start', 'important');
-    el.style.setProperty('overflow', 'visible', 'important');
+    icon.style.setProperty('position', 'absolute', 'important');
+    icon.style.setProperty('left', `${x}px`, 'important');
+    icon.style.setProperty('top', `${y}px`, 'important');
+    icon.style.setProperty('right', 'auto', 'important');
+    icon.style.setProperty('bottom', 'auto', 'important');
+    icon.style.setProperty('transform', 'none', 'important');
+    icon.style.setProperty('width', '104px', 'important');
+    icon.style.setProperty('height', `${ROW_H - 4}px`, 'important');
+    icon.style.setProperty('min-width', '104px', 'important');
+    icon.style.setProperty('min-height', `${ROW_H - 4}px`, 'important');
+    icon.style.setProperty('margin', '0', 'important');
+    icon.style.setProperty('padding', '3px 2px', 'important');
+    icon.style.setProperty('box-sizing', 'border-box', 'important');
+    icon.style.setProperty('display', 'flex', 'important');
+    icon.style.setProperty('flex-direction', 'column', 'important');
+    icon.style.setProperty('align-items', 'center', 'important');
+    icon.style.setProperty('justify-content', 'flex-start', 'important');
+    icon.style.setProperty('overflow', 'visible', 'important');
 
-    const glyph = el.querySelector('.glyph');
+    const glyph = icon.querySelector('.glyph,.idk-installed-shortcut-icon');
     if (glyph) {
       glyph.style.setProperty('width', '48px', 'important');
       glyph.style.setProperty('height', '48px', 'important');
       glyph.style.setProperty('flex', '0 0 48px', 'important');
       glyph.style.setProperty('margin', '0 0 6px', 'important');
     }
-    const label = el.querySelector('.label,.icon-label,.desktop-icon-label');
+    const label = icon.querySelector('.label,.icon-label,.desktop-icon-label') || icon.querySelector(':scope > span:last-child');
     if (label) {
       label.style.setProperty('width', '100px', 'important');
       label.style.setProperty('max-width', '100px', 'important');
@@ -145,10 +136,10 @@
 
   function boot() {
     arrange();
-    const r = getRoot();
-    if (r) new MutationObserver(mutations => {
+    const root = getRoot();
+    if (root) new MutationObserver(mutations => {
       if (!applying && mutations.some(m => m.type === 'childList' && (m.addedNodes.length || m.removedNodes.length))) schedule();
-    }).observe(r, { childList: true });
+    }).observe(root, { childList: true });
     window.addEventListener('resize', schedule, { passive: true });
     [300, 800, 1500, 3000].forEach(ms => setTimeout(arrange, ms));
   }

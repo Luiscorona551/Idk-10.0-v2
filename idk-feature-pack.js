@@ -11,12 +11,16 @@
     guest: false,
     pinHash: '',
     note: '',
-    bookmarks: []
+    bookmarks: [],
+    customTheme: { accent: '#5986da', panel: '#0c1226', panelSolid: '#0d1226', text: '#eaf0ff' }
   };
   const read = () => {
     try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; }
   };
   const state = { ...defaults, ...read() };
+  const savedTheme = store.get('theme', null);
+  if (savedTheme) state.theme = savedTheme;
+  state.customTheme = { ...defaults.customTheme, ...(state.customTheme || {}), ...store.get('idkCustomTheme', {}) };
   state.bookmarks = Array.isArray(state.bookmarks) ? state.bookmarks : [];
   const save = () => {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
@@ -72,8 +76,20 @@
 
   function applyTheme() {
     const themes = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
-    const theme = themes.includes(state.theme) ? state.theme : 'midnight';
-    document.getElementById('desktop')?.setAttribute('data-theme', theme);
+    const theme = store.get('theme', state.theme);
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    if (theme === 'custom') {
+      desktop.setAttribute('data-theme', 'custom');
+      desktop.style.setProperty('--accent', state.customTheme.accent);
+      desktop.style.setProperty('--panel', state.customTheme.panel);
+      desktop.style.setProperty('--panel-solid', state.customTheme.panelSolid);
+      desktop.style.setProperty('--text', state.customTheme.text);
+      desktop.style.setProperty('--muted', `color-mix(in srgb, ${state.customTheme.text} 62%, transparent)`);
+      return;
+    }
+    ['--accent', '--panel', '--panel-solid', '--text', '--muted'].forEach(property => desktop.style.removeProperty(property));
+    desktop.setAttribute('data-theme', themes.includes(theme) ? theme : 'midnight');
   }
 
   function applyDeviceSettings() {
@@ -210,15 +226,27 @@
     if (!pane) return;
     document.querySelectorAll('.idk-pack-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.pane === name));
     if (name === 'desktop') {
-      pane.innerHTML = `<section class="idk-pack-card"><h3>Virtual desktops</h3><p>Keep school, games, and personal windows separate.</p><div class="idk-pack-space-list">${[1, 2, 3].map(space => `<button class="idk-pack-space${state.space === space ? ' active' : ''}" data-space="${space}">Desktop ${space}</button>`).join('')}</div><div class="idk-pack-actions"><button class="idk-pack-btn" data-action="move">Move active window</button><button class="idk-pack-btn" data-action="widgets">Show widgets</button><button class="idk-pack-btn" data-action="screenshot">Save screenshot</button></div></section>
-        <section class="idk-pack-card"><h3>Appearance</h3><label class="idk-pack-label"><strong>Theme</strong><select class="idk-pack-select" id="idk-pack-theme">${['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'].map(theme => `<option value="${theme}">${theme[0].toUpperCase() + theme.slice(1)}</option>`).join('')}</select></label></section>`;
-      one('#idk-pack-theme').value = state.theme;
-      pane.querySelectorAll('[data-space]').forEach(button => { button.onclick = () => switchSpace(button.dataset.space); });
+       pane.innerHTML = `<section class="idk-pack-card"><h3>Virtual desktops</h3><p>Keep school, games, and personal windows separate.</p><div class="idk-pack-space-list">${[1, 2, 3].map(space => `<button class="idk-pack-space${state.space === space ? ' active' : ''}" data-space="${space}">Desktop ${space}</button>`).join('')}</div><div class="idk-pack-actions"><button class="idk-pack-btn" data-action="move">Move active window</button><button class="idk-pack-btn" data-action="widgets">Show widgets</button><button class="idk-pack-btn" data-action="screenshot">Save screenshot</button></div></section>
+         <section class="idk-pack-card"><h3>Appearance</h3><label class="idk-pack-label"><strong>Theme</strong><select class="idk-pack-select" id="idk-pack-theme">${['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy', 'custom'].map(theme => `<option value="${theme}">${theme[0].toUpperCase() + theme.slice(1)}</option>`).join('')}</select></label><div class="idk-pack-custom-theme" id="idk-pack-custom-theme"><label class="idk-pack-label"><strong>Accent</strong><input class="idk-pack-color" data-color="accent" type="color" value="${state.customTheme.accent}"></label><label class="idk-pack-label"><strong>Panel</strong><input class="idk-pack-color" data-color="panel" type="color" value="${state.customTheme.panel}"></label><label class="idk-pack-label"><strong>Window panel</strong><input class="idk-pack-color" data-color="panelSolid" type="color" value="${state.customTheme.panelSolid}"></label><label class="idk-pack-label"><strong>Text</strong><input class="idk-pack-color" data-color="text" type="color" value="${state.customTheme.text}"></label></div></section>`;
+       one('#idk-pack-theme').value = state.theme;
+       const customTheme = one('#idk-pack-custom-theme');
+       const syncCustomTheme = () => {
+         customTheme.hidden = one('#idk-pack-theme').value !== 'custom';
+         if (!customTheme.hidden) applyTheme();
+       };
+       customTheme.querySelectorAll('[data-color]').forEach(input => input.oninput = () => {
+         state.customTheme[input.dataset.color] = input.value;
+         store.set('idkCustomTheme', state.customTheme);
+         save();
+         syncCustomTheme();
+       });
+       pane.querySelectorAll('[data-space]').forEach(button => { button.onclick = () => switchSpace(button.dataset.space); });
       pane.querySelector('[data-action="move"]').onclick = () => moveFocusedWindow(state.space === 3 ? 1 : state.space + 1);
       pane.querySelector('[data-action="widgets"]').onclick = toggleWidgets;
       pane.querySelector('[data-action="screenshot"]').onclick = saveScreenshot;
-      one('#idk-pack-theme').onchange = event => { state.theme = event.target.value; save(); applyTheme(); };
-      return;
+       one('#idk-pack-theme').onchange = event => { state.theme = event.target.value; store.set('theme', state.theme); save(); syncCustomTheme(); applyTheme(); };
+       syncCustomTheme();
+       return;
     }
     if (name === 'system') {
       pane.innerHTML = `<section class="idk-pack-card"><h3>System health</h3><p class="idk-pack-status" id="idk-pack-health">Checking system status…</p><button class="idk-pack-btn" id="idk-pack-refresh-health">Refresh status</button></section><section class="idk-pack-card"><h3>Device controls</h3><label class="idk-pack-label"><strong>Brightness</strong><input class="idk-pack-range" id="idk-pack-brightness-range" type="range" min="20" max="100" value="${state.brightness}"></label><label class="idk-pack-label"><strong>Volume</strong><input class="idk-pack-range" id="idk-pack-volume-range" type="range" min="0" max="100" value="${state.volume}"></label></section><section class="idk-pack-card"><h3>Open a built-in app</h3><div class="idk-pack-actions"><button class="idk-pack-btn" data-app="files">Files</button><button class="idk-pack-btn" data-app="proxy">Browser</button><button class="idk-pack-btn" data-app="chat">Messenger</button><button class="idk-pack-btn" data-app="games">Games</button><button class="idk-pack-btn" data-app="music">Music</button></div></section>`;

@@ -29,7 +29,15 @@ const OS = (() => {
   let workspaceSaveTimer = null;
   let restoringWorkspace = false;
   const WORKSPACE_KEY = 'idkWorkspace';
-  const notificationHistory = [];
+  const ACTIVITY_KEY = 'idkActivityHistory';
+  const notificationHistory = (() => {
+    const saved = store.get(ACTIVITY_KEY, []);
+    return Array.isArray(saved) ? saved.filter(item => item && item.title && item.message).slice(0, 50) : [];
+  })();
+
+  function persistActivity() {
+    store.set(ACTIVITY_KEY, notificationHistory);
+  }
 
   function setLoading(loading) {
     loadingCount = Math.max(0, loadingCount + (loading ? 1 : -1));
@@ -59,8 +67,11 @@ const OS = (() => {
 
   function notify(title, message, kind = 'info') {
     if (!notifications) return;
-    notificationHistory.unshift({ title, message, kind, at: Date.now() });
+    const item = { title, message, kind, at: Date.now() };
+    notificationHistory.unshift(item);
     notificationHistory.splice(30);
+    persistActivity();
+    window.dispatchEvent(new CustomEvent('idk-activity', { detail: item }));
     unreadNotifications += 1;
     renderNotifications();
     const toast = document.createElement('article');
@@ -110,7 +121,15 @@ const OS = (() => {
     notificationToggle.setAttribute('aria-expanded', String(Boolean(opening)));
     if (opening) { unreadNotifications = 0; renderNotifications(); }
   });
-  notificationsClear?.addEventListener('click', () => { notificationHistory.length = 0; unreadNotifications = 0; renderNotifications(); });
+  function clearActivity() {
+    notificationHistory.length = 0;
+    unreadNotifications = 0;
+    persistActivity();
+    renderNotifications();
+    window.dispatchEvent(new Event('idk-activity-cleared'));
+  }
+
+  notificationsClear?.addEventListener('click', clearActivity);
   document.addEventListener('pointerdown', event => {
     if (notificationsPanel && !notificationsPanel.contains(event.target) && event.target !== notificationToggle) {
       notificationsPanel.hidden = true;
@@ -231,6 +250,13 @@ const OS = (() => {
     if (side === 'max') win.classList.add('maximized');
     if (side === 'left') win.classList.add('snapped-left');
     if (side === 'right') win.classList.add('snapped-right');
+  }
+
+  function cycleSnap(win) {
+    if (win.classList.contains('snapped-left')) return snap(win, 'right');
+    if (win.classList.contains('snapped-right')) return snap(win, 'max');
+    if (win.classList.contains('maximized')) return snap(win, 'free');
+    snap(win, 'left');
   }
 
   function drag(win, handle) {
@@ -425,6 +451,11 @@ const OS = (() => {
     const app = APPS[appId];
     if (!app) return;
 
+    if (window.IDKPermissions?.can && !window.IDKPermissions.can(appId, 'open')) {
+      notify('App permissions', `${app.title} is blocked. Allow it in App Permissions to open it.`);
+      return;
+    }
+
     if (appId !== 'player') {
       const recent = store.get('recentApps', []);
       store.set('recentApps', [appId, ...(Array.isArray(recent) ? recent : []).filter(id => id !== appId)].slice(0, 6));
@@ -454,6 +485,15 @@ const OS = (() => {
     focus(win);
     drag(win, titlebar);
     resize(win, win.querySelector('.resizer'));
+
+    const snapButton = document.createElement('button');
+    snapButton.className = 'ctrl snap';
+    snapButton.type = 'button';
+    snapButton.title = 'Snap window';
+    snapButton.setAttribute('aria-label', 'Snap window');
+    snapButton.textContent = '◧';
+    snapButton.addEventListener('click', () => { cycleSnap(win); scheduleWorkspaceSave(); });
+    titlebar.querySelector('.controls')?.insertBefore(snapButton, titlebar.querySelector('.close'));
 
     open.set(key, win);
     markDock();
@@ -671,7 +711,16 @@ const OS = (() => {
   }
 
   build();
-  return { open: launch, tickClock, setLoading, notify, restoreWorkspace, clearWorkspace };
+  return {
+    open: launch,
+    tickClock,
+    setLoading,
+    notify,
+    restoreWorkspace,
+    clearWorkspace,
+    clearActivity,
+    getActivityHistory: () => notificationHistory.map(item => ({ ...item }))
+  };
 })();
 
 window.OS = OS;

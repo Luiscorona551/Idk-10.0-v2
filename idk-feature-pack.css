@@ -87,6 +87,9 @@
   font: inherit;
 }
 .idk-pack-textarea { min-height: 82px; resize: vertical; }
+.idk-pack-custom-theme { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.idk-pack-custom-theme[hidden] { display: none; }
+.idk-pack-color { width: 100%; min-height: 34px; padding: 2px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; background: rgba(0, 0, 0, .25); cursor: pointer; }
 .idk-pack-label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
 .idk-pack-label strong { color: var(--text); font-size: 12px; }
 .idk-pack-range { width: 100%; accent-color: var(--accent); }

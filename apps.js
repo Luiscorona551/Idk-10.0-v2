@@ -21,6 +21,18 @@ const PANIC_URL = 'https://classroom.google.com/';
 const DEFAULT_WALLPAPER = 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png';
 const FALLBACK_WALLPAPER = 'linear-gradient(135deg, #16224a, #2b1748)';
 const THEMES = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
+const CUSTOM_THEME_KEY = 'idkCustomTheme';
+const CUSTOM_THEME_DEFAULTS = { accent: '#5986da', panel: '#0c1226', panelSolid: '#0d1226', text: '#eaf0ff' };
+const APP_PERMISSIONS_KEY = 'idkAppPermissions';
+const PERMISSION_TYPES = [
+  ['open', 'Open app'],
+  ['storage', 'Saved data'],
+  ['notifications', 'Notifications'],
+  ['network', 'Internet access'],
+  ['microphone', 'Microphone'],
+  ['camera', 'Camera']
+];
+const PERMISSION_DEFAULTS = { open: true, storage: true, notifications: true, network: true, microphone: false, camera: false };
 const WALLPAPER_PRESETS = [
   { value: DEFAULT_WALLPAPER, label: 'IDK Blue' },
   { value: 'linear-gradient(135deg, #101a3d 0%, #16224a 48%, #4b1f57 100%)', label: 'Violet Horizon' },
@@ -39,7 +51,21 @@ function applyWallpaper(url) {
 }
 
 function applyTheme(name) {
-  document.getElementById('desktop')?.setAttribute('data-theme', THEMES.includes(name) ? name : 'midnight');
+  const desktop = document.getElementById('desktop');
+  if (!desktop) return;
+  if (name === 'custom') {
+    const saved = store.get(CUSTOM_THEME_KEY, CUSTOM_THEME_DEFAULTS);
+    const theme = { ...CUSTOM_THEME_DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) };
+    desktop.setAttribute('data-theme', 'custom');
+    desktop.style.setProperty('--accent', theme.accent);
+    desktop.style.setProperty('--panel', theme.panel);
+    desktop.style.setProperty('--panel-solid', theme.panelSolid);
+    desktop.style.setProperty('--text', theme.text);
+    desktop.style.setProperty('--muted', `color-mix(in srgb, ${theme.text} 62%, transparent)`);
+    return;
+  }
+  ['--accent', '--panel', '--panel-solid', '--text', '--muted'].forEach(property => desktop.style.removeProperty(property));
+  desktop.setAttribute('data-theme', THEMES.includes(name) ? name : 'midnight');
 }
 
 function applyIconSize(size) {
@@ -90,6 +116,81 @@ function el(tag, props = {}, children = []) {
 
 function emptyState(message) {
   return el('div', { className: 'empty-state', innerHTML: message });
+}
+
+function appPermissionState(appId) {
+  const all = store.get(APP_PERMISSIONS_KEY, {});
+  const saved = all && typeof all === 'object' ? all[appId] : null;
+  return { ...PERMISSION_DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) };
+}
+
+function setAppPermission(appId, permission, allowed) {
+  const all = store.get(APP_PERMISSIONS_KEY, {});
+  const permissions = all && typeof all === 'object' ? all : {};
+  permissions[appId] = { ...appPermissionState(appId), [permission]: Boolean(allowed) };
+  store.set(APP_PERMISSIONS_KEY, permissions);
+  window.dispatchEvent(new CustomEvent('idk-permissions-changed', { detail: { appId, permission, allowed: Boolean(allowed) } }));
+}
+
+function permissionsApp() {
+  const root = el('div', { className: 'app permissions-app' });
+  const appSelect = el('select', { className: 'field', 'aria-label': 'Choose an app' });
+  const table = el('div', { className: 'permissions-list' });
+  const status = el('p', { className: 'permissions-status', textContent: 'Changes are saved on this device.' });
+  Object.entries(APPS).filter(([id]) => !['panic', 'player'].includes(id)).forEach(([id, app]) => appSelect.append(el('option', { value: id, textContent: app.title })));
+
+  const render = () => {
+    const appId = appSelect.value;
+    const state = appPermissionState(appId);
+    table.replaceChildren(...PERMISSION_TYPES.map(([permission, label]) => {
+      const toggle = el('input', { type: 'checkbox', checked: state[permission], 'aria-label': `${label} for ${APPS[appId].title}` });
+      toggle.addEventListener('change', () => {
+        setAppPermission(appId, permission, toggle.checked);
+        status.textContent = `${label} ${toggle.checked ? 'allowed' : 'blocked'} for ${APPS[appId].title}.`;
+      });
+      return el('label', { className: 'permission-row' }, [el('span', { textContent: label }), toggle]);
+    }));
+  };
+  appSelect.addEventListener('change', render);
+  root.append(
+    el('h2', { textContent: 'App Permissions' }),
+    el('p', { textContent: 'Choose what each built-in app may use. These choices stay in this browser.' }),
+    el('div', { className: 'permissions-picker' }, [el('label', { textContent: 'App' }), appSelect]),
+    table,
+    status
+  );
+  render();
+  return root;
+}
+
+function activityCenterApp() {
+  const root = el('div', { className: 'app activity-center-app' });
+  const list = el('div', { className: 'activity-list' });
+  const count = el('span', { className: 'count' });
+  const render = () => {
+    const items = window.OS?.getActivityHistory?.() || [];
+    count.textContent = `${items.length} entr${items.length === 1 ? 'y' : 'ies'}`;
+    list.replaceChildren();
+    if (!items.length) {
+      list.append(emptyState('No activity yet. System updates and app messages will appear here.'));
+      return;
+    }
+    items.forEach(item => list.append(el('article', { className: `activity-entry ${item.kind || 'info'}` }, [
+      el('div', { className: 'activity-entry-copy' }, [el('strong', { textContent: item.title }), el('p', { textContent: item.message })]),
+      el('time', { dateTime: new Date(item.at).toISOString(), textContent: new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
+    ])));
+  };
+  const clear = el('button', { className: 'btn tab', type: 'button', textContent: 'Clear activity' });
+  clear.addEventListener('click', () => window.OS?.clearActivity?.());
+  window.addEventListener('idk-activity', render);
+  window.addEventListener('idk-activity-cleared', render);
+  root.cleanup = () => {
+    window.removeEventListener('idk-activity', render);
+    window.removeEventListener('idk-activity-cleared', render);
+  };
+  root.append(el('div', { className: 'activity-heading' }, [el('div', {}, [el('h2', { textContent: 'Activity Center' }), el('p', { textContent: 'Your recent IDK updates, alerts, and app activity.' })]), count, clear]), list);
+  render();
+  return root;
 }
 
 function loadingState(label = 'Loading') {
@@ -1137,6 +1238,24 @@ const APPS = {
     render: appsHub
   },
 
+  activity: {
+    title: 'Activity Center',
+    glyph: '◌',
+    desktop: true,
+    width: 680,
+    height: 560,
+    render: activityCenterApp
+  },
+
+  permissions: {
+    title: 'App Permissions',
+    glyph: '🛡️',
+    desktop: true,
+    width: 620,
+    height: 540,
+    render: permissionsApp
+  },
+
   files: {
     title: 'Files',
     glyph: '📁',
@@ -1780,8 +1899,30 @@ const APPS = {
       wallpaperPreset.addEventListener('change', () => { if (wallpaperPreset.value) input.value = wallpaperPreset.value; });
       const clock24 = el('input', { type: 'checkbox', checked: store.get('clock24', false) });
       const theme = el('select', { className: 'field', value: store.get('theme', 'midnight') });
-      [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
+      [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy'], ['custom', 'Custom']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
       theme.value = store.get('theme', 'midnight');
+      const savedCustomTheme = store.get(CUSTOM_THEME_KEY, CUSTOM_THEME_DEFAULTS);
+      const customThemeValues = { ...CUSTOM_THEME_DEFAULTS, ...(savedCustomTheme && typeof savedCustomTheme === 'object' ? savedCustomTheme : {}) };
+      const customThemeInputs = Object.fromEntries(Object.entries({
+        accent: 'Accent',
+        panel: 'Panel',
+        panelSolid: 'Window panel',
+        text: 'Text'
+      }).map(([key, label]) => [key, el('label', { textContent: label }, [el('input', { className: 'field', type: 'color', value: customThemeValues[key] })])]));
+      const customTheme = el('div', { className: 'settings-custom-theme' }, [
+        el('strong', { textContent: 'Custom theme colors' }),
+        el('div', { className: 'settings-color-grid' }, Object.values(customThemeInputs))
+      ]);
+      const readCustomTheme = () => Object.fromEntries(Object.entries(customThemeInputs).map(([key, label]) => [key, label.querySelector('input').value]));
+      const updateCustomTheme = () => {
+        const values = readCustomTheme();
+        store.set(CUSTOM_THEME_KEY, values);
+        customTheme.hidden = theme.value !== 'custom';
+        if (theme.value === 'custom') applyTheme('custom');
+      };
+      Object.values(customThemeInputs).forEach(label => label.querySelector('input').addEventListener('input', updateCustomTheme));
+      theme.addEventListener('change', updateCustomTheme);
+      updateCustomTheme();
       const iconSize = el('select', { className: 'field', value: store.get('iconSize', 'normal') });
       [['compact', 'Compact'], ['normal', 'Normal'], ['large', 'Large']].forEach(([value, label]) => iconSize.append(el('option', { value, textContent: label })));
       iconSize.value = store.get('iconSize', 'normal');
@@ -1803,6 +1944,7 @@ const APPS = {
         store.set('wallpaper', input.value.trim());
         store.set('clock24', clock24.checked);
         store.set('theme', theme.value);
+        store.set(CUSTOM_THEME_KEY, readCustomTheme());
         store.set('iconSize', iconSize.value);
         store.set('dockPosition', dockPosition.value);
         store.set('motion', motion.value);
@@ -1881,5 +2023,17 @@ const APPS = {
       });
       return frame;
     }
+  }
+};
+
+window.IDKPermissions = {
+  can(appId, permission) {
+    return appPermissionState(appId)[permission] !== false;
+  },
+  get(appId) {
+    return appPermissionState(appId);
+  },
+  set(appId, permission, allowed) {
+    setAppPermission(appId, permission, allowed);
   }
 };
