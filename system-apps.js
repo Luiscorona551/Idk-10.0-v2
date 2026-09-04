@@ -103,6 +103,24 @@ window.SYSTEM_APPS = (() => {
     return seeded;
   }
 
+  async function importFileEntries(files, parent = '', target = null) {
+    const entries = target || getFiles();
+    const list = Array.from(files || []);
+    for (const [index, file] of list.entries()) {
+      const id = `${file.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}-${index}`;
+      const entry = {
+        id, name: file.name, type: 'file', parent,
+        updated: Date.now(), size: file.size, mime: file.type || 'application/octet-stream',
+        storage: 'indexeddb', text: isTextFile({ name: file.name, mime: file.type })
+      };
+      await storeBlob(entry.id, file);
+      entries.push(entry);
+    }
+    write(FILES_KEY, entries);
+    if (list.length) window.OS?.notify('Files', `${list.length} file${list.length === 1 ? '' : 's'} imported.`);
+    return entries;
+  }
+
   function formatDate(timestamp) {
     return new Date(timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
   }
@@ -137,6 +155,40 @@ window.SYSTEM_APPS = (() => {
       if (index >= 0) entries.splice(index, 1);
       persist();
       window.OS?.notify('Files', `${entry.name} was deleted.`);
+      renderFolder();
+    };
+
+    const renameEntry = entry => {
+      const name = window.prompt('New file name', entry.name);
+      if (!name?.trim()) return;
+      entry.name = name.trim();
+      entry.updated = Date.now();
+      persist();
+      renderFolder();
+    };
+
+    const copyEntry = async entry => {
+      if (entry.type === 'folder') return window.OS?.notify('Files', 'Copying folders is not available yet.');
+      const source = await blobFor(entry);
+      if (!source) return window.OS?.notify('Files', 'That file is no longer available.');
+      const copy = { ...entry, id: `${entry.id}-copy-${Date.now()}`, name: `Copy of ${entry.name}`, parent: current, updated: Date.now() };
+      if (entry.storage === 'indexeddb') await storeBlob(copy.id, source);
+      entries.push(copy);
+      persist();
+      window.OS?.notify('Files', `${entry.name} copied.`);
+      renderFolder();
+    };
+
+    const moveEntry = entry => {
+      const folders = entries.filter(item => item.type === 'folder' && item.id !== entry.id);
+      const destination = window.prompt(`Move to a folder name, or leave blank for C:\\IDK root.\nAvailable: ${folders.map(item => item.name).join(', ') || 'none'}`, current ? entries.find(item => item.id === current)?.name || '' : '');
+      if (destination === null) return;
+      const folder = folders.find(item => item.name.toLowerCase() === destination.trim().toLowerCase());
+      if (destination.trim() && !folder) return window.OS?.notify('Files', 'That folder was not found.');
+      entry.parent = folder?.id || '';
+      entry.updated = Date.now();
+      persist();
+      window.OS?.notify('Files', `${entry.name} moved.`);
       renderFolder();
     };
 
@@ -231,20 +283,28 @@ window.SYSTEM_APPS = (() => {
         body.append(ui('div', { className: 'empty-state', textContent: 'This folder is empty.' }));
         return;
       }
-      visible.forEach(entry => {
-        const row = ui('button', { className: 'file-entry', type: 'button' });
-        row.append(
-          ui('span', { className: 'file-entry-icon', textContent: entry.type === 'folder' ? '📁' : '📄' }),
-          ui('span', { className: 'file-entry-name' }, [
-            ui('strong', { textContent: entry.name }),
-            ui('small', { textContent: entry.type === 'folder' ? 'Folder' : `${formatDate(entry.updated)} · ${entry.mime || 'Text file'} · ${formatBytes(entry.size ?? entry.content?.length)}` })
-          ])
-        );
-        row.addEventListener('click', () => {
-          if (entry.type === 'folder') { current = entry.id; renderFolder(); } else openEditor(entry);
-        });
-        body.append(row);
-      });
+       visible.forEach(entry => {
+         const row = ui('div', { className: 'file-entry', role: 'button', tabIndex: 0 });
+         const open = ui('button', { className: 'btn tab file-entry-open', type: 'button', textContent: 'Open' });
+         const actions = ui('span', { className: 'file-entry-actions' });
+         const action = (text, handler) => { const button = ui('button', { className: 'btn tab', type: 'button', textContent: text }); button.addEventListener('click', event => { event.stopPropagation(); handler(); }); return button; };
+         row.append(
+           ui('span', { className: 'file-entry-icon', textContent: entry.type === 'folder' ? '📁' : '📄' }),
+           ui('span', { className: 'file-entry-name' }, [
+             ui('strong', { textContent: entry.name }),
+             ui('small', { textContent: entry.type === 'folder' ? 'Folder' : `${formatDate(entry.updated)} · ${entry.mime || 'Text file'} · ${formatBytes(entry.size ?? entry.content?.length)}` })
+           ]),
+           actions
+         );
+         const openEntry = () => {
+           if (entry.type === 'folder') { current = entry.id; renderFolder(); } else openEditor(entry);
+         };
+         open.addEventListener('click', event => { event.stopPropagation(); openEntry(); });
+         row.addEventListener('dblclick', openEntry);
+         row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEntry(); } });
+         actions.append(open, action('Rename', () => renameEntry(entry)), action('Copy', () => copyEntry(entry)), action('Move', () => moveEntry(entry)), action('Delete', () => removeEntry(entry)));
+         body.append(row);
+       });
     };
 
     back.addEventListener('click', () => {
@@ -273,17 +333,8 @@ window.SYSTEM_APPS = (() => {
       if (!files.length) return;
       uploadButton.disabled = true;
       try {
-        for (const file of files) {
-          const entry = {
-            id: idFor(file.name), name: file.name, type: 'file', parent: current,
-            updated: Date.now(), size: file.size, mime: file.type || 'application/octet-stream', storage: 'indexeddb', text: isTextFile({ name: file.name, mime: file.type })
-          };
-          await storeBlob(entry.id, file);
-          entries.push(entry);
-        }
-        persist();
-        window.OS?.notify('Files', `${files.length} file${files.length === 1 ? '' : 's'} imported.`);
-        renderFolder();
+         await importFileEntries(files, current, entries);
+         renderFolder();
       } catch (error) {
         window.alert(`Import failed: ${error.message}`);
       } finally {
@@ -523,14 +574,14 @@ window.SYSTEM_APPS = (() => {
     const root = ui('div', { className: 'system-app dos-app' });
     const output = ui('div', { className: 'dos-output' });
     const input = ui('input', { className: 'dos-input', type: 'text', spellcheck: false, autocomplete: 'off' });
-    const aliases = { file: 'files', files: 'files', note: 'notes', notes: 'notes', calc: 'calculator', calculator: 'calculator', calendar: 'calendar', todo: 'todo', 'to-do': 'todo', images: 'viewer', viewer: 'viewer', stopwatch: 'stopwatch', timer: 'stopwatch', weather: 'weather', ai: 'ai', apps: 'apps', search: 'search', paint: 'paint', speaker: 'speaker', terminal: 'terminal', games: 'games', movies: 'movies', music: 'music', soundboard: 'soundboard', settings: 'settings', roblox: 'roblox', browser: 'proxy', proxy: 'proxy' };
+  const aliases = { file: 'files', files: 'files', note: 'notes', notes: 'notes', calc: 'calculator', calculator: 'calculator', calendar: 'calendar', todo: 'todo', 'to-do': 'todo', images: 'viewer', viewer: 'viewer', stopwatch: 'stopwatch', timer: 'stopwatch', weather: 'weather', ai: 'ai', apps: 'apps', search: 'search', paint: 'paint', speaker: 'speaker', terminal: 'terminal', games: 'games', movies: 'movies', music: 'music', soundboard: 'soundboard', settings: 'settings', roblox: 'roblox', browser: 'proxy', proxy: 'proxy' };
     const web = {
       facebook: ['Facebook', 'https://www.facebook.com/'], instagram: ['Instagram', 'https://www.instagram.com/'], tiktok: ['TikTok', 'https://www.tiktok.com/'], youtube: ['YouTube', 'https://www.youtube.com/'], twitter: ['Twitter', 'https://twitter.com/'], reddit: ['Reddit', 'https://www.reddit.com/'], discord: ['Discord', 'https://discord.com/app'], twitch: ['Twitch', 'https://www.twitch.tv/'], 'internet archive': ['Internet Archive', 'https://archive.org/']
     };
     const print = text => { output.append(ui('div', { className: 'dos-line', textContent: text })); output.scrollTop = output.scrollHeight; };
     const open = target => {
       const name = target.trim().toLowerCase();
-      if (web[name]) { OS.open('proxy', { title: `${web[name][0]} — Proxy`, url: web[name][1] }); return; }
+      if (web[name]) { OS.open('proxy', { title: `${web[name][0]} — Browser`, url: web[name][1] }); return; }
       const id = aliases[name] || (typeof APPS !== 'undefined' && Object.keys(APPS).find(key => key === name || APPS[key].title.toLowerCase() === name));
       if (id) OS.open(id); else print(`Bad command or file name: ${target}`);
     };
@@ -542,7 +593,7 @@ window.SYSTEM_APPS = (() => {
       const cmd = raw.toLowerCase();
       const arg = rest.join(' ');
       if (cmd === 'help' || cmd === '?') print('HELP  DIR  APPS  OPEN <name>  START <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
-      else if (cmd === 'dir' || cmd === 'apps') print('Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Proxy  Settings');
+      else if (cmd === 'dir' || cmd === 'apps') print('Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings');
       else if (cmd === 'open' || cmd === 'start') arg ? open(arg) : print('Usage: OPEN <app>');
       else if (aliases[cmd]) open(cmd);
       else if (cmd === 'cls' || cmd === 'clear') output.replaceChildren();
@@ -778,5 +829,5 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries };
 })();

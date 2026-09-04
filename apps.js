@@ -1069,18 +1069,18 @@ function appsHub() {
       el('span', { className: 'app-icon', textContent: site.icon }),
       el('span', { className: 'app-card-copy' }, [
         el('strong', { textContent: site.title }),
-        el('small', { textContent: 'Open through Proxy' })
+         el('small', { textContent: 'Open through Browser' })
       ])
     ]);
     button.addEventListener('click', () => {
-      OS.open('proxy', { title: `${site.title} — Proxy`, url: site.url });
+       OS.open('proxy', { title: `${site.title} — Browser`, url: site.url });
     });
     grid.append(button);
   });
 
   root.append(
     el('h2', { textContent: 'Apps' }),
-    el('p', { className: 'apps-description', textContent: 'Popular sites and Internet Archive open immediately inside the site proxy.' }),
+     el('p', { className: 'apps-description', textContent: 'Popular sites and Internet Archive open immediately inside IDK Browser.' }),
     grid
   );
   return root;
@@ -1383,7 +1383,7 @@ const APPS = {
     height: 680,
     action() {
       OS.open('proxy', {
-        title: 'Roblox — Proxy',
+         title: 'Roblox — Browser',
         url: 'https://frogiesarcade.win/algebra.html'
       });
     }
@@ -1490,8 +1490,8 @@ const APPS = {
     }
   },
 
-  proxy: {
-    title: 'Proxy',
+   proxy: {
+     title: 'Browser',
     glyph: '🌐',
     desktop: true,
     multi: true,
@@ -1500,7 +1500,7 @@ const APPS = {
     async render(opts = {}) {
       const root = el('div', { className: 'site-frame' });
       const frame = el('iframe', { allow: 'autoplay; fullscreen; clipboard-write' });
-      const status = el('span', { className: 'count', textContent: 'Ready' });
+       const status = el('span', { className: 'count', textContent: 'Checking browser server…' });
 
       const bar = el('div', { className: 'toolbar' });
       const url = el('input', {
@@ -1514,7 +1514,7 @@ const APPS = {
 
       if (!await PROXY.backendAvailable()) {
         root.append(bar, emptyState(
-          'The proxy backend is not running.<br>Start the site with <code>npm start</code> ' +
+           'The Browser server is not running.<br>Start the site with <code>npm start</code> ' +
           '(or deploy it to a Node host) instead of opening the files directly.'
         ));
         url.disabled = true;
@@ -1522,7 +1522,9 @@ const APPS = {
         return root;
       }
 
-      const navigate = async () => {
+       const scope = await PROXY.serverScope();
+       status.textContent = scope.scope ? `Server scope ${scope.scope} · Ready` : 'Ready';
+       const navigate = async () => {
         if (!url.value.trim()) return;
         status.textContent = 'Connecting…';
         try {

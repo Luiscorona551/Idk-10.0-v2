@@ -31,6 +31,14 @@ setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
+app.get('/api/browser/scope', async (req, res) => res.json({
+  ok: true,
+  name: 'IDK Browser',
+  origin: `${req.protocol}://${req.get('host')}`,
+  proxy: backend.proxy,
+  scope: '/uv/',
+  transport: backend.proxy ? 'Ultraviolet + Wisp' : 'Unavailable'
+}));
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));

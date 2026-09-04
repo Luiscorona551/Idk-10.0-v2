@@ -35,6 +35,15 @@ const PROXY = (() => {
     return data.chat === true;
   }
 
+  async function serverScope() {
+    try {
+      const res = await fetch('/api/browser/scope', { cache: 'no-store' });
+      return res.ok ? await res.json() : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   async function init() {
     if (!window.isSecureContext) {
       throw new Error('The proxy needs HTTPS (or localhost) to register its service worker.');
@@ -83,5 +92,5 @@ const PROXY = (() => {
     return __uv$config.prefix + __uv$config.encodeUrl(normalize(input));
   }
 
-  return { encode, backendAvailable, chatAvailable, status };
+  return { encode, backendAvailable, chatAvailable, serverScope, status };
 })();
