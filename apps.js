@@ -121,6 +121,19 @@ async function gameBlobURL(name) {
   return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }
 
+function openGame(name, title) {
+  const gameWindow = window.open('about:blank', '_blank');
+  if (!gameWindow) throw new Error('Allow pop-ups for IDK to open games in a separate tab.');
+  gameWindow.document.title = `Loading ${title}…`;
+  return gameBlobURL(name).then(src => {
+    gameWindow.location.href = src;
+    setTimeout(() => URL.revokeObjectURL(src), 60000);
+  }).catch(error => {
+    gameWindow.close();
+    throw error;
+  });
+}
+
 function el(tag, props = {}, children = []) {
   const node = Object.assign(document.createElement(tag), props);
   Object.entries(props).filter(([key]) => key.startsWith('aria-') || key.startsWith('data-')).forEach(([key, value]) => node.setAttribute(key, String(value)));
@@ -1215,7 +1228,7 @@ async function searchApp() {
           if (item.kind === 'app') return OS.open(item.id);
           const label = button.querySelector('strong');
           label.textContent = 'Loading…';
-          try { OS.open('player', { title: item.title, src: await gameBlobURL(item.id) }); }
+           try { await openGame(item.id, item.title); }
           catch (error) { alert(error.message); }
           finally { label.textContent = item.title; }
         });
@@ -1429,8 +1442,7 @@ const APPS = {
           const label = title.textContent;
           title.textContent = 'Loading…';
           try {
-            const src = await gameBlobURL(item.id);
-            OS.open('player', { title: item.title, src });
+             await openGame(item.id, item.title);
           } catch (err) {
             alert(err.message);
           } finally {
@@ -2061,7 +2073,6 @@ const APPS = {
       const frame = el('iframe', {
         src: opts.src,
         allow: 'autoplay; fullscreen; gamepad; clipboard-write',
-        sandbox: 'allow-forms allow-modals allow-pointer-lock allow-scripts',
         allowFullscreen: true
       });
       return frame;
