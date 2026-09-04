@@ -340,8 +340,8 @@
   }
 
   function addInstallerIcon() {
-    const layer = document.getElementById('icons');
-    if (!layer || layer.querySelector('.idk-program-installer-icon')) return;
+    const layer = document.getElementById('idk-left-app-rail-grid') || document.getElementById('icons');
+    if (!layer || document.querySelector('.idk-program-installer-icon')) return;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'idk-installed-shortcut idk-program-installer-icon';

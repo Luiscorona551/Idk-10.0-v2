@@ -48,10 +48,12 @@
       header.innerHTML = '<div class="idk-dm-avatar" aria-hidden="true">♡</div><div><div class="idk-dm-name">Personal chat</div><div class="idk-dm-status">Private conversation · just between you two</div></div><div class="idk-dm-heart" aria-hidden="true">♥</div>';
       root.prepend(header);
     }
+    const recipient = recipientName(root);
     const name = header.querySelector('.idk-dm-name');
-    if (name) name.textContent = recipientName(root);
+    if (name && name.textContent !== recipient) name.textContent = recipient;
     const avatar = header.querySelector('.idk-dm-avatar');
-    if (avatar) avatar.textContent = recipientName(root).slice(0,1).toUpperCase() || '♡';
+    const initial = recipient.slice(0, 1).toUpperCase() || '♡';
+    if (avatar && avatar.textContent !== initial) avatar.textContent = initial;
   }
 
   function watch(root) {

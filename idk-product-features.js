@@ -75,6 +75,22 @@
     input.oninput = render; render(); input.focus();
   }
 
+  function appRail() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop || document.getElementById('idk-left-app-rail')) return;
+    const rail = document.createElement('aside'); rail.id = 'idk-left-app-rail'; rail.className = 'idk-left-app-rail'; rail.setAttribute('aria-label', 'IDK app shelf');
+    rail.innerHTML = '<div class="idk-left-app-rail-head"><strong>App shelf</strong><small>Two rows · scroll</small></div><div class="idk-left-app-rail-grid" id="idk-left-app-rail-grid" tabindex="0"></div>';
+    const grid = rail.querySelector('#idk-left-app-rail-grid'); const seen = new Set();
+    document.querySelectorAll('#dock .dock-btn[data-app]').forEach(source => {
+      const id = source.dataset.app; const app = APPS[id]; if (!id || !app || seen.has(id)) return; seen.add(id);
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'idk-left-app'; item.dataset.app = id; item.title = app.title; item.setAttribute('aria-label', `Open ${app.title}`); item.innerHTML = `<span class="idk-left-app-glyph">${app.glyph}</span><span>${esc(app.title)}</span>`; item.onclick = () => window.OS?.open(id); grid.append(item);
+    });
+    const installer = document.querySelector('.idk-program-installer-icon'); if (installer) { installer.classList.add('idk-left-rail-installer'); grid.prepend(installer); }
+    rail.querySelector('.idk-left-app-rail-head').append(button('‹', () => grid.scrollBy({ left: -grid.clientWidth, behavior: 'smooth' }), 'idk-left-app-rail-arrow'), button('›', () => grid.scrollBy({ left: grid.clientWidth, behavior: 'smooth' }), 'idk-left-app-rail-arrow'));
+    grid.addEventListener('keydown', event => { if (event.key === 'ArrowRight') grid.scrollBy({ left: grid.clientWidth, behavior: 'smooth' }); if (event.key === 'ArrowLeft') grid.scrollBy({ left: -grid.clientWidth, behavior: 'smooth' }); });
+    desktop.append(rail);
+  }
+
   function installGridControls() {
     const desktop = document.getElementById('desktop'), root = document.getElementById('icons'); if (!desktop || !root || document.getElementById('idk-grid-control')) return;
     const controls = document.createElement('div'); controls.id = 'idk-grid-control'; controls.innerHTML = '<input class="field" type="search" placeholder="Find apps…" aria-label="Find desktop apps"><button type="button" data-prev aria-label="Previous app column">‹</button><button type="button" data-next aria-label="Next app column">›</button><select aria-label="Icon spacing"><option value="compact">Compact</option><option value="normal">Normal</option><option value="spacious">Spacious</option></select><span class="count" data-count></span>';
@@ -89,7 +105,7 @@
   function dockUtilities() {
     const dock = document.getElementById('dock'); if (!dock || dock.querySelector('[data-idk-product="store"]')) return; [['store', '🛍️', 'App Store', appCenter], ['update', '⬆️', 'System Updates', updateCenter], ['audio', '🔊', 'Audio Center', audioCenter], ['theme', '🎨', 'Share theme', themeShare]].forEach(([id, icon, title, action]) => { const b = button(icon, action, 'dock-btn idk-product-dock'); b.dataset.idkProduct = id; b.title = title; b.setAttribute('aria-label', title); dock.prepend(b); }); }
 
-  function install() { installGridControls(); dockUtilities(); applyAudio(); applySafeMode(); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 600); }
+  function install() { appRail(); installGridControls(); dockUtilities(); applyAudio(); applySafeMode(); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 600); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
   window.IDKUnifiedSearch = { open: unifiedSearch }; window.IDKFileAssociations = { open: openAssociated, settings: fileAssociations }; window.IDKProductFeatures = { appCenter, updateCenter, audioCenter, themeShare, unifiedSearch, fileAssociations };
 })();
