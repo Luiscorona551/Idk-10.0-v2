@@ -2,7 +2,7 @@
   'use strict';
   const read = (key, fallback) => { try { const value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } };
   const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-  const el = (tag, props = {}, children = []) => { const node = Object.assign(document.createElement(tag), props); children.forEach(child => node.append(child)); return node; };
+  const el = (tag, props = {}, children = []) => { const node = Object.assign(document.createElement(tag), props); Object.entries(props).filter(([key]) => key.startsWith('aria-') || key.startsWith('data-')).forEach(([key, value]) => node.setAttribute(key, String(value))); children.forEach(child => node.append(child)); return node; };
   const notify = (title, message) => window.OS?.notify?.(title, message);
   const id = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -56,7 +56,7 @@
     const addEvent = () => { const titleValue = eventTitle.value.trim(), dateValue = eventDate.value; if (!titleValue || !dateValue) return; events.push({ id: id('event'), title: titleValue, date: dateValue, time: eventTime.value, repeat: repeat.value, reminded: false }); persist(); eventTitle.value = ''; status.textContent = 'Reminder added'; render(); };
     const previous = el('button', { className: 'btn tab', type: 'button', textContent: '‹', 'aria-label': 'Previous period' }); const next = el('button', { className: 'btn tab', type: 'button', textContent: '›', 'aria-label': 'Next period' }); const viewSelect = el('select', { className: 'field', 'aria-label': 'Calendar view' }); [['month', 'Month view'], ['week', 'Week view']].forEach(([value, label]) => viewSelect.append(el('option', { value, textContent: label })));
     previous.onclick = () => { cursor.setMonth(cursor.getMonth() + (view === 'month' ? -1 : 0)); cursor.setDate(cursor.getDate() + (view === 'week' ? -7 : 0)); render(); }; next.onclick = () => { cursor.setMonth(cursor.getMonth() + (view === 'month' ? 1 : 0)); cursor.setDate(cursor.getDate() + (view === 'week' ? 7 : 0)); render(); }; viewSelect.onchange = () => { view = viewSelect.value; render(); };
-    const reminder = () => { const today = key(new Date()); events.filter(item => item.date === today && !item.reminded).forEach(item => { item.reminded = true; notify('Calendar reminder', item.title); }); persist(); }; setInterval(reminder, 30000);
+    const reminder = () => { const today = key(new Date()); events.filter(item => item.date === today && !item.reminded).forEach(item => { item.reminded = true; notify('Calendar reminder', item.title); }); persist(); }; const reminderTimer = setInterval(reminder, 30000); root.cleanup = () => clearInterval(reminderTimer);
     root.append(el('div', { className: 'calendar-toolbar' }, [previous, title, viewSelect, next]), grid, el('form', { className: 'calendar-event-form' }, [eventTitle, eventDate, eventTime, repeat, el('button', { className: 'btn', type: 'submit', textContent: 'Add reminder' }), status])); root.querySelector('form').onsubmit = event => { event.preventDefault(); addEvent(); }; render(); return root;
   }
 
