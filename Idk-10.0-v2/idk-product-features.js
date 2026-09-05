@@ -1,0 +1,112 @@
+(() => {
+  'use strict';
+  if (window.IDKProductFeatures) return;
+  const read = (key, fallback) => { try { const value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const button = (text, action, className = 'btn') => { const b = document.createElement('button'); b.type = 'button'; b.className = className; b.textContent = text; b.onclick = action; return b; };
+  const notify = (title, message) => window.OS?.notify?.(title, message);
+  const download = (name, data) => { const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); };
+
+  function modal(id, title, content) {
+    document.getElementById(id)?.remove();
+    const root = document.createElement('section'); root.id = id; root.className = 'idk-update-modal'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true');
+    root.innerHTML = `<div class="idk-modal-head"><h2>${esc(title)}</h2><button type="button" data-close aria-label="Close">×</button></div><div class="idk-modal-content">${content}</div>`;
+    root.querySelector('[data-close]').onclick = () => root.remove(); document.body.append(root); return root;
+  }
+
+  function welcome() {
+    if (read('idkOnboardingComplete', false)) return;
+    const root = modal('idk-onboarding', 'Welcome to IDK 10.0', '<p>Your desktop is ready for apps, workspaces, widgets, files, themes, and Browser.</p><div class="idk-update-grid"><div class="idk-update-card"><strong>Apps</strong><small>Use the two-row desktop or search with Ctrl/Cmd + K.</small></div><div class="idk-update-card"><strong>Personalize</strong><small>Open widgets, themes, audio, and settings from the top controls.</small></div><div class="idk-update-card"><strong>Stay safe</strong><small>Permissions, guest mode, backups, and Safe Mode are available.</small></div></div><div class="idk-update-actions" data-actions></div>');
+    root.querySelector('[data-actions]').append(button('Start exploring', () => { write('idkOnboardingComplete', true); root.remove(); }, 'btn'), button('Show again later', () => root.remove(), 'btn tab'));
+  }
+
+  function appCenter() {
+    const root = modal('idk-app-center', 'App Store', '<p>Open built-in apps, repair installed programs, or install an HTML program.</p><div class="idk-update-actions" data-actions></div><h3>Built-in apps</h3><div class="idk-update-grid" data-builtins></div><h3>Installed programs</h3><div class="idk-update-grid" data-programs></div>');
+    root.querySelector('[data-actions]').append(button('Install HTML program', () => window.IDKInstaller?.open?.(), 'btn'), button('Publish to public store', () => window.IDKPublicStore?.open?.(), 'btn tab'), button('File associations', fileAssociations, 'btn tab'), button('Refresh programs', () => appCenter(), 'btn tab'));
+    const builtins = root.querySelector('[data-builtins]'); Object.entries(APPS).filter(([id]) => id !== 'player').forEach(([id, app]) => { const card = document.createElement('div'); card.className = 'idk-update-card'; card.innerHTML = `<strong>${esc(app.glyph.replace?.(/<[^>]+>/g, '') || app.glyph)} ${esc(app.title)}</strong><small>Built in · Current</small>`; card.append(button('Open', () => { root.remove(); OS.open(id); }, 'btn tab')); builtins.append(card); });
+    const programs = root.querySelector('[data-programs]'); const installed = read('idkInstalledPrograms', []); if (!installed.length) programs.innerHTML = '<p class="empty-state">No installed programs yet.</p>';
+    installed.forEach(program => { const card = document.createElement('div'); card.className = 'idk-update-card'; card.innerHTML = `<strong>${esc(program.icon || '🎮')} ${esc(program.name)}</strong><small>Installed ${program.installedAt ? new Date(program.installedAt).toLocaleDateString() : 'locally'}</small>`; const actions = document.createElement('div'); actions.className = 'idk-update-actions'; actions.append(button('Repair', async () => { try { await window.IDKInstaller?.repair?.(program); notify('App Store', `${program.name} is ready.`); } catch (error) { notify('App Store', error.message); } }, 'btn tab'), button('Remove', async () => { if (!confirm(`Remove ${program.name}?`)) return; await window.IDKInstaller?.remove?.(program.id); appCenter(); }, 'btn tab')); card.append(actions); programs.append(card); });
+  }
+
+  async function updateCenter() {
+    const root = modal('idk-update-center', 'System Update Center', '<p data-status>Checking this IDK server…</p><div class="idk-update-grid" data-info></div><div class="idk-update-actions" data-actions></div>');
+    const status = root.querySelector('[data-status]'), info = root.querySelector('[data-info]');
+    try { const data = await fetch('/api/update', { cache: 'no-store' }).then(response => response.json()); status.textContent = `${data.channel || 'stable'} channel · ${data.build || 'current build'}`; info.innerHTML = `<div class="idk-update-card"><strong>Version</strong><small>${esc(data.version || '10.0.0')}</small></div><div class="idk-update-card"><strong>Server</strong><small>${data.health?.database?.configured ? 'Database connected' : 'Local server online'}</small></div><div class="idk-update-card"><strong>Changelog</strong><small>${(data.changelog || []).map(esc).join('<br>')}</small></div>`; } catch { status.textContent = 'Update service unavailable. IDK local apps are still available.'; }
+    const actions = root.querySelector('[data-actions]'); actions.append(button('Refresh health', async () => { const health = await fetch('/healthz', { cache: 'no-store' }).then(response => response.json()).catch(() => ({ ok: false })); status.textContent = health.ok ? 'Server healthy and responding.' : 'Server health check failed.'; }, 'btn'), button(read('idkSafeMode', false) ? 'Turn off Safe Mode' : 'Restart in Safe Mode', () => { write('idkSafeMode', !read('idkSafeMode', false)); location.reload(); }, 'btn tab'), button('Recovery reset', () => { localStorage.removeItem('idkGridDensity'); localStorage.removeItem('idkDesktopIconPositions'); localStorage.removeItem('idkSafeMode'); location.reload(); }, 'btn tab')); 
+  }
+
+  function themeShare() {
+    const bundle = { theme: read('theme', 'midnight'), customTheme: read('idkCustomTheme', {}), widgets: read('idkWidgetConfig', {}), favorites: read('idkDesktopFavorites', []), order: read('desktopOrder', []), gridDensity: read('idkGridDensity', 'normal') };
+    const root = modal('idk-theme-share', 'Share Theme and Desktop', '<p>Export a small bundle containing appearance, widgets, favorites, and grid density.</p><div class="idk-theme-share"><textarea data-json spellcheck="false"></textarea><div class="idk-update-actions" data-actions></div><input type="file" data-import accept="application/json" hidden></div>');
+    const area = root.querySelector('[data-json]'); area.value = JSON.stringify(bundle, null, 2); const actions = root.querySelector('[data-actions]'); const file = root.querySelector('[data-import]');
+    actions.append(button('Download bundle', () => download('idk-theme-desktop.json', area.value), 'btn'), button('Import bundle', () => file.click(), 'btn tab'), button('Copy JSON', async () => { try { await navigator.clipboard.writeText(area.value); notify('Themes', 'Theme bundle copied.'); } catch { notify('Themes', 'Copy is unavailable; download the bundle instead.'); } }, 'btn tab'));
+    file.onchange = async () => { try { const value = JSON.parse(await file.files[0].text()); [['theme', 'theme'], ['customTheme', 'idkCustomTheme'], ['widgets', 'idkWidgetConfig'], ['favorites', 'idkDesktopFavorites'], ['order', 'desktopOrder'], ['gridDensity', 'idkGridDensity']].forEach(([key, storageKey]) => { if (value[key] !== undefined) write(storageKey, value[key]); }); location.reload(); } catch { notify('Themes', 'That theme bundle could not be imported.'); } };
+  }
+
+  const associationDefaults = { '.txt': 'notes', '.md': 'notes', '.json': 'notes', '.csv': 'sheets', '.html': 'proxy', '.htm': 'proxy', '.png': 'viewer', '.jpg': 'viewer', '.jpeg': 'viewer', '.gif': 'viewer', '.mp3': 'player', '.wav': 'player', '.ogg': 'player', '.mp4': 'player', '.webm': 'player', '.mov': 'player' };
+  function fileAssociations() {
+    const saved = { ...associationDefaults, ...read('idkFileAssociations', {}) };
+    const root = modal('idk-file-associations', 'File Associations', '<p>Choose which IDK app opens common file types. Files without an association continue to open in the built-in editor.</p><div class="idk-association-list" data-list></div><div class="idk-update-actions" data-actions></div>');
+    const list = root.querySelector('[data-list]');
+    Object.keys(associationDefaults).forEach(extension => { const row = document.createElement('label'); row.className = 'idk-audio-row'; row.innerHTML = `<span>${esc(extension)}</span><select class="field" data-extension="${esc(extension)}"><option value="">Built-in Files editor</option>${Object.entries(APPS).filter(([id]) => id !== 'player').map(([id, app]) => `<option value="${esc(id)}">${esc(app.title)}</option>`).join('')}</select>`; row.querySelector('select').value = saved[extension] || ''; list.append(row); });
+    root.querySelector('[data-actions]').append(button('Save associations', () => { const next = {}; list.querySelectorAll('select').forEach(select => { next[select.dataset.extension] = select.value; }); write('idkFileAssociations', next); root.remove(); notify('Files', 'File associations saved.'); }, 'btn'));
+  }
+
+  function openAssociated(entry) {
+    const extension = `.${String(entry?.name || '').split('.').pop().toLowerCase()}`;
+    const appId = read('idkFileAssociations', associationDefaults)[extension];
+    if (!appId || !APPS[appId]) return false;
+    if (appId === 'player' && window.IDKAdvancedPolish?.openFile) { window.IDKAdvancedPolish.openFile(entry); return true; }
+    window.OS?.open(appId); notify('Files', `${entry.name} opened with ${APPS[appId].title}.`); return true;
+  }
+
+  let audioContext;
+  function audioState() { return { volume: 70, media: 100, startupVolume: 100, notificationVolume: 100, muted: false, startup: true, notifications: true, ...read('idkAudioSettings', {}) }; }
+  function applyAudio() { const state = audioState(); document.querySelectorAll('audio,video').forEach(media => { media.muted = state.muted; media.volume = state.volume / 100 * state.media / 100; }); }
+  function beep(kind = 'notice') { const state = audioState(); if (state.muted || (kind === 'notice' && !state.notifications)) return; try { audioContext ||= new AudioContext(); const oscillator = audioContext.createOscillator(); const gain = audioContext.createGain(); oscillator.frequency.value = kind === 'startup' ? 520 : 740; gain.gain.value = .035 * (kind === 'startup' ? state.startupVolume : state.notificationVolume) / 100; oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .09); } catch {} }
+  function audioCenter() {
+    const state = audioState(); const root = modal('idk-audio-center', 'Audio Center', '<p>Control media volume and IDK sounds.</p><div data-body></div>'); const body = root.querySelector('[data-body]'); body.innerHTML = `<div class="idk-audio-row"><label for="idk-audio-volume">Master volume</label><output>${state.volume}%</output></div><input id="idk-audio-volume" type="range" min="0" max="100" value="${state.volume}"><div class="idk-audio-mixer"><strong>Mixer</strong><label class="idk-audio-row"><span>Media</span><input data-level="media" type="range" min="0" max="100" value="${state.media}"></label><label class="idk-audio-row"><span>Startup</span><input data-level="startupVolume" type="range" min="0" max="100" value="${state.startupVolume}"></label><label class="idk-audio-row"><span>Notifications</span><input data-level="notificationVolume" type="range" min="0" max="100" value="${state.notificationVolume}"></label></div><label class="idk-audio-row"><span>Mute all media</span><input type="checkbox" data-mute ${state.muted ? 'checked' : ''}></label><label class="idk-audio-row"><span>Startup sound</span><input type="checkbox" data-startup ${state.startup ? 'checked' : ''}></label><label class="idk-audio-row"><span>Notification sounds</span><input type="checkbox" data-notifications ${state.notifications ? 'checked' : ''}></label><div class="idk-update-actions"></div>`;
+    const save = () => { write('idkAudioSettings', state); applyAudio(); }; const range = body.querySelector('#idk-audio-volume'); range.oninput = () => { state.volume = Number(range.value); body.querySelector('output').textContent = `${state.volume}%`; save(); }; body.querySelectorAll('[data-level]').forEach(input => { input.oninput = () => { state[input.dataset.level] = Number(input.value); save(); }; }); body.querySelector('[data-mute]').onchange = event => { state.muted = event.target.checked; save(); }; body.querySelector('[data-startup]').onchange = event => { state.startup = event.target.checked; save(); }; body.querySelector('[data-notifications]').onchange = event => { state.notifications = event.target.checked; save(); }; body.querySelector('.idk-update-actions').append(button('Test sound', () => beep(), 'btn'));
+  }
+
+  function unifiedSearch() {
+    const root = modal('idk-unified-search', 'Search IDK', '<input class="field" data-query placeholder="Apps, files, notes, contacts, settings, or the web…" autocomplete="off"><div class="idk-command-results" data-results></div>'); const input = root.querySelector('[data-query]'), results = root.querySelector('[data-results]');
+    const render = () => { const q = input.value.toLowerCase().trim(); const items = []; Object.entries(APPS).filter(([id, app]) => id !== 'player' && (!q || app.title.toLowerCase().includes(q))).forEach(([id, app]) => items.push({ title: app.title, type: 'App', run: () => OS.open(id) })); read('idkFileSystem', []).filter(item => item.name?.toLowerCase().includes(q)).slice(0, 12).forEach(item => items.push({ title: item.name, type: 'File', run: () => openAssociated(item) || OS.open('files') })); read('idkRichNotes', []).filter(item => `${item.title} ${item.text} ${item.tags}`.toLowerCase().includes(q)).slice(0, 8).forEach(item => items.push({ title: item.title, type: 'Note', run: () => OS.open('notes') })); read('idkMessengerContacts', []).filter(item => `${item.name || ''} ${item.username || ''}`.toLowerCase().includes(q)).slice(0, 8).forEach(item => items.push({ title: item.name || item.username, type: 'Contact', run: () => OS.open('chat') })); ['Settings', 'Themes', 'Audio Center', 'File Associations', 'System Update Center', 'App Store'].filter(item => item.toLowerCase().includes(q)).forEach(item => items.push({ title: item, type: 'IDK tool', run: () => item === 'Themes' ? themeShare() : item === 'Audio Center' ? audioCenter() : item === 'File Associations' ? fileAssociations() : item === 'System Update Center' ? updateCenter() : item === 'App Store' ? appCenter() : OS.open('settings') })); if (q) items.push({ title: `Search the web for “${q}”`, type: 'Web', run: () => window.open(`https://duckduckgo.com/?q=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer') }); results.replaceChildren(...items.slice(0, 30).map(item => { const b = button(item.title, () => { root.remove(); item.run(); }, 'idk-command-item'); b.innerHTML = `<strong>${esc(item.title)}</strong><small>${esc(item.type)}</small>`; return b; })); };
+    input.oninput = render; render(); input.focus();
+  }
+
+  function appRail() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop || document.getElementById('idk-left-app-rail')) return;
+    const rail = document.createElement('aside'); rail.id = 'idk-left-app-rail'; rail.className = 'idk-left-app-rail'; rail.setAttribute('aria-label', 'IDK app shelf');
+    rail.innerHTML = '<div class="idk-left-app-rail-head"><strong>App shelf</strong><small>Two rows · scroll</small></div><div class="idk-left-app-rail-grid" id="idk-left-app-rail-grid" tabindex="0"></div>';
+    const grid = rail.querySelector('#idk-left-app-rail-grid'); const seen = new Set();
+    document.querySelectorAll('#dock .dock-btn[data-app]').forEach(source => {
+      const id = source.dataset.app; const app = APPS[id]; if (!id || !app || seen.has(id)) return; seen.add(id);
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'idk-left-app'; item.dataset.app = id; item.title = app.title; item.setAttribute('aria-label', `Open ${app.title}`); item.innerHTML = `<span class="idk-left-app-glyph">${app.glyph}</span><span>${esc(app.title)}</span>`; item.onclick = () => window.OS?.open(id); grid.append(item);
+    });
+    const installer = document.querySelector('.idk-program-installer-icon'); if (installer) { installer.classList.add('idk-left-rail-installer'); grid.prepend(installer); }
+    rail.querySelector('.idk-left-app-rail-head').append(button('‹', () => grid.scrollBy({ left: -grid.clientWidth, behavior: 'smooth' }), 'idk-left-app-rail-arrow'), button('›', () => grid.scrollBy({ left: grid.clientWidth, behavior: 'smooth' }), 'idk-left-app-rail-arrow'));
+    grid.addEventListener('keydown', event => { if (event.key === 'ArrowRight') grid.scrollBy({ left: grid.clientWidth, behavior: 'smooth' }); if (event.key === 'ArrowLeft') grid.scrollBy({ left: -grid.clientWidth, behavior: 'smooth' }); });
+    desktop.append(rail);
+  }
+
+  function installGridControls() {
+    const desktop = document.getElementById('desktop'), root = document.getElementById('icons'); if (!desktop || !root || document.getElementById('idk-grid-control')) return;
+    const controls = document.createElement('div'); controls.id = 'idk-grid-control'; controls.innerHTML = '<input class="field" type="search" placeholder="Find apps…" aria-label="Find desktop apps"><button type="button" data-prev aria-label="Previous app column">‹</button><button type="button" data-next aria-label="Next app column">›</button><select aria-label="Icon spacing"><option value="compact">Compact</option><option value="normal">Normal</option><option value="spacious">Spacious</option></select><span class="count" data-count></span>';
+    const search = controls.querySelector('input'), density = controls.querySelector('select'), count = controls.querySelector('[data-count]'); density.value = read('idkGridDensity', 'normal'); const all = () => [...root.children].filter(node => node.matches('.desktop-icon,.idk-final-desktop-icon,.idk-installed-shortcut') && !node.classList.contains('idk-program-installer-icon'));
+    const filter = () => { const q = search.value.toLowerCase().trim(); const items = all(); let shown = 0; items.forEach(item => { const match = !q || item.textContent.toLowerCase().includes(q); item.hidden = !match; if (match) shown += 1; }); count.textContent = `${shown}/${items.length}`; }; search.oninput = filter; density.onchange = () => { write('idkGridDensity', density.value); location.reload(); }; controls.querySelector('[data-prev]').onclick = () => root.scrollBy({ left: -root.clientWidth, behavior: 'smooth' }); controls.querySelector('[data-next]').onclick = () => root.scrollBy({ left: root.clientWidth, behavior: 'smooth' }); root.addEventListener('keydown', event => { if (event.key === 'ArrowRight') root.scrollBy({ left: root.clientWidth, behavior: 'smooth' }); if (event.key === 'ArrowLeft') root.scrollBy({ left: -root.clientWidth, behavior: 'smooth' }); }); desktop.append(controls); new MutationObserver(filter).observe(root, { childList: true }); filter();
+  }
+
+  function applySafeMode() {
+    const safe = read('idkSafeMode', false); document.body.classList.toggle('idk-safe-mode', safe); if (!safe || window.IDKSafeMode) return; const heavy = new Set(['games', 'movies', 'music', 'soundboard', 'ai', 'roblox', 'proxy', 'chat']); const open = OS.open.bind(OS); OS.open = (id, ...args) => heavy.has(id) ? notify('Safe Mode', `${APPS[id]?.title || id} is disabled in Safe Mode.`) : open(id, ...args); window.IDKSafeMode = { enabled: true, heavyApps: [...heavy] };
+  }
+
+  function dockUtilities() {
+    const dock = document.getElementById('dock'); if (!dock || dock.querySelector('[data-idk-product="store"]')) return; [['store', '🛍️', 'App Store', appCenter], ['update', '⬆️', 'System Updates', updateCenter], ['audio', '🔊', 'Audio Center', audioCenter], ['theme', '🎨', 'Share theme', themeShare], ['backup', '💾', 'Backup & Restore', () => window.IDKBackup?.open?.()]].forEach(([id, icon, title, action]) => { const b = button(icon, action, 'dock-btn idk-product-dock'); b.dataset.idkProduct = id; b.title = title; b.setAttribute('aria-label', title); dock.prepend(b); }); }
+
+  function install() { appRail(); installGridControls(); dockUtilities(); applyAudio(); applySafeMode(); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 600); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
+  window.IDKUnifiedSearch = { open: unifiedSearch }; window.IDKFileAssociations = { open: openAssociated, settings: fileAssociations }; window.IDKProductFeatures = { appCenter, updateCenter, audioCenter, themeShare, unifiedSearch, fileAssociations };
+})();
