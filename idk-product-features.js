@@ -44,7 +44,7 @@
     file.onchange = async () => { try { const value = JSON.parse(await file.files[0].text()); [['theme', 'theme'], ['customTheme', 'idkCustomTheme'], ['widgets', 'idkWidgetConfig'], ['favorites', 'idkDesktopFavorites'], ['order', 'desktopOrder'], ['gridDensity', 'idkGridDensity']].forEach(([key, storageKey]) => { if (value[key] !== undefined) write(storageKey, value[key]); }); location.reload(); } catch { notify('Themes', 'That theme bundle could not be imported.'); } };
   }
 
-  const associationDefaults = { '.txt': 'notes', '.md': 'notes', '.json': 'notes', '.csv': 'sheets', '.html': 'proxy', '.htm': 'proxy', '.png': 'viewer', '.jpg': 'viewer', '.jpeg': 'viewer', '.gif': 'viewer' };
+  const associationDefaults = { '.txt': 'notes', '.md': 'notes', '.json': 'notes', '.csv': 'sheets', '.html': 'proxy', '.htm': 'proxy', '.png': 'viewer', '.jpg': 'viewer', '.jpeg': 'viewer', '.gif': 'viewer', '.mp3': 'player', '.wav': 'player', '.ogg': 'player', '.mp4': 'player', '.webm': 'player', '.mov': 'player' };
   function fileAssociations() {
     const saved = { ...associationDefaults, ...read('idkFileAssociations', {}) };
     const root = modal('idk-file-associations', 'File Associations', '<p>Choose which IDK app opens common file types. Files without an association continue to open in the built-in editor.</p><div class="idk-association-list" data-list></div><div class="idk-update-actions" data-actions></div>');
@@ -57,6 +57,7 @@
     const extension = `.${String(entry?.name || '').split('.').pop().toLowerCase()}`;
     const appId = read('idkFileAssociations', associationDefaults)[extension];
     if (!appId || !APPS[appId]) return false;
+    if (appId === 'player' && window.IDKAdvancedPolish?.openFile) { window.IDKAdvancedPolish.openFile(entry); return true; }
     window.OS?.open(appId); notify('Files', `${entry.name} opened with ${APPS[appId].title}.`); return true;
   }
 

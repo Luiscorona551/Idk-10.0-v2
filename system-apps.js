@@ -129,12 +129,17 @@ window.SYSTEM_APPS = (() => {
     const root = ui('div', { className: 'system-app files-app' });
     const entries = getFiles();
     let current = '';
+    const history = [''];
+    let historyIndex = 0;
+    let view = 'list';
 
     const back = ui('button', { className: 'btn tab', type: 'button', textContent: 'Back', hidden: true });
+    const forward = ui('button', { className: 'btn tab', type: 'button', textContent: 'Forward', hidden: true });
     const path = ui('span', { className: 'system-path', textContent: 'C:\\IDK' });
     const search = ui('input', { className: 'field file-search', type: 'search', placeholder: 'Search files…', 'aria-label': 'Search files' });
     const newFolder = ui('button', { className: 'btn tab', type: 'button', textContent: 'New folder' });
     const newFile = ui('button', { className: 'btn tab', type: 'button', textContent: 'New text file' });
+    const viewToggle = ui('button', { className: 'btn tab', type: 'button', textContent: 'Grid view', 'aria-pressed': 'false' });
     const uploadButton = ui('button', { className: 'btn tab', type: 'button', textContent: 'Import files' });
     const upload = ui('input', { type: 'file', hidden: true, multiple: true });
     const body = ui('div', { className: 'file-list' });
@@ -146,6 +151,22 @@ window.SYSTEM_APPS = (() => {
     const clearPreview = () => {
       if (previewURL) URL.revokeObjectURL(previewURL);
       previewURL = '';
+    };
+
+    const updateNavigation = () => {
+      back.hidden = historyIndex === 0;
+      forward.hidden = historyIndex >= history.length - 1;
+      back.disabled = historyIndex === 0;
+      forward.disabled = historyIndex >= history.length - 1;
+    };
+
+    const navigate = next => {
+      if (next === current) return;
+      history.splice(historyIndex + 1);
+      history.push(next);
+      historyIndex = history.length - 1;
+      current = next;
+      renderFolder();
     };
 
     const removeEntry = async entry => {
@@ -203,7 +224,7 @@ window.SYSTEM_APPS = (() => {
     const openEditor = async entry => {
       clearPreview();
       path.textContent = `C:\\IDK\\${entry.name}`;
-      back.hidden = false;
+      back.hidden = forward.hidden = true;
       search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = true;
       body.replaceChildren(ui('div', { className: 'empty-state', textContent: 'Opening file…' }));
       try {
@@ -273,8 +294,12 @@ window.SYSTEM_APPS = (() => {
     const renderFolder = () => {
       clearPreview();
       path.textContent = current ? `C:\\IDK\\${entries.find(item => item.id === current)?.name || ''}` : 'C:\\IDK';
-      back.hidden = !current;
+      updateNavigation();
       search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = false;
+      viewToggle.hidden = false;
+      viewToggle.textContent = view === 'list' ? 'Grid view' : 'List view';
+      viewToggle.setAttribute('aria-pressed', String(view === 'grid'));
+      body.dataset.view = view;
       body.replaceChildren();
       const query = search.value.trim().toLowerCase();
       const visible = entries.filter(item => item.parent === current && (!query || item.name.toLowerCase().includes(query)))
@@ -297,7 +322,7 @@ window.SYSTEM_APPS = (() => {
            actions
          );
           const openEntry = () => {
-            if (entry.type === 'folder') { current = entry.id; renderFolder(); } else if (!window.IDKFileAssociations?.open?.(entry)) openEditor(entry);
+             if (entry.type === 'folder') navigate(entry.id); else if (!window.IDKFileAssociations?.open?.(entry)) openEditor(entry);
           };
          open.addEventListener('click', event => { event.stopPropagation(); openEntry(); });
          row.addEventListener('dblclick', openEntry);
@@ -308,9 +333,20 @@ window.SYSTEM_APPS = (() => {
     };
 
     back.addEventListener('click', () => {
-      current = entries.find(item => item.id === current)?.parent || '';
-      renderFolder();
+      if (historyIndex > 0) {
+        historyIndex -= 1;
+        current = history[historyIndex];
+        renderFolder();
+      }
     });
+    forward.addEventListener('click', () => {
+      if (historyIndex < history.length - 1) {
+        historyIndex += 1;
+        current = history[historyIndex];
+        renderFolder();
+      }
+    });
+    viewToggle.addEventListener('click', () => { view = view === 'list' ? 'grid' : 'list'; renderFolder(); });
     search.addEventListener('input', renderFolder);
     newFolder.addEventListener('click', () => {
       const name = window.prompt('Folder name');
@@ -355,7 +391,19 @@ window.SYSTEM_APPS = (() => {
       upload.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    root.append(ui('div', { className: 'system-toolbar' }, [back, path, search, ui('span', { className: 'toolbar-spacer' }), newFolder, newFile, uploadButton, upload]), body);
+    root.tabIndex = 0;
+    root.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        (event.shiftKey ? newFolder : newFile).click();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        search.focus();
+      }
+      if (event.key === 'Backspace' && event.target === root && historyIndex > 0) back.click();
+    });
+    root.append(ui('div', { className: 'system-toolbar' }, [back, forward, path, search, ui('span', { className: 'toolbar-spacer' }), viewToggle, newFolder, newFile, uploadButton, upload]), body);
     renderFolder();
     return root;
   }
@@ -372,7 +420,24 @@ window.SYSTEM_APPS = (() => {
       write(NOTES_KEY, notes[0].text);
       status.textContent = 'Saved locally';
     };
+    let activeNote = 0;
+    const saveToFiles = () => {
+      const note = notes[activeNote];
+      const files = read(FILES_KEY, []);
+      const name = `${(note.title || `Notepad ${activeNote + 1}`).trim() || `Notepad ${activeNote + 1}`}.txt`;
+      const existing = files.find(file => file.type === 'file' && file.parent === '' && file.name === name);
+      const entry = existing || { id: `note-${Date.now()}`, name, type: 'file', parent: '', mime: 'text/plain', text: true, content: '' };
+      entry.content = note.text || '';
+      entry.size = new Blob([entry.content]).size;
+      entry.updated = Date.now();
+      if (!existing) files.push(entry);
+      write(FILES_KEY, files);
+      status.textContent = `Saved to Files as ${name}`;
+      window.OS?.notify('Notes', `${name} saved to Files.`);
+    };
     const clearAll = ui('button', { className: 'btn tab', type: 'button', textContent: 'Clear both' });
+    const saveFile = ui('button', { className: 'btn tab', type: 'button', textContent: 'Save active to Files' });
+    saveFile.addEventListener('click', saveToFiles);
     clearAll.addEventListener('click', () => {
       if ((!notes[0].text && !notes[1].text) || window.confirm('Clear both notepads?')) {
         notes.forEach(note => { note.text = ''; });
@@ -388,6 +453,8 @@ window.SYSTEM_APPS = (() => {
       const area = ui('textarea', { className: 'notes-area', placeholder: `Write in ${note.title || `Notepad ${index + 1}`}…` });
       area.value = note.text || '';
       const clear = ui('button', { className: 'btn tab', type: 'button', textContent: 'Clear' });
+      area.addEventListener('focus', () => { activeNote = index; });
+      title.addEventListener('focus', () => { activeNote = index; });
       title.addEventListener('input', () => { note.title = title.value; persist(); });
       area.addEventListener('input', () => { note.text = area.value; persist(); });
       clear.addEventListener('click', () => {
@@ -401,7 +468,14 @@ window.SYSTEM_APPS = (() => {
         ui('div', { className: 'notepad-toolbar' }, [title, clear]), area
       ]));
     });
-    root.append(ui('div', { className: 'system-toolbar' }, [ui('strong', { textContent: 'Notes · 2 notepads' }), ui('span', { className: 'toolbar-spacer' }), status, clearAll]), grid);
+    root.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        persist();
+        saveToFiles();
+      }
+    });
+    root.append(ui('div', { className: 'system-toolbar' }, [ui('strong', { textContent: 'Notes · 2 notepads' }), ui('span', { className: 'toolbar-spacer' }), status, saveFile, clearAll]), grid);
     return root;
   }
 
@@ -574,27 +648,57 @@ window.SYSTEM_APPS = (() => {
     const root = ui('div', { className: 'system-app dos-app' });
     const output = ui('div', { className: 'dos-output' });
     const input = ui('input', { className: 'dos-input', type: 'text', spellcheck: false, autocomplete: 'off' });
-  const aliases = { file: 'files', files: 'files', note: 'notes', notes: 'notes', calc: 'calculator', calculator: 'calculator', calendar: 'calendar', todo: 'todo', 'to-do': 'todo', images: 'viewer', viewer: 'viewer', stopwatch: 'stopwatch', timer: 'stopwatch', weather: 'weather', ai: 'ai', apps: 'apps', search: 'search', paint: 'paint', speaker: 'speaker', terminal: 'terminal', games: 'games', movies: 'movies', music: 'music', soundboard: 'soundboard', settings: 'settings', roblox: 'roblox', browser: 'proxy', proxy: 'proxy' };
+    const prompt = ui('span', { className: 'dos-prompt', textContent: 'C:\\IDK>' });
+    let current = '';
+    const aliases = { file: 'files', files: 'files', note: 'notes', notes: 'notes', calc: 'calculator', calculator: 'calculator', calendar: 'calendar', todo: 'todo', 'to-do': 'todo', images: 'viewer', viewer: 'viewer', stopwatch: 'stopwatch', timer: 'stopwatch', weather: 'weather', ai: 'ai', apps: 'apps', search: 'search', paint: 'paint', speaker: 'speaker', terminal: 'terminal', games: 'games', movies: 'movies', music: 'music', soundboard: 'soundboard', settings: 'settings', roblox: 'roblox', browser: 'proxy', proxy: 'proxy' };
     const web = {
       facebook: ['Facebook', 'https://www.facebook.com/'], instagram: ['Instagram', 'https://www.instagram.com/'], tiktok: ['TikTok', 'https://www.tiktok.com/'], youtube: ['YouTube', 'https://www.youtube.com/'], twitter: ['Twitter', 'https://twitter.com/'], reddit: ['Reddit', 'https://www.reddit.com/'], discord: ['Discord', 'https://discord.com/app'], twitch: ['Twitch', 'https://www.twitch.tv/'], 'internet archive': ['Internet Archive', 'https://archive.org/']
     };
     const print = text => { output.append(ui('div', { className: 'dos-line', textContent: text })); output.scrollTop = output.scrollHeight; };
-    const open = target => {
+     const open = target => {
       const name = target.trim().toLowerCase();
       if (web[name]) { OS.open('proxy', { title: `${web[name][0]} — Browser`, url: web[name][1] }); return; }
       const id = aliases[name] || (typeof APPS !== 'undefined' && Object.keys(APPS).find(key => key === name || APPS[key].title.toLowerCase() === name));
       if (id) OS.open(id); else print(`Bad command or file name: ${target}`);
     };
-    const run = command => {
-      const value = command.trim();
-      if (!value) return;
-      print(`C:\\IDK>${value}`);
-      const [raw, ...rest] = value.split(/\s+/);
-      const cmd = raw.toLowerCase();
-      const arg = rest.join(' ');
-      if (cmd === 'help' || cmd === '?') print('HELP  DIR  APPS  OPEN <name>  START <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
-      else if (cmd === 'dir' || cmd === 'apps') print('Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings');
-      else if (cmd === 'open' || cmd === 'start') arg ? open(arg) : print('Usage: OPEN <app>');
+     const path = () => current ? `C:\\IDK\\${getFiles().find(item => item.id === current)?.name || ''}` : 'C:\\IDK';
+     const run = async command => {
+       const value = command.trim();
+       if (!value) return;
+       print(`${path()}>${value}`);
+       const [raw, ...rest] = value.split(/\s+/);
+       const cmd = raw.toLowerCase();
+       const arg = rest.join(' ');
+       if (cmd === 'help' || cmd === '?') print('HELP  DIR  CD <folder>  CAT <file>  OPEN <name>  START <name>  COLOR <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
+       else if (cmd === 'dir' || cmd === 'ls' || cmd === 'apps') {
+         const items = getFiles().filter(item => item.parent === current).map(item => item.type === 'folder' ? `<DIR> ${item.name}` : item.name);
+         print(cmd === 'apps' ? 'Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings' : (items.join('\\n') || 'Directory is empty.'));
+       }
+       else if (cmd === 'cd') {
+         if (!arg || arg === '.') return;
+         if (arg === '..') current = getFiles().find(item => item.id === current)?.parent || '';
+         else {
+           const folder = getFiles().find(item => item.type === 'folder' && item.parent === current && item.name.toLowerCase() === arg.toLowerCase());
+           if (!folder) return print(`The system cannot find the path specified: ${arg}`);
+           current = folder.id;
+         }
+         prompt.textContent = `${path()}>`;
+       }
+       else if (cmd === 'cat' || cmd === 'type') {
+         const file = getFiles().find(item => item.type === 'file' && item.parent === current && item.name.toLowerCase() === arg.toLowerCase());
+         if (!file) print(`File not found: ${arg}`);
+         else if (typeof file.content === 'string') print(file.content || '(empty file)');
+         else if (file.storage === 'indexeddb') {
+           try { print(await blobFor(file).then(blob => blob ? blob.text() : '(file unavailable)')); }
+           catch { print('(file unavailable)'); }
+         } else print('(binary file)');
+       }
+       else if (cmd === 'color') {
+         const color = arg.toLowerCase();
+         const palette = { black: '#071329', blue: '#0b2a55', green: '#09291e', purple: '#25134d', amber: '#3c2705' };
+         root.style.setProperty('--dos-accent', palette[color] || color || '#071329');
+       }
+       else if (cmd === 'open' || cmd === 'start') arg ? open(arg) : print('Usage: OPEN <app>');
       else if (aliases[cmd]) open(cmd);
       else if (cmd === 'cls' || cmd === 'clear') output.replaceChildren();
       else if (cmd === 'ver') print('IDK 10.0 terminal');
@@ -603,10 +707,10 @@ window.SYSTEM_APPS = (() => {
       else if (cmd === 'echo') print(arg);
       else print(`Bad command or file name: ${raw}`);
     };
-    input.addEventListener('keydown', event => { if (event.key === 'Enter') { run(input.value); input.value = ''; } });
+     input.addEventListener('keydown', event => { if (event.key === 'Enter') { run(input.value); input.value = ''; } });
     print('IDK 10.0 Terminal');
     print('(C) IDK Systems. Type HELP for a list of commands.');
-    root.append(output, ui('div', { className: 'dos-input-row' }, [ui('span', { className: 'dos-prompt', textContent: 'C:\\IDK>' }), input]));
+     root.append(output, ui('div', { className: 'dos-input-row' }, [prompt, input]));
     setTimeout(() => input.focus(), 0);
     return root;
   }
@@ -829,5 +933,5 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, readBlob: blobFor, getFiles };
 })();

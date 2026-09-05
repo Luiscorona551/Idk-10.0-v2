@@ -264,6 +264,7 @@ const OS = (() => {
       if (event.target.closest('.ctrl')) return;
       focus(win);
       const rect = win.getBoundingClientRect();
+      const desktopRect = desktop.getBoundingClientRect();
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
       let lastX = event.clientX;
@@ -274,8 +275,10 @@ const OS = (() => {
         lastY = e.clientY;
         win.classList.remove('maximized');
         win.classList.remove('snapped-left', 'snapped-right');
-        win.style.left = `${Math.min(Math.max(0, e.clientX - offsetX), desktop.clientWidth - 60)}px`;
-        win.style.top = `${Math.min(Math.max(0, e.clientY - offsetY), desktop.clientHeight - 40)}px`;
+        const nextLeft = e.clientX - desktopRect.left - offsetX;
+        const nextTop = e.clientY - desktopRect.top - offsetY;
+        win.style.left = `${Math.min(Math.max(0, nextLeft), Math.max(0, desktop.clientWidth - rect.width))}px`;
+        win.style.top = `${Math.min(Math.max(0, nextTop), Math.max(0, desktop.clientHeight - rect.height))}px`;
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
@@ -295,9 +298,14 @@ const OS = (() => {
       event.preventDefault();
       focus(win);
       const rect = win.getBoundingClientRect();
+      const desktopRect = desktop.getBoundingClientRect();
+      const left = rect.left - desktopRect.left;
+      const top = rect.top - desktopRect.top;
       const move = e => {
-        win.style.width = `${Math.max(320, e.clientX - rect.left)}px`;
-        win.style.height = `${Math.max(220, e.clientY - rect.top)}px`;
+        const maxWidth = Math.max(320, desktop.clientWidth - left);
+        const maxHeight = Math.max(220, desktop.clientHeight - top);
+        win.style.width = `${Math.min(maxWidth, Math.max(320, e.clientX - rect.left))}px`;
+        win.style.height = `${Math.min(maxHeight, Math.max(220, e.clientY - rect.top))}px`;
       };
       const up = () => {
         window.removeEventListener('pointermove', move);

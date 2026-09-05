@@ -2292,6 +2292,14 @@ const APPS = {
     multi: true,
     render(opts = {}) {
       if (!opts.src) return emptyState('Nothing to play.');
+      if (opts.mediaType?.startsWith('audio/') || opts.mediaType?.startsWith('video/')) {
+        const root = el('div', { className: 'media-player' });
+        const media = el(opts.mediaType.startsWith('video/') ? 'video' : 'audio', { controls: true, autoplay: true, preload: 'metadata', src: opts.src });
+        if (media.tagName === 'VIDEO') media.setAttribute('playsinline', '');
+        root.append(media);
+        root.cleanup = () => { media.pause(); URL.revokeObjectURL(opts.src); };
+        return root;
+      }
       const frame = el('iframe', {
         src: opts.src,
         allow: 'autoplay; fullscreen; gamepad; clipboard-write',

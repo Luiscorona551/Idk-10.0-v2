@@ -107,7 +107,7 @@
   function install() {
     attachBackupButtons(); installAccessibility(); installNotificationFilter(); installSelfTest();
     new MutationObserver(() => { attachBackupButtons(); installNotificationFilter(); }).observe(document.body, { childList: true, subtree: true });
-    document.addEventListener('keydown', event => { if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 't') { event.preventDefault(); window.IDKSelfTest?.open?.(); } });
+    document.addEventListener('keydown', event => { if (event.ctrlKey && event.altKey && event.shiftKey && event.key.toLowerCase() === 't') { event.preventDefault(); window.IDKSelfTest?.open?.(); } });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();
