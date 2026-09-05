@@ -1,0 +1,5 @@
+const CACHE = 'idk-shell-v1';
+const ASSETS = ['/', '/desktop.html', '/style.css', '/idk-os-next.css', '/idk-platform-next.css', '/idk-platform-polish.css', '/idk-platform-next.js', '/idk-platform-polish.js', '/idk-quality-features.js', '/apps.js', '/os.js', '/system-apps.js'];
+self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => Promise.allSettled(ASSETS.map(asset => cache.add(asset))))); self.skipWaiting(); });
+self.addEventListener('activate', event => { event.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', event => { if (event.request.method !== 'GET') return; event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => { if (response.ok && new URL(event.request.url).origin === location.origin) { const copy = response.clone(); caches.open(CACHE).then(cache => cache.put(event.request, copy)); } return response; }).catch(() => cached || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } })))); });

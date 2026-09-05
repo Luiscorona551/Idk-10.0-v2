@@ -51,6 +51,9 @@ app.get('/api/update', async (req, res) => res.json({
     'Welcome tour, App Store lifecycle tools, and recovery controls.',
     'Theme, widget, audio, search, and accessibility improvements.',
     'Public HTML app publishing with versions, ratings, installs, and reports.',
+    'App manifests, content fingerprints, verified publishers, creator updates, and version history.',
+    'Account security status, full account export, permanent account deletion, and offline recovery tools.',
+    'Installable PWA shell with service-worker caching, recovery snapshots, profiles, and command palette.',
     'Files backup and restore plus the IDK System Self-Test.',
     'Smart Workspaces, Universal Clipboard, Share Sheet, and System Timeline.',
     'Drag-and-drop desktop widgets for weather, news, calendar, stocks, and sports.'

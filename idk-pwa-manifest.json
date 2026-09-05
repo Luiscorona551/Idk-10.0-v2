@@ -1,0 +1,10 @@
+{
+  "name": "IDK 10.0",
+  "short_name": "IDK",
+  "start_url": "/desktop.html",
+  "display": "standalone",
+  "background_color": "#071329",
+  "theme_color": "#1553a4",
+  "description": "A personal IDK desktop for apps, files, workspaces, and Echo.",
+  "icons": [{"src":"/ugs-icon.jpeg","sizes":"192x192","type":"image/jpeg"}]
+}
