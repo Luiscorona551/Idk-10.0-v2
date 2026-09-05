@@ -115,8 +115,16 @@
       if (!blob) throw new Error('The saved program file could not be found.');
 
       const url = URL.createObjectURL(blob);
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!popup) alert('Allow pop-ups for IDK 10.0 to launch this program.');
+      const popup = window.open('about:blank', '_blank');
+      if (!popup) { alert('Allow pop-ups for IDK 10.0 to launch this program.'); URL.revokeObjectURL(url); return; }
+      popup.opener = null;
+      popup.document.title = program.name || 'IDK program';
+      popup.document.body.innerHTML = '<style>html,body,iframe{width:100%;height:100%;margin:0;border:0;background:#071329}</style>';
+      const frame = popup.document.createElement('iframe');
+      frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-pointer-lock');
+      frame.setAttribute('allow', 'clipboard-read; clipboard-write');
+      frame.src = url;
+      popup.document.body.append(frame);
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (error) {
       alert(error.message || 'Unable to launch the program.');
