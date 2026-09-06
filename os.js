@@ -622,7 +622,7 @@ const OS = (() => {
 
   function setupEchoCompanion() {
     if (!echoCompanion) return;
-    echoCompanion.addEventListener('click', () => launch('ai'));
+    echoCompanion.addEventListener('click', () => window.IDKAIControls?.openSelected?.() || launch('ai'));
   }
 
   function buildStartMenu() {
