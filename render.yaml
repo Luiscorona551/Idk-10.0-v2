@@ -10,7 +10,7 @@ services:
       - key: NODE_VERSION
         value: "20"
       - key: IDK_VERSION
-        value: "10.12.0"
+        value: "10.13.0"
       # Keeps setup sessions valid across restarts.
       - key: SESSION_SECRET
         generateValue: true
