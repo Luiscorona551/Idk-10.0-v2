@@ -4,7 +4,8 @@
   const HYDRATED_KEY = 'idkAccountHydrated';
   const FILE_DB = 'idkFileBlobs';
   const FILE_STORE = 'files';
-  const skipKeys = new Set([ACCOUNT_KEY]);
+  const SYNC_STATUS_KEY = 'idkSyncStatus';
+  const skipKeys = new Set([ACCOUNT_KEY, SYNC_STATUS_KEY]);
   let user = null, timer = null, saving = false, restored = false, saveQueued = false, fileFingerprints = new Map();
 
   const readLocal = () => { const out = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || skipKeys.has(k)) continue; out[k] = localStorage.getItem(k); } return out; };
@@ -16,19 +17,21 @@
   const post = async (url, body) => { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) }); return r.json(); };
   const put = async (url, body) => { const r = await fetch(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) }); return r.json(); };
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const openFileDB = () => new Promise((resolve, reject) => { if (!window.indexedDB) return reject(new Error('IndexedDB unavailable')); const r = indexedDB.open(FILE_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore(FILE_STORE); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+  const openFileDB = () => new Promise((resolve, reject) => { if (!window.indexedDB) return reject(new Error('IndexedDB unavailable')); const r = indexedDB.open(window.IDKProfileStorage?.dbName?.() || FILE_DB, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(FILE_STORE)) r.result.createObjectStore(FILE_STORE); }; r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
   const loadFileBlob = async id => { const db = await openFileDB(); return new Promise((resolve, reject) => { const r = db.transaction(FILE_STORE, 'readonly').objectStore(FILE_STORE).get(id); r.onsuccess = () => resolve(r.result || null); r.onerror = () => reject(r.error); }); };
   const storeFileBlob = async (id, blob) => { const db = await openFileDB(); return new Promise((resolve, reject) => { const tx = db.transaction(FILE_STORE, 'readwrite'); tx.objectStore(FILE_STORE).put(blob, id); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }); };
   const deleteFileBlob = async id => { const db = await openFileDB(); return new Promise((resolve, reject) => { const tx = db.transaction(FILE_STORE, 'readwrite'); tx.objectStore(FILE_STORE).delete(id); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }); };
   const arrayBufferToBase64 = buffer => { const bytes = new Uint8Array(buffer); let binary = ''; const chunk = 0x8000; for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk)); return btoa(binary); };
+  const syncStatus = () => readJSON(SYNC_STATUS_KEY, { state: 'idle', failures: 0, pending: false });
+  const setSyncStatus = patch => { const next = { ...syncStatus(), ...patch, checkedAt: Date.now() }; writeJSON(SYNC_STATUS_KEY, next); window.dispatchEvent(new CustomEvent('idk-sync-status', { detail: next })); return next; };
 
   function style() {
     if (document.getElementById('idk-account-style')) return;
     const s = document.createElement('style'); s.id = 'idk-account-style';
-    s.textContent = `#idk-account-overlay{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:rgba(0,3,15,.68);backdrop-filter:blur(6px)}.idk-account-card{width:min(430px,calc(100% - 28px));padding:22px;border:1px solid rgba(89,134,218,.65);border-radius:10px;background:linear-gradient(145deg,rgba(19,45,95,.98),rgba(5,12,30,.98));color:#fff;box-shadow:0 25px 80px #0009}.idk-account-card h2{margin:0 0 5px}.idk-account-card p{color:#b6c7e4;font-size:11px}.idk-account-card label{display:block;margin:10px 0;color:#c9d6ed;font-size:11px}.idk-account-card input{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;border-radius:5px;border:1px solid #5575a8;background:#07142d;color:#fff}.idk-account-row{display:flex;gap:7px;margin-top:14px}.idk-account-row button{flex:1;padding:9px;border-radius:5px;border:1px solid #638bd1;background:#245db4;color:#fff;cursor:pointer}.idk-account-secondary{background:transparent!important}.idk-account-error{min-height:16px;color:#ff9b9b;font-size:11px}.idk-account-profile{position:fixed;right:12px;top:12px;z-index:10040;display:flex;gap:7px;align-items:center;padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:7px;background:rgba(5,12,30,.62);color:#fff;font-size:11px}.idk-account-profile img{width:25px;height:25px;border-radius:50%;object-fit:cover}`;
+     s.textContent = `#idk-account-overlay{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:rgba(0,3,15,.68);backdrop-filter:blur(6px)}.idk-account-card{width:min(430px,calc(100% - 28px));padding:22px;border:1px solid rgba(89,134,218,.65);border-radius:10px;background:linear-gradient(145deg,rgba(19,45,95,.98),rgba(5,12,30,.98));color:#fff;box-shadow:0 25px 80px #0009}.idk-account-card h2{margin:0 0 5px}.idk-account-card p{color:#b6c7e4;font-size:11px}.idk-account-card label{display:block;margin:10px 0;color:#c9d6ed;font-size:11px}.idk-account-card input{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;border-radius:5px;border:1px solid #5575a8;background:#07142d;color:#fff}.idk-account-row{display:flex;gap:7px;margin-top:14px}.idk-account-row button{flex:1;padding:9px;border-radius:5px;border:1px solid #638bd1;background:#245db4;color:#fff;cursor:pointer}.idk-account-secondary{background:transparent!important}.idk-account-recover{display:block;margin:12px auto 0;border:0;background:none;color:#9fc2ff;font-size:11px;cursor:pointer}.idk-account-error{min-height:16px;color:#ff9b9b;font-size:11px}.idk-account-profile{position:fixed;right:12px;top:12px;z-index:10040;display:flex;gap:7px;align-items:center;padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:7px;background:rgba(5,12,30,.62);color:#fff;font-size:11px}.idk-account-profile img{width:25px;height:25px;border-radius:50%;object-fit:cover}`;
     document.head.appendChild(s);
   }
-  function modal() { style(); const o = document.createElement('div'); o.id = 'idk-account-overlay'; o.innerHTML = `<section class="idk-account-card"><h2 id="idk-account-title">Welcome to IDK 10.0</h2><p id="idk-account-copy">Create an IDK account so your desktop and personal data follow you across devices.</p><form id="idk-account-form"><label>Username<input id="idk-account-user" maxlength="32" autocomplete="username" required></label><label>Password<input id="idk-account-pass" type="password" minlength="6" autocomplete="current-password" required></label><label id="idk-account-avatar-label" hidden>Profile picture<input id="idk-account-avatar" value="profile-1.jpg"></label><div class="idk-account-error" id="idk-account-error"></div><div class="idk-account-row"><button type="submit" id="idk-account-submit">Sign in</button><button type="button" class="idk-account-secondary" id="idk-account-toggle">Create account</button></div></form></section>`; document.body.appendChild(o); return o; }
+  function modal() { style(); const o = document.createElement('div'); o.id = 'idk-account-overlay'; o.innerHTML = `<section class="idk-account-card"><h2 id="idk-account-title">Welcome to IDK 10.0</h2><p id="idk-account-copy">Create an IDK account so your desktop and personal data follow you across devices.</p><form id="idk-account-form"><label>Username<input id="idk-account-user" maxlength="32" autocomplete="username" required></label><label id="idk-account-password-label">Password<input id="idk-account-pass" type="password" minlength="6" autocomplete="current-password" required></label><label id="idk-account-recovery-label" hidden>Recovery code<input id="idk-account-recovery" autocomplete="one-time-code" placeholder="One unused recovery code"></label><label id="idk-account-avatar-label" hidden>Profile picture<input id="idk-account-avatar" value="profile-1.jpg"></label><div class="idk-account-error" id="idk-account-error"></div><div class="idk-account-row"><button type="submit" id="idk-account-submit">Sign in</button><button type="button" class="idk-account-secondary" id="idk-account-toggle">Create account</button></div><button type="button" class="idk-account-recover" id="idk-account-recover">Use a recovery code</button></form></section>`; document.body.appendChild(o); return o; }
   function profile() { if (!user) return; style(); document.getElementById('idk-account-profile')?.remove(); const p = document.createElement('div'); p.id = 'idk-account-profile'; p.innerHTML = `<img src="${esc(user.avatar || 'profile-1.jpg')}" alt=""><span>${esc(user.username)}</span>`; document.body.appendChild(p); }
 
   function localPayload() {
@@ -81,11 +84,23 @@
 
   async function sync() {
     if (!user || !restored || saving) return false;
+    setSyncStatus({ state: 'syncing', pending: true, lastError: '' });
     saving = true;
-    try { const r = await put('/api/account/state', localPayload()); await syncFiles(); return Boolean(r.ok); }
-    catch { return false; }
-    finally { saving = false; }
+    try {
+      const r = await put('/api/account/state', localPayload());
+      await syncFiles();
+      const ok = Boolean(r.ok);
+      setSyncStatus({ state: ok ? 'healthy' : 'error', pending: !ok, lastSuccess: ok ? Date.now() : syncStatus().lastSuccess, failures: ok ? 0 : syncStatus().failures + 1, lastError: ok ? '' : 'The account service did not confirm the save.' });
+      return ok;
+    } catch (error) {
+      const offline = !navigator.onLine;
+      if (offline && !readJSON('idkOfflineQueue', []).some(item => item.type === 'account-sync')) window.IDKOffline?.enqueue?.({ type: 'account-sync', reason: 'offline' });
+      setSyncStatus({ state: offline ? 'queued' : 'error', pending: true, failures: syncStatus().failures + 1, lastError: offline ? 'Offline changes are queued.' : 'The account service could not be reached.' });
+      return false;
+    } finally { saving = false; }
   }
+
+  const retrySync = () => sync();
 
   async function restore() {
     const r = await get('/api/account/state'); if (!r.ok) return false;
@@ -109,7 +124,7 @@
   }
 
   async function startUser(nextUser) {
-    user = nextUser; restored = false; await restore(); await sync(); profile(); clearInterval(timer); timer = setInterval(sync, 5000); window.addEventListener('beforeunload', sync, { capture: true });
+    user = nextUser; restored = false; setSyncStatus({ state: 'restoring', pending: true, lastError: '' }); await restore(); await sync(); profile(); clearInterval(timer); timer = setInterval(sync, 30000); window.addEventListener('beforeunload', sync, { capture: true });
     if (!sessionStorage.getItem(HYDRATED_KEY)) { sessionStorage.setItem(HYDRATED_KEY, '1'); location.reload(); }
   }
 
@@ -118,14 +133,15 @@
     if (!st.configured) return true;
     if (st.authenticated) { await startUser(st.user); return true; }
     clearLocal(); sessionStorage.removeItem(HYDRATED_KEY); window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
-    const o = modal(), form = o.querySelector('#idk-account-form'), toggle = o.querySelector('#idk-account-toggle'), title = o.querySelector('#idk-account-title'), copy = o.querySelector('#idk-account-copy'), submit = o.querySelector('#idk-account-submit'), avatar = o.querySelector('#idk-account-avatar-label');
-    let register = false;
-    toggle.onclick = () => { register = !register; title.textContent = register ? 'Create your IDK account' : 'Welcome to IDK 10.0'; copy.textContent = register ? 'Your personal desktop will be saved securely to your account.' : 'Sign in to restore your personal desktop, games, Files and Messenger data.'; submit.textContent = register ? 'Create account' : 'Sign in'; toggle.textContent = register ? 'I already have an account' : 'Create account'; avatar.hidden = !register; form.querySelector('#idk-account-pass').autocomplete = register ? 'new-password' : 'current-password'; };
-    form.onsubmit = async e => { e.preventDefault(); const err = o.querySelector('#idk-account-error'); err.textContent = ''; submit.disabled = true; const body = { username: o.querySelector('#idk-account-user').value.trim(), password: o.querySelector('#idk-account-pass').value, avatar: o.querySelector('#idk-account-avatar').value.trim() || 'profile-1.jpg' }; try { const r = await post(register ? '/api/account/register' : '/api/account/login', body); if (!r.ok) { err.textContent = r.error || 'Could not sign in.'; submit.disabled = false; return; } o.remove(); await startUser(r.user); } catch { err.textContent = 'Could not connect to the IDK account service.'; submit.disabled = false; } };
+     const o = modal(), form = o.querySelector('#idk-account-form'), toggle = o.querySelector('#idk-account-toggle'), recover = o.querySelector('#idk-account-recover'), title = o.querySelector('#idk-account-title'), copy = o.querySelector('#idk-account-copy'), submit = o.querySelector('#idk-account-submit'), avatar = o.querySelector('#idk-account-avatar-label'), passwordLabel = o.querySelector('#idk-account-password-label'), recoveryLabel = o.querySelector('#idk-account-recovery-label');
+     let mode = 'login';
+     toggle.onclick = () => { mode = mode === 'register' ? 'login' : 'register'; title.textContent = mode === 'register' ? 'Create your IDK account' : 'Welcome to IDK 10.0'; copy.textContent = mode === 'register' ? 'Your personal desktop will be saved securely to your account.' : 'Sign in to restore your personal desktop, games, Files and Messenger data.'; submit.textContent = mode === 'register' ? 'Create account' : 'Sign in'; toggle.textContent = mode === 'register' ? 'I already have an account' : 'Create account'; avatar.hidden = mode !== 'register'; recoveryLabel.hidden = true; passwordLabel.querySelector('label')?.remove?.(); form.querySelector('#idk-account-pass').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; };
+     recover.onclick = () => { mode = 'recover'; title.textContent = 'Reset your password'; copy.textContent = 'Use one unused recovery code generated from a signed-in device.'; submit.textContent = 'Reset password'; toggle.hidden = true; recover.hidden = true; avatar.hidden = true; recoveryLabel.hidden = false; passwordLabel.firstChild.textContent = 'New password'; form.querySelector('#idk-account-pass').autocomplete = 'new-password'; };
+     form.onsubmit = async e => { e.preventDefault(); const err = o.querySelector('#idk-account-error'); err.textContent = ''; submit.disabled = true; const body = { username: o.querySelector('#idk-account-user').value.trim(), password: o.querySelector('#idk-account-pass').value, avatar: o.querySelector('#idk-account-avatar').value.trim() || 'profile-1.jpg', currentPassword: o.querySelector('#idk-account-pass').value, newPassword: o.querySelector('#idk-account-pass').value, recoveryCode: o.querySelector('#idk-account-recovery').value.trim() }; try { const route = mode === 'register' ? '/api/account/register' : mode === 'recover' ? '/api/account/reset-password' : '/api/account/login'; const r = await post(route, mode === 'recover' ? { username: body.username, recoveryCode: body.recoveryCode, newPassword: body.newPassword } : { username: body.username, password: body.password, avatar: body.avatar }); if (!r.ok) { err.textContent = r.error || 'Could not sign in.'; submit.disabled = false; return; } o.remove(); await startUser(r.user); } catch { err.textContent = 'Could not connect to the IDK account service.'; submit.disabled = false; } };
     return true;
   }
 
   function init() { watchLocalStorage(); auth(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.IDKAccount = { sync, restore, get user() { return user; } };
+  window.IDKAccount = { sync, retrySync, getSyncStatus: syncStatus, restore, get user() { return user; } };
 })();

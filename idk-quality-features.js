@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const STORAGE_KEYS = ['theme', 'idkCustomTheme', 'wallpaper', 'iconSize', 'dockPosition', 'motion', 'idkDesktopWidgets', 'idkWidgetConfig', 'idkFileSystem', 'idkDropzone', 'idkInstalledPrograms', 'idkProgramSafety', 'idkProgramVersions', 'idkPendingAppUpdates', 'idkEchoAutomations', 'idkRecoverySnapshots', 'idkDesktopProfiles', 'idkProgramTrust', 'idkOfflineQueue', 'idkLocale', 'idkMailMessages', 'idkMessengerProfile', 'idkTodos', 'idkCalendarEvents', 'idkRichNotes', 'idkAudioSettings', 'idkAccessibility', 'idkSmartWorkspaces', 'idkClipboardHistory', 'idkSystemTimeline'];
+  const STORAGE_KEYS = ['theme', 'idkCustomTheme', 'wallpaper', 'iconSize', 'dockPosition', 'motion', 'idkDesktopWidgets', 'idkWidgetConfig', 'idkFileSystem', 'idkDropzone', 'idkInstalledPrograms', 'idkProgramSafety', 'idkProgramVersions', 'idkPendingAppUpdates', 'idkEchoAutomations', 'idkRecoverySnapshots', 'idkDesktopProfiles', 'idkProgramTrust', 'idkOfflineQueue', 'idkSyncStatus', 'idkLocale', 'idkMailMessages', 'idkMessengerProfile', 'idkTodos', 'idkCalendarEvents', 'idkRichNotes', 'idkAudioSettings', 'idkAccessibility', 'idkSmartWorkspaces', 'idkClipboardHistory', 'idkSystemTimeline', 'idkUserProfiles', 'idkActiveUserProfile', 'idkUserProfilesReady', 'idkCloudSyncConfig'];
   const read = (key, fallback) => { try { const value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } };
   const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   const notify = (title, message) => window.OS?.notify?.(title, message);
@@ -9,7 +9,7 @@
   function blobDatabase() {
     return new Promise((resolve, reject) => {
       if (!window.indexedDB) return reject(new Error('IndexedDB is unavailable.'));
-      const request = indexedDB.open('idkFileBlobs', 1);
+      const request = indexedDB.open(window.IDKProfileStorage?.dbName?.() || 'idkFileBlobs', 1);
       request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('files')) request.result.createObjectStore('files'); };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error('Could not open file storage.'));
@@ -91,7 +91,11 @@
       ['Account and database service', async () => { const response = await fetch('/api/account/status', { cache: 'no-store' }); return response.ok; }],
       ['Server health', async () => { const response = await fetch('/healthz', { cache: 'no-store' }); return response.ok; }],
       ['Browser proxy route', async () => { const response = await fetch('/api/browser/scope', { cache: 'no-store' }); return response.ok; }],
-      ['Public App Store', async () => { const response = await fetch('/api/store/programs', { cache: 'no-store' }); return response.ok; }]
+       ['Public App Store', async () => { const response = await fetch('/api/store/programs', { cache: 'no-store' }); return response.ok; }],
+       ['Platform hardening', () => Boolean(window.IDKPerfectOS && window.IDKAppSecurity)],
+       ['Encrypted recovery', () => Boolean(window.crypto?.subtle)],
+       ['Ecosystem Hub', () => Boolean(window.IDKEcosystem && window.IDKExtensions && window.IDKLocalAI)],
+       ['Virtual desktops', () => Boolean(document.getElementById('idk-virtual-desktops'))]
     ];
     for (const [name, check] of checks) { const row = document.createElement('div'); row.className = 'idk-self-test-row'; row.innerHTML = `<strong>${esc(name)}</strong><span>Checking…</span>`; list.append(row); try { const result = await check(); row.classList.add(result ? 'pass' : 'warn'); row.querySelector('span').textContent = result ? 'Pass' : 'Unavailable'; } catch { row.classList.add('warn'); row.querySelector('span').textContent = 'Unavailable'; } }
     const warnings = list.querySelectorAll('.warn').length; status.textContent = warnings ? `${warnings} service${warnings === 1 ? '' : 's'} unavailable. Local IDK features remain usable.` : 'All checks passed.';

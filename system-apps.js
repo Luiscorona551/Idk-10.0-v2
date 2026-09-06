@@ -29,11 +29,12 @@ window.SYSTEM_APPS = (() => {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { /* storage unavailable */ }
   };
 
-  const openFileDB = () => {
-    if (!window.indexedDB) return Promise.reject(new Error('Browser file storage is unavailable.'));
-    if (fileDBPromise) return fileDBPromise;
-    fileDBPromise = new Promise((resolve, reject) => {
-      const request = window.indexedDB.open(FILE_DB, 1);
+   const openFileDB = () => {
+     if (!window.indexedDB) return Promise.reject(new Error('Browser file storage is unavailable.'));
+     if (fileDBPromise) return fileDBPromise;
+     fileDBPromise = new Promise((resolve, reject) => {
+       const database = window.IDKProfileStorage?.dbName?.() || FILE_DB;
+       const request = window.indexedDB.open(database, 1);
       request.onupgradeneeded = () => request.result.createObjectStore(FILE_STORE);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error('Could not open file storage.'));
@@ -652,7 +653,7 @@ window.SYSTEM_APPS = (() => {
     let current = '';
     const aliases = { file: 'files', files: 'files', note: 'notes', notes: 'notes', calc: 'calculator', calculator: 'calculator', calendar: 'calendar', todo: 'todo', 'to-do': 'todo', images: 'viewer', viewer: 'viewer', stopwatch: 'stopwatch', timer: 'stopwatch', weather: 'weather', ai: 'ai', apps: 'apps', search: 'search', paint: 'paint', speaker: 'speaker', terminal: 'terminal', games: 'games', movies: 'movies', music: 'music', soundboard: 'soundboard', settings: 'settings', roblox: 'roblox', browser: 'proxy', proxy: 'proxy' };
     const web = {
-      facebook: ['Facebook', 'https://www.facebook.com/'], instagram: ['Instagram', 'https://www.instagram.com/'], tiktok: ['TikTok', 'https://www.tiktok.com/'], youtube: ['YouTube', 'https://www.youtube.com/'], twitter: ['Twitter', 'https://twitter.com/'], reddit: ['Reddit', 'https://www.reddit.com/'], discord: ['Discord', 'https://discord.com/app'], twitch: ['Twitch', 'https://www.twitch.tv/'], 'internet archive': ['Internet Archive', 'https://archive.org/']
+      facebook: ['Facebook', 'https://www.facebook.com/'], instagram: ['Instagram', 'https://www.instagram.com/'], tiktok: ['TikTok', 'https://www.tiktok.com/'], youtube: ['YouTube', 'https://www.youtube.com/'], spotify: ['Spotify', 'https://open.spotify.com/'], twitter: ['Twitter', 'https://twitter.com/'], reddit: ['Reddit', 'https://www.reddit.com/'], discord: ['Discord', 'https://discord.com/app'], twitch: ['Twitch', 'https://www.twitch.tv/'], 'internet archive': ['Internet Archive', 'https://archive.org/']
     };
     const print = text => { output.append(ui('div', { className: 'dos-line', textContent: text })); output.scrollTop = output.scrollHeight; };
      const open = target => {
@@ -933,5 +934,5 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, readBlob: blobFor, getFiles };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, readBlob: blobFor, getFiles, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
 })();

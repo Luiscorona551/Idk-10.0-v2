@@ -53,6 +53,7 @@
     try {
       const blob = await getProgram(program.id);
       if (!blob) throw new Error('Program data is missing.');
+      if (window.IDKAppSecurity?.launch && await window.IDKAppSecurity.launch(blob, program)) return;
       const url = URL.createObjectURL(blob);
       const win = window.open(url, '_blank', 'noopener,noreferrer');
       if (!win) window.OS?.notify?.('Program Installer', 'Your browser blocked the program window. Allow pop-ups for IDK 10.0.', 'warning');
@@ -149,7 +150,10 @@
       next.disabled = true; status.textContent = 'Installing…';
       try {
         const id = `program-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const program = { id, name: nameInput.value.trim(), icon: iconInput.value, installedAt: Date.now(), fileName: selectedFile.name };
+        const source = await selectedFile.text();
+        const capabilities = window.IDKAppSecurity?.capabilities?.(source) || {};
+        const contentHash = window.IDKPerfectOS?.digest ? await window.IDKPerfectOS.digest(source) : '';
+        const program = { id, name: nameInput.value.trim(), icon: iconInput.value, installedAt: Date.now(), fileName: selectedFile.name, version: '1.0.0', capabilities, contentHash };
         await putProgram(id, selectedFile);
         const programs = read(PROGRAMS_KEY, []).filter(item => item.name !== program.name);
         programs.unshift(program); write(PROGRAMS_KEY, programs);

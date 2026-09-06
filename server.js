@@ -22,9 +22,20 @@ const uvServiceWorker = ["self.__uv$cookies = ''; importScripts('/uv/uv.bundle.j
 const root = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
 async function backendStatus() { return { ...backend, ai: aiStatus(), database: await databaseStatus() }; }
 app.use(express.json({ limit: '20mb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(self), bluetooth=(self), gamepad=(self), clipboard-read=(self), clipboard-write=(self)');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: ws: wss:; frame-src 'self' https: data: blob:; worker-src 'self' blob:");
+  if (req.path === '/desktop.html' || req.path === '/') res.setHeader('Cache-Control', 'no-store');
+  if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
 const healthHandler = async (req, res) => res.status(200).json({ ok: true, service: 'ugs-desktop', https: req.secure, ...(await backendStatus()) });
 app.get('/healthz', healthHandler);
 app.get('/api/health', healthHandler);
@@ -33,6 +44,15 @@ accountRoutes(app);
 friendRoutes(app);
 publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
+app.get('/api/deploy/status', async (req, res) => res.json({
+  ok: true,
+  version: process.env.IDK_VERSION || '10.0.0',
+  environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
+  commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
+  node: process.version,
+  uptime: Math.round(process.uptime()),
+  checkedAt: new Date().toISOString()
+}));
 app.get('/api/browser/scope', async (req, res) => res.json({
   ok: true,
   name: 'IDK Browser',
@@ -56,7 +76,13 @@ app.get('/api/update', async (req, res) => res.json({
     'Installable PWA shell with service-worker caching, recovery snapshots, profiles, and command palette.',
     'Files backup and restore plus the IDK System Self-Test.',
     'Smart Workspaces, Universal Clipboard, Share Sheet, and System Timeline.',
-    'Drag-and-drop desktop widgets for weather, news, calendar, stocks, and sports.'
+    'Drag-and-drop desktop widgets for weather, news, calendar, stocks, and sports.',
+    'Accounts & Devices with profile-isolated storage, multi-provider sync, browser sessions, and hardware bridges.',
+    'Encrypted recovery packages, storage health, offline retry queues, PWA updates, accessibility focus management, and sandboxed installed apps.',
+    'Security headers, login throttling, app capability fingerprints, crash diagnostics, and persistent-storage controls.',
+    'Ecosystem Hub with collaboration rooms, extension records, private AI mode, localization, virtual desktops, portability, and update-channel controls.',
+    'Reliability Center with deployment checks, diagnostics export, sync health, account recovery codes, password reset, and app trust controls.',
+    'Official Spotify, YouTube, and Internet Archive media links with no unapproved streaming proxies.'
   ],
   health: await backendStatus()
 }));

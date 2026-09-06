@@ -1,0 +1,23 @@
+/* Desktop window layout and performance controls. */
+.idk-tile-window { border-radius: 8px; transition: border-color .18s ease, box-shadow .18s ease, left .2s ease, top .2s ease, width .2s ease, height .2s ease; }
+.idk-performance-modal { position: fixed; inset: 0; z-index: 310000; display: grid; place-items: center; padding: 12px; background: rgba(1, 7, 19, .64); backdrop-filter: blur(8px); }
+.idk-performance-card { width: min(560px, calc(100vw - 24px)); max-height: min(680px, calc(100vh - 24px)); overflow: auto; border: 1px solid rgba(151, 197, 255, .28); border-radius: 16px; background: linear-gradient(150deg, rgba(13, 31, 65, .98), rgba(5, 15, 33, .98)); box-shadow: 0 30px 90px rgba(0, 0, 0, .58); color: #eef5ff; }
+.idk-performance-card header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+.idk-performance-card header strong, .idk-performance-card header small { display: block; }
+.idk-performance-card header small { margin-top: 4px; color: #a9bfdf; font-size: 12px; }
+.idk-performance-card header button { width: 30px; height: 30px; border: 1px solid rgba(255, 255, 255, .15); border-radius: 8px; background: rgba(255, 255, 255, .08); color: #fff; cursor: pointer; font-size: 20px; line-height: 1; }
+.idk-performance-body { display: grid; gap: 16px; padding: 20px; }
+.idk-performance-body label { display: grid; gap: 7px; color: #a9bfdf; font-size: 12px; }
+.idk-performance-body select { width: 100%; }
+.idk-performance-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.idk-performance-metrics article { min-width: 0; padding: 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .055); }
+.idk-performance-metrics strong, .idk-performance-metrics small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idk-performance-metrics strong { color: #7ef6a8; font-size: 14px; }
+.idk-performance-metrics small { margin-top: 4px; color: #a9bfdf; font-size: 10px; }
+.idk-performance-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.idk-performance-actions .btn { flex: 1 1 135px; }
+.idk-performance-status { min-height: 18px; margin: 0; color: #7ef6a8; font-size: 12px; }
+#idk-perfect-status [data-window-layout], #idk-perfect-status [data-performance] { white-space: nowrap; }
+html[data-idk-performance="saver"] .window:not(.focused) { box-shadow: 0 12px 30px rgba(0, 0, 0, .42); }
+html[data-idk-performance="saver"] .window:not(.focused) .content { content-visibility: auto; contain-intrinsic-size: 420px; }
+html[data-idk-performance="performance"] .window { will-change: left, top, width, height; }

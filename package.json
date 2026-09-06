@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Desktop-style front end for the UGS collection, with an Ultraviolet proxy backend.",
   "main": "server.js",
-  "scripts": {"start": "node --import ./env.js server.js"},
+  "scripts": {"start": "node --import ./env.js server.js", "validate": "node scripts/validate-idk.mjs"},
   "license": "UNLICENSED",
   "dependencies": {
     "@mercuryworkshop/bare-mux": "^2.1.9",

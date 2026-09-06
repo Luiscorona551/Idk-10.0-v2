@@ -4,11 +4,13 @@ services:
     runtime: node
     plan: free
     healthCheckPath: /healthz
-    buildCommand: npm install
+    buildCommand: npm ci && npm run validate
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: IDK_VERSION
+        value: "10.0.0"
       # Keeps setup sessions valid across restarts.
       - key: SESSION_SECRET
         generateValue: true

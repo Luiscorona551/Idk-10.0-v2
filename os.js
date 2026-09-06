@@ -733,6 +733,7 @@ const OS = (() => {
   build();
   return {
     open: launch,
+    focus,
     tickClock,
     setLoading,
     notify,

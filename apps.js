@@ -270,8 +270,8 @@ function externalSite(url, label, { embeddable = true } = {}) {
   return root;
 }
 
-function movieSource(url, label, repository) {
-  const root = externalSite(url, label);
+function movieSource(url, label, repository, options = {}) {
+  const root = externalSite(url, label, options);
   const frame = root.querySelector('iframe');
   const status = el('span', { className: 'movie-source-status checking', textContent: 'Checking source…' });
   if (frame) {
@@ -332,12 +332,24 @@ function moviesApp() {
       title: 'BW Cinema Fork',
       url: 'https://corvid-agent.github.io/bw-cinema/',
       repository: 'https://github.com/corvid-agent/bw-cinema'
+    },
+    {
+      id: 'archive-official',
+      title: 'Internet Archive Movies',
+      url: 'https://archive.org/details/movies',
+      embeddable: false
+    },
+    {
+      id: 'youtube-official',
+      title: 'YouTube',
+      url: 'https://www.youtube.com/',
+      embeddable: false
     }
   ];
   const root = el('div', { className: 'movies-app' });
   const browser = tabbedApp(sources.map(source => ({
     title: source.title,
-    render: () => movieSource(source.url, source.title, source.repository)
+    render: () => movieSource(source.url, source.title, source.repository, { embeddable: source.embeddable !== false })
   })));
   const toggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Watchlist (0)', 'aria-expanded': 'false' });
   const count = el('span', { className: 'count', textContent: '0 saved' });
@@ -1722,6 +1734,10 @@ const APPS = {
         render: () => driveFolder(folder.id, folder.title)
       }));
       tabs.push({ title: 'Player', render: audioPlayer });
+      tabs.push({
+        title: 'Spotify',
+        render: () => externalSite('https://open.spotify.com/', 'Spotify', { embeddable: false })
+      });
 
       return tabbedApp(tabs);
     }
