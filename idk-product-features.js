@@ -18,7 +18,7 @@
   function welcome() {
     if (read('idkOnboardingComplete', false)) return;
     if (document.getElementById('idk-account-overlay')) { setTimeout(welcome, 500); return; }
-    const root = modal('idk-onboarding', 'Welcome to IDK 10.0', '<p>Your desktop is ready for apps, workspaces, widgets, files, themes, and Browser.</p><div class="idk-update-grid"><div class="idk-update-card"><strong>Apps</strong><small>Use the two-row desktop or search with Ctrl/Cmd + K.</small></div><div class="idk-update-card"><strong>Personalize</strong><small>Open widgets, themes, audio, and settings from the top controls.</small></div><div class="idk-update-card"><strong>Stay safe</strong><small>Permissions, guest mode, backups, and Safe Mode are available.</small></div></div><div class="idk-update-actions" data-actions></div>');
+    const root = modal('idk-onboarding', 'Welcome to IDK 10.0', '<p>Your desktop is ready for apps, workspaces, widgets, files, themes, Browser, and private AI choices.</p><div class="idk-update-grid"><div class="idk-update-card"><strong>Find anything</strong><small>Use the app shelf, Ctrl/Cmd + K search, or the command palette with Ctrl/Cmd + Shift + P.</small></div><div class="idk-update-card"><strong>Choose your AI</strong><small>Open AI Modes to use Cloud AI, Local AI, or Offline AI.</small></div><div class="idk-update-card"><strong>Protect your data</strong><small>Privacy Center, Backup & Recovery, permissions, and offline sync controls are built in.</small></div></div><div class="idk-update-actions" data-actions></div>');
     root.querySelector('[data-actions]').append(button('Start exploring', () => { write('idkOnboardingComplete', true); root.remove(); }, 'btn'), button('Show again later', () => root.remove(), 'btn tab'));
   }
 
