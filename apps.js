@@ -1804,7 +1804,9 @@ const APPS = {
     async render(opts = {}) {
       const root = el('div', { className: 'site-frame' });
       const frame = el('iframe', { allow: 'autoplay; fullscreen; clipboard-write' });
-       const status = el('span', { className: 'count', textContent: 'Checking browser server…' });
+      const status = el('span', { className: 'count', textContent: 'Checking browser server…' });
+      const scopePanel = el('section', { className: 'idk-browser-scope', hidden: true });
+      const scopeToggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Server scope' });
 
       const bar = el('div', { className: 'toolbar' });
       const url = el('input', {
@@ -1814,7 +1816,7 @@ const APPS = {
         value: opts.url || ''
       });
       const go = el('button', { className: 'btn tab', type: 'button', textContent: 'Go' });
-      bar.append(url, go, status);
+      bar.append(url, go, scopeToggle, status);
 
       if (!await PROXY.backendAvailable()) {
         root.append(bar, emptyState(
@@ -1826,8 +1828,20 @@ const APPS = {
         return root;
       }
 
-       const scope = await PROXY.serverScope();
-       status.textContent = scope.scope ? `Server scope ${scope.scope} · Ready` : 'Ready';
+      const scope = await PROXY.serverScope();
+      status.textContent = scope.scope ? `Server scope ${scope.scope} · Ready` : 'Ready';
+      const scopeHeading = el('div', { className: 'idk-browser-scope-heading' }, [
+        el('strong', { textContent: 'Browser Server Scope' }),
+        el('small', { textContent: 'The server routes browser traffic through this scope.' })
+      ]);
+      const scopeGrid = el('div', { className: 'idk-browser-scope-grid' }, [
+        el('div', {}, [el('small', { textContent: 'Status' }), el('strong', { textContent: scope.proxy ? 'Ready' : 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Scope' }), el('strong', { textContent: scope.scope || 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Transport' }), el('strong', { textContent: scope.transport || 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Origin' }), el('strong', { textContent: scope.origin || location.origin })])
+      ]);
+      scopePanel.append(scopeHeading, scopeGrid);
+      scopeToggle.addEventListener('click', () => { scopePanel.hidden = !scopePanel.hidden; scopeToggle.textContent = scopePanel.hidden ? 'Server scope' : 'Hide scope'; });
        const navigate = async () => {
         if (!url.value.trim()) return;
         status.textContent = 'Connecting…';
@@ -1844,7 +1858,7 @@ const APPS = {
         if (event.key === 'Enter') navigate();
       });
 
-      root.append(bar, frame);
+       root.append(bar, scopePanel, frame);
       if (opts.url) await navigate();
       return root;
     }
