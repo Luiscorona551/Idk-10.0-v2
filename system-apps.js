@@ -29,6 +29,14 @@ window.SYSTEM_APPS = (() => {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { /* storage unavailable */ }
   };
 
+  const friendlyAIError = error => {
+    const message = String(error?.message || error || 'Unknown AI error');
+    if (/429|quota|rate limit|resource exhausted/i.test(message)) return 'Cloud AI has reached its usage limit. Try Local AI or Offline AI, or try again later.';
+    if (/401|403|api key|unauthorized|forbidden/i.test(message)) return 'Cloud AI credentials are not available. Ask the IDK owner to check the server AI settings, or choose Local AI.';
+    if (/503|502|504|unavailable|failed to fetch|network/i.test(message)) return 'Cloud AI is temporarily unavailable. Your local IDK data is safe; try Local AI or Offline AI.';
+    return message;
+  };
+
    const openFileDB = () => {
      if (!window.indexedDB) return Promise.reject(new Error('Browser file storage is unavailable.'));
      if (fileDBPromise) return fileDBPromise;
@@ -792,8 +800,8 @@ window.SYSTEM_APPS = (() => {
           addMessage('assistant', answer, selectedMode === 'code' ? 'code' : 'text');
         }
         status.textContent = 'Ready';
-      } catch (error) {
-        addMessage('assistant', `Could not connect: ${error.message}`);
+       } catch (error) {
+         addMessage('assistant', friendlyAIError(error));
         status.textContent = 'Connection error';
       } finally {
         send.disabled = false;
