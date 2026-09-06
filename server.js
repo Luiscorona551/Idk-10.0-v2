@@ -47,7 +47,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.12.0',
+  version: process.env.IDK_VERSION || '10.13.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -64,10 +64,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.12.0',
+  version: '10.13.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch thirteen: AI mode and privacy controls, Sync Center, Backup & Recovery hub, command palette, and Chromebook/mobile polish.',
     'Batch twelve: Local Agent with Ollama and LM Studio support, permissioned IDK actions, and offline-first local chat.',
     'Batch eleven: full-content file transfers with Copy Files progress, conflict review, named Browser Workspaces, handoff links, and direct Today reminders.',
     'Batch ten: IDK Flow with Today, unified search and actions, and selective Transfer Center previews.',
