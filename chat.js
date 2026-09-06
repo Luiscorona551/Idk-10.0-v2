@@ -7,6 +7,7 @@ const MAX_PAYLOAD = 250000;
 const MAX_HISTORY = 50;
 const MAX_PER_ROOM = 50;
 const MAX_MUTE_MINUTES = 60;
+const MAX_METADATA = 180000;
 const HEARTBEAT_MS = 30000;
 const rooms = new Map();
 
@@ -16,8 +17,10 @@ function send(socket, payload) { if (socket.readyState === WebSocket.OPEN) socke
 function broadcast(code, payload) { const current = rooms.get(code); if (!current) return; if (payload.type === 'message' && !payload.private) { current.history.push(payload); if (current.history.length > MAX_HISTORY) current.history.shift(); } current.clients.forEach(client => send(client, payload)); }
 function users(code) { const current = rooms.get(code); return [...(current?.clients ?? [])].map(client => { const member = current.members.get(client.peerId); return { id: client.peerId, userId: client.userId || null, name: client.nick, role: member?.role || (client.peerId === current.ownerId ? 'owner' : 'member'), mutedUntil: member?.mutedUntil || 0 }; }); }
 function presence(code, text) { const current = rooms.get(code); if (!current) return; broadcast(code, { type: 'presence', text, users: users(code), ownerId: current.ownerId }); }
-async function dbRoomHistory(code) { const pool = getAccountPool(); if (!pool) return []; const { rows } = await pool.query(`SELECT sender_user_id AS "userId",sender_name AS name,text,EXTRACT(EPOCH FROM created_at)*1000 AS at FROM idk_room_messages WHERE room_code=$1 AND private=FALSE ORDER BY created_at DESC LIMIT $2`, [code, MAX_HISTORY]); return rows.reverse().map(row => ({ type: 'message', userId: row.userId, name: row.name, text: row.text, at: Number(row.at) })); }
-async function dbDmHistory(userId, targetUserId) { const pool = getAccountPool(); if (!pool || !userId || !targetUserId) return []; const { rows } = await pool.query(`SELECT sender_user_id AS "userId",sender_name AS name,text,EXTRACT(EPOCH FROM created_at)*1000 AS at FROM idk_room_messages WHERE private=TRUE AND ((sender_user_id=$1 AND target_user_id=$2) OR (sender_user_id=$2 AND target_user_id=$1)) ORDER BY created_at ASC LIMIT $3`, [userId, targetUserId, MAX_HISTORY]); return rows.map(row => ({ type: 'message', private: true, userId: row.userId, name: row.name, text: row.text, at: Number(row.at) })); }
+function messageMeta(data) { const value = { mentions: Array.isArray(data.mentions) ? data.mentions.map(item => String(item).slice(0, 32)).filter(Boolean).slice(0, 12) : [], attachments: Array.isArray(data.attachments) ? data.attachments.map(item => ({ fileId: String(item.fileId || '').slice(0, 120), name: String(item.name || 'attachment').slice(0, 120), mime: String(item.mime || 'application/octet-stream').slice(0, 80), size: Math.min(Math.max(Number(item.size) || 0, 0), 200000), content: typeof item.content === 'string' && item.content.length <= 160000 ? item.content : '' })).slice(0, 4) : [], replyTo: data.replyTo && typeof data.replyTo === 'object' ? { id: String(data.replyTo.id || '').slice(0, 80), name: String(data.replyTo.name || '').slice(0, 32), text: String(data.replyTo.text || '').slice(0, 180) } : null }; return JSON.stringify(value).length <= MAX_METADATA ? value : { mentions: value.mentions, attachments: [], replyTo: value.replyTo }; }
+function applyMeta(row, base) { const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}; return { ...base, id: row.id, mentions: metadata.mentions || [], attachments: metadata.attachments || [], replyTo: metadata.replyTo || null }; }
+async function dbRoomHistory(code) { const pool = getAccountPool(); if (!pool) return []; const { rows } = await pool.query(`SELECT id,sender_user_id AS "userId",sender_name AS name,text,metadata,EXTRACT(EPOCH FROM created_at)*1000 AS at FROM idk_room_messages WHERE room_code=$1 AND private=FALSE ORDER BY created_at DESC LIMIT $2`, [code, MAX_HISTORY]); return rows.reverse().map(row => applyMeta(row, { type: 'message', userId: row.userId, name: row.name, text: row.text, at: Number(row.at) })); }
+async function dbDmHistory(userId, targetUserId) { const pool = getAccountPool(); if (!pool || !userId || !targetUserId) return []; const { rows } = await pool.query(`SELECT id,sender_user_id AS "userId",sender_name AS name,text,metadata,EXTRACT(EPOCH FROM created_at)*1000 AS at FROM idk_room_messages WHERE private=TRUE AND ((sender_user_id=$1 AND target_user_id=$2) OR (sender_user_id=$2 AND target_user_id=$1)) ORDER BY created_at ASC LIMIT $3`, [userId, targetUserId, MAX_HISTORY]); return rows.map(row => applyMeta(row, { type: 'message', private: true, userId: row.userId, name: row.name, text: row.text, at: Number(row.at) })); }
 
 export const chat = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
 const heartbeat = setInterval(() => { chat.clients.forEach(socket => { if (socket.readyState !== WebSocket.OPEN) return socket.terminate(); if (socket.isAlive === false) return socket.terminate(); socket.isAlive = false; socket.ping(); }); }, HEARTBEAT_MS); heartbeat.unref?.();
@@ -51,9 +54,9 @@ chat.on('connection', (socket, req) => {
     if (data.type === 'message' && socket.code) {
       const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
       if (member?.mutedUntil > Date.now()) return send(socket, { type: 'error', text: `You are muted for ${Math.ceil((member.mutedUntil - Date.now()) / 60000)} more minute(s).` });
-      const text = String(data.text ?? '').trim().slice(0, MAX_MESSAGE); if (!text) return;
-      const payload = { type: 'message', name: socket.nick, userId: socket.userId || null, text, at: Date.now() };
-      if (socket.userId) { const pool = getAccountPool(); try { await pool.query('INSERT INTO idk_room_messages(id,room_code,sender_user_id,sender_name,text,private) VALUES($1,$2,$3,$4,$5,FALSE)', [randomUUID(), socket.code, socket.userId, socket.nick, text]); } catch {} }
+      const text = String(data.text ?? '').trim().slice(0, MAX_MESSAGE); if (!text && !data.attachments?.length) return;
+      const metadata = messageMeta(data), payload = { type: 'message', id: randomUUID(), name: socket.nick, userId: socket.userId || null, text, at: Date.now(), ...metadata };
+      if (socket.userId) { const pool = getAccountPool(); try { await pool.query('INSERT INTO idk_room_messages(id,room_code,sender_user_id,sender_name,text,metadata,private) VALUES($1,$2,$3,$4,$5,$6,FALSE)', [payload.id, socket.code, socket.userId, socket.nick, text, metadata]); } catch {} }
       broadcast(socket.code, payload); return;
     }
 
@@ -69,12 +72,22 @@ chat.on('connection', (socket, req) => {
       const targetUserId = String(data.targetUserId || '').slice(0, 64);
       const targetId = String(data.targetId || '').slice(0, 64);
       const targetSocket = [...(current?.clients ?? [])].find(client => (targetUserId && client.userId === targetUserId) || (!targetUserId && client.peerId === targetId));
-      const text = String(data.text ?? '').trim().slice(0, MAX_MESSAGE);
+       const text = String(data.text ?? '').trim().slice(0, MAX_MESSAGE), metadata = messageMeta(data);
       if (!targetSocket || targetSocket === socket) return send(socket, { type: 'error', text: 'Choose someone else in this room for a personal chat.' });
-      if (!text) return;
-      const payload = { type: 'message', private: true, name: socket.nick, userId: socket.userId || null, fromId: socket.peerId, toId: targetSocket.peerId, toUserId: targetSocket.userId || null, toName: targetSocket.nick, text, at: Date.now() };
-      if (socket.userId && targetSocket.userId) { const pool = getAccountPool(); try { await pool.query('INSERT INTO idk_room_messages(id,room_code,sender_user_id,sender_name,target_user_id,text,private) VALUES($1,$2,$3,$4,$5,$6,TRUE)', [randomUUID(), socket.code, socket.userId, socket.nick, targetSocket.userId, text]); } catch {} }
+       if (!text && !data.attachments?.length) return;
+       const payload = { type: 'message', private: true, id: randomUUID(), name: socket.nick, userId: socket.userId || null, fromId: socket.peerId, toId: targetSocket.peerId, toUserId: targetSocket.userId || null, toName: targetSocket.nick, text, at: Date.now(), ...metadata };
+       if (socket.userId && targetSocket.userId) { const pool = getAccountPool(); try { await pool.query('INSERT INTO idk_room_messages(id,room_code,sender_user_id,sender_name,target_user_id,text,metadata,private) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE)', [payload.id, socket.code, socket.userId, socket.nick, targetSocket.userId, text, metadata]); } catch {} }
       send(socket, payload); send(targetSocket, payload); return;
+    }
+
+    if (data.type === 'reaction' && socket.code) {
+      const current = rooms.get(socket.code), message = current?.history.find(item => item.id === String(data.messageId || ''));
+      if (!message) return;
+      const emoji = String(data.emoji || '❤️').slice(0, 8); message.reactions ||= {};
+      const users = Array.isArray(message.reactions[emoji]) ? message.reactions[emoji] : [];
+      message.reactions[emoji] = users.includes(socket.peerId) ? users.filter(id => id !== socket.peerId) : [...users, socket.peerId].slice(-50);
+      broadcast(socket.code, { type: 'reaction', messageId: message.id, reactions: message.reactions });
+      return;
     }
 
     if (data.type === 'typing' && socket.code) {

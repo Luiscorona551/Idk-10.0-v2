@@ -17,6 +17,7 @@
 
   function welcome() {
     if (read('idkOnboardingComplete', false)) return;
+    if (document.getElementById('idk-account-overlay')) { setTimeout(welcome, 500); return; }
     const root = modal('idk-onboarding', 'Welcome to IDK 10.0', '<p>Your desktop is ready for apps, workspaces, widgets, files, themes, and Browser.</p><div class="idk-update-grid"><div class="idk-update-card"><strong>Apps</strong><small>Use the two-row desktop or search with Ctrl/Cmd + K.</small></div><div class="idk-update-card"><strong>Personalize</strong><small>Open widgets, themes, audio, and settings from the top controls.</small></div><div class="idk-update-card"><strong>Stay safe</strong><small>Permissions, guest mode, backups, and Safe Mode are available.</small></div></div><div class="idk-update-actions" data-actions></div>');
     root.querySelector('[data-actions]').append(button('Start exploring', () => { write('idkOnboardingComplete', true); root.remove(); }, 'btn'), button('Show again later', () => root.remove(), 'btn tab'));
   }
@@ -106,7 +107,7 @@
   function dockUtilities() {
     const dock = document.getElementById('dock'); if (!dock || dock.querySelector('[data-idk-product="store"]')) return; [['store', '🛍️', 'App Store', appCenter], ['update', '⬆️', 'System Updates', updateCenter], ['audio', '🔊', 'Audio Center', audioCenter], ['theme', '🎨', 'Share theme', themeShare], ['backup', '💾', 'Backup & Restore', () => window.IDKBackup?.open?.()]].forEach(([id, icon, title, action]) => { const b = button(icon, action, 'dock-btn idk-product-dock'); b.dataset.idkProduct = id; b.title = title; b.setAttribute('aria-label', title); dock.prepend(b); }); }
 
-  function install() { appRail(); installGridControls(); dockUtilities(); applyAudio(); applySafeMode(); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 600); }
+  function install() { const idle = task => window.requestIdleCallback ? requestIdleCallback(task, { timeout: 1200 }) : setTimeout(task, 0); applyAudio(); applySafeMode(); idle(() => { appRail(); installGridControls(); dockUtilities(); }); document.addEventListener('pointerdown', () => { if (audioState().startup) { beep('startup'); write('idkAudioSettings', { ...audioState(), startup: false }); } }, { once: true, passive: true }); setTimeout(welcome, 1800); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
-  window.IDKUnifiedSearch = { open: unifiedSearch }; window.IDKFileAssociations = { open: openAssociated, settings: fileAssociations }; window.IDKProductFeatures = { appCenter, updateCenter, audioCenter, themeShare, unifiedSearch, fileAssociations };
+  window.IDKUnifiedSearch = { open: unifiedSearch }; window.IDKFileAssociations = { open: openAssociated, settings: fileAssociations }; window.IDKProductFeatures = { appCenter, updateCenter, audioCenter, themeShare, unifiedSearch, fileAssociations, welcome };
 })();

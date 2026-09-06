@@ -209,6 +209,7 @@
     if (!win || win.dataset.idkFilesEnhanced === 'true') return;
     const title = win.querySelector('.title');
     if (!title || !/files/i.test(title.textContent || '')) return;
+    if (win.querySelector('.files-app')) return;
     win.dataset.idkFilesEnhanced = 'true';
     const content = win.querySelector('.content'); if (!content) return;
     content.innerHTML = fileHomeMarkup();

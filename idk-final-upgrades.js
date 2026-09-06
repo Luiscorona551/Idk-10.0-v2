@@ -103,12 +103,16 @@
   function desktopMenu(event) {
     const icon = event.target.closest('#icons .desktop-icon,#icons .idk-installed-shortcut,#icons .idk-final-desktop-icon');
     if (icon) { event.preventDefault(); event.stopPropagation(); iconMenu(icon, event); return; }
-    if (event.target.closest('#windows,#dock,#start-menu,#idk-upgrade-widgets,#idk-widget-editor')) return;
+    if (event.target.closest('#windows,#dock,#idk-taskbar,#start-menu,#idk-upgrade-widgets,#idk-widget-editor')) return;
     event.preventDefault();
     showMenu(event.clientX, event.clientY, [
-      { label: 'Open widgets', action: renderWidgets },
-      { label: 'Edit widgets', action: openWidgetEditor },
-      { label: 'Command palette', action: openPalette },
+       { label: 'Open widgets', action: renderWidgets },
+       { label: 'Edit widgets', action: openWidgetEditor },
+       { label: 'System Monitor', action: () => window.OS?.open('system-monitor') },
+       { label: 'Grid window layout', action: () => window.IDKWindowManager?.tileLayout?.('grid') },
+       { label: 'Minimize all windows', action: () => window.IDKWindowManager?.minimizeAll?.() },
+       { label: 'Save workspace', action: () => window.OS?.saveWorkspace?.() },
+       { label: 'Command palette', action: openPalette },
       { label: 'Settings', action: () => window.OS?.open('settings') },
       { label: 'Switch to Desktop 1', action: () => window.IDKFeaturePack?.switchSpace(1) },
       { label: 'Switch to Desktop 2', action: () => window.IDKFeaturePack?.switchSpace(2) },

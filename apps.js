@@ -1508,6 +1508,46 @@ const APPS = {
     render: activityCenterApp
   },
 
+  'system-monitor': {
+    title: 'System Monitor',
+    glyph: '◫',
+    desktop: false,
+    dock: false,
+    width: 720,
+    height: 560,
+    render: () => window.IDKBatchFive?.systemMonitor?.() || document.createElement('div')
+  },
+
+  gallery: {
+    title: 'Gallery',
+    glyph: '▧',
+    desktop: false,
+    dock: false,
+    width: 760,
+    height: 580,
+    render: () => window.IDKBatchSix?.gallery?.() || document.createElement('div')
+  },
+
+  contacts: {
+    title: 'Contacts',
+    glyph: '♙',
+    desktop: false,
+    dock: false,
+    width: 620,
+    height: 560,
+    render: () => window.IDKBatchSix?.contacts?.() || document.createElement('div')
+  },
+
+  'control-center': {
+    title: 'Control Center',
+    glyph: '◉',
+    desktop: false,
+    dock: false,
+    width: 680,
+    height: 580,
+    render: () => window.IDKBatchSix?.controlCenter?.() || document.createElement('div')
+  },
+
   permissions: {
     title: 'App Permissions',
     glyph: '🛡️',

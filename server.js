@@ -46,7 +46,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.0.0',
+  version: process.env.IDK_VERSION || '10.6.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -63,10 +63,16 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.0.0',
+  version: '10.6.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch six: Files-backed Gallery, Contacts, Control Center, workspace controls, and Chat Room 2.0 attachments, mentions, replies, and reactions.',
+    'Batch five: live open-window taskbar, desktop window actions, System Monitor, workspace save access, and responsive shell polish.',
+    'Batch four: functional Files locations, canonical text-file writes, richer Browser persistence, Notes-to-Files export, local Calendar dates, app change events, and safer snapshot restore.',
+    'Batch three: visible sync health, safe workspace sharing, pre-restore conflict snapshots, IndexedDB-aware storage reporting, and offline cache updates.',
+    'Batch two: one-at-a-time onboarding, local guest access, safer local state handling, keyboard focus improvements, and idle-time startup work.',
+    'IDK Hub control center with focus modes, routines, privacy controls, health checks, recovery snapshots, and appearance tools.',
     'Two-row scrollable app desktop with favorites and density controls.',
     'Welcome tour, App Store lifecycle tools, and recovery controls.',
     'Theme, widget, audio, search, and accessibility improvements.',

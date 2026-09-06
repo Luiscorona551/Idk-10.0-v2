@@ -39,7 +39,7 @@
       let button = [...(sidebar?.querySelectorAll(':scope > button') || [])].find(item => item.textContent.trim() === name);
       if (!button && sidebar) { button = document.createElement('button'); button.type = 'button'; button.textContent = name; sidebar.insertBefore(button, sidebar.querySelector('.idk-dropzone')); }
       button?.classList.add(`idk-shortcut-${name.toLowerCase().replace(/\s+/g, '-')}`);
-      button?.addEventListener('click', () => notify('Files', `${name} is a local IDK location.`));
+      button?.addEventListener('click', () => window.IDKFiles?.openLocation?.(name));
     });
     const drop = home.querySelector('#idk-dropzone');
     if (!drop) return;

@@ -737,8 +737,9 @@ const OS = (() => {
     tickClock,
     setLoading,
     notify,
-    restoreWorkspace,
-    clearWorkspace,
+     restoreWorkspace,
+     saveWorkspace,
+     clearWorkspace,
     clearActivity,
     getActivityHistory: () => notificationHistory.map(item => ({ ...item }))
   };

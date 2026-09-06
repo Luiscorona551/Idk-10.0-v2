@@ -291,7 +291,7 @@
         card.innerHTML = `<span class="idk-folder-icon">${icon}</span><strong>${esc(name)}</strong><small>Stored locally</small><i aria-label="Pinned">▸</i>`;
         if (!card.dataset.idkFolderBound) {
           card.dataset.idkFolderBound = 'true';
-          card.onclick = () => notify('Files', `${name} is available in the IDK local file system.`);
+          card.onclick = () => window.IDKFiles?.openLocation?.(name);
         }
       });
     }
@@ -326,7 +326,7 @@
       button.style.setProperty('--shortcut-color', color);
       button.innerHTML = `<span class="idk-shortcut-icon">${icon}</span><span>${esc(name)}</span><small>Stored locally</small><i aria-hidden="true">▸</i>`;
       button.title = `${name} · Stored locally`;
-      button.onclick = () => notify('Files', `${name} is available in the IDK local file system.`);
+      button.onclick = () => window.IDKFiles?.openLocation?.(name);
       sidebar.append(button);
     });
     if (drop) {

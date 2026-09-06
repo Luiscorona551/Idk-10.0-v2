@@ -90,15 +90,26 @@ window.SYSTEM_APPS = (() => {
   const isTextFile = entry => entry.text === true || (entry.mime || '').startsWith('text/') || /\.(txt|md|json|csv|log|xml|html?|css|js|ts|jsx|tsx|yaml|yml|ini|conf|svg)$/i.test(entry.name);
 
   function initialFiles() {
+    const folders = ['Desktop', 'Downloads', 'Documents', 'Pictures', 'Music', 'Videos'];
     return [
-      { id: 'documents', name: 'Documents', type: 'folder', parent: '', updated: Date.now() },
+      ...folders.map(name => ({ id: name.toLowerCase(), name, type: 'folder', parent: '', updated: Date.now() })),
       { id: 'welcome', name: 'Welcome.txt', type: 'file', parent: '', updated: Date.now(), content: 'Welcome to IDK 10.0.\n\nThis is your local file system.', mime: 'text/plain', text: true }
     ];
   }
 
   function getFiles() {
     const files = read(FILES_KEY, null);
-    if (Array.isArray(files) && files.length) return files;
+    if (Array.isArray(files) && files.length) {
+      let changed = false;
+      ['Desktop', 'Downloads', 'Documents', 'Pictures', 'Music', 'Videos'].forEach(name => {
+        if (!files.some(item => item.type === 'folder' && item.parent === '' && item.name.toLowerCase() === name.toLowerCase())) {
+          files.push({ id: name.toLowerCase(), name, type: 'folder', parent: '', updated: Date.now() });
+          changed = true;
+        }
+      });
+      if (changed) write(FILES_KEY, files);
+      return files;
+    }
     const seeded = initialFiles();
     write(FILES_KEY, seeded);
     return seeded;
@@ -118,8 +129,25 @@ window.SYSTEM_APPS = (() => {
       entries.push(entry);
     }
     write(FILES_KEY, entries);
+    window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', key: FILES_KEY } }));
     if (list.length) window.OS?.notify('Files', `${list.length} file${list.length === 1 ? '' : 's'} imported.`);
     return entries;
+  }
+
+  function writeTextFile(name, content, parent = '', mime = 'text/plain') {
+    const files = getFiles();
+    const safeName = String(name || 'Untitled.txt').trim() || 'Untitled.txt';
+    const existing = files.find(item => item.type === 'file' && item.parent === parent && item.name === safeName);
+    const entry = existing || { id: `${safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`, name: safeName, type: 'file', parent, mime: 'text/plain', text: true };
+    entry.content = String(content ?? '');
+    entry.mime = mime;
+    entry.storage = 'local';
+    entry.size = new Blob([entry.content]).size;
+    entry.updated = Date.now();
+    if (!existing) files.push(entry);
+    write(FILES_KEY, files);
+    window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', key: FILES_KEY, entry } }));
+    return entry;
   }
 
   function formatDate(timestamp) {
@@ -169,6 +197,14 @@ window.SYSTEM_APPS = (() => {
       current = next;
       renderFolder();
     };
+
+    root.addEventListener('idk-files-navigate', event => {
+      const name = String(event.detail?.name || '').trim().toLowerCase();
+      if (!name || name === 'home') return navigate('');
+      const folder = entries.find(item => item.type === 'folder' && item.parent === '' && item.name.toLowerCase() === name);
+      if (folder) navigate(folder.id);
+      else window.OS?.notify('Files', `${event.detail?.name || 'That location'} is not created yet.`);
+    });
 
     const removeEntry = async entry => {
       if (!window.confirm(`Delete ${entry.name}?`)) return;
@@ -934,5 +970,10 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, readBlob: blobFor, getFiles, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
+  window.IDKFiles = {
+    openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
+    writeTextFile,
+    getFiles
+  };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, readBlob: blobFor, getFiles, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
 })();

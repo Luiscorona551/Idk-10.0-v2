@@ -1,9 +1,10 @@
-const CACHE = 'idk-shell-v3';
+const CACHE = 'idk-shell-v7';
 const ASSETS = [
   '/', '/desktop.html', '/style.css', '/idk-pwa-manifest.json',
   '/idk-os-next.css', '/idk-platform-next.css', '/idk-platform-polish.css',
-  '/idk-advanced-polish.css', '/idk-connectivity-suite.css', '/idk-accounts-devices.css', '/idk-perfect-os.css', '/idk-ecosystem-suite.css', '/idk-production-suite.css', '/idk-window-performance.css',
-  '/idk-platform-next.js', '/idk-platform-polish.js', '/idk-quality-features.js', '/idk-connectivity-suite.js', '/idk-accounts-devices.js', '/idk-perfect-os.js', '/idk-ecosystem-suite.js', '/idk-production-suite.js', '/idk-window-performance.js',
+  '/idk-advanced-polish.css', '/idk-connectivity-suite.css', '/idk-accounts-devices.css', '/idk-perfect-os.css', '/idk-ecosystem-suite.css', '/idk-production-suite.css', '/idk-window-performance.css', '/idk-next-suite.css',
+  '/idk-platform-next.js', '/idk-platform-polish.js', '/idk-quality-features.js', '/idk-connectivity-suite.js', '/idk-accounts-devices.js', '/idk-perfect-os.js', '/idk-ecosystem-suite.js', '/idk-production-suite.js', '/idk-window-performance.js', '/idk-next-suite.js', '/idk-app-upgrades.js', '/idk-batch-two.js', '/idk-batch-three.js', '/idk-batch-four.js', '/idk-batch-five.js', '/idk-batch-six.js',
+  '/idk-final-upgrades.css',
   '/proxy.js', '/apps.js', '/os.js', '/system-apps.js', '/idk-account-client.js', '/idk-v2-features.js'
 ];
 
