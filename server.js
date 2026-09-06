@@ -18,7 +18,8 @@ import { publicStoreRoutes } from './idk-public-store-server.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
-const uvServiceWorker = ["self.__uv$cookies = ''; importScripts('/uv/uv.bundle.js', '/uv/uv.config.js');","const uv = new self.UVServiceWorker();","self.addEventListener('fetch', event => {","  if (uv.route(event)) event.respondWith(uv.fetch(event));","});"].join('\n');
+const uvServiceWorker = readFileSync(join(uvPath, 'uv.sw.js'), 'utf8');
+const uvServiceWorkerLoader = readFileSync(join(uvPath, 'sw.js'), 'utf8');
 const root = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
@@ -58,7 +59,7 @@ app.get('/api/browser/scope', async (req, res) => res.json({
   name: 'IDK Browser',
   origin: `${req.protocol}://${req.get('host')}`,
   proxy: backend.proxy,
-  scope: '/uv/',
+  scope: '/uv/service/',
   transport: backend.proxy ? 'Ultraviolet + Wisp' : 'Unavailable'
 }));
 app.get('/api/update', async (req, res) => res.json({
@@ -96,6 +97,7 @@ app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));
 app.get('/uv/uv.sw.js', (req, res) => res.type('js').send(uvServiceWorker));
+app.get('/uv/sw.js', (req, res) => res.type('js').send(uvServiceWorkerLoader));
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
