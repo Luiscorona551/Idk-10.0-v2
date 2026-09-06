@@ -150,6 +150,18 @@ window.SYSTEM_APPS = (() => {
     return entry;
   }
 
+  async function removeFileEntries(targets = []) {
+    const entries = getFiles();
+    const ids = new Set(targets.map(item => item?.id).filter(Boolean));
+    for (const entry of entries.filter(item => ids.has(item.id))) {
+      if (entry.storage === 'indexeddb') await deleteBlob(entry.id).catch(() => {});
+    }
+    const remaining = entries.filter(item => !ids.has(item.id));
+    write(FILES_KEY, remaining);
+    window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', key: FILES_KEY } }));
+    return remaining;
+  }
+
   function formatDate(timestamp) {
     return new Date(timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
   }
@@ -161,6 +173,9 @@ window.SYSTEM_APPS = (() => {
     const history = [''];
     let historyIndex = 0;
     let view = 'list';
+    let sortKey = 'name';
+    let sortDirection = 'asc';
+    const selected = new Set();
 
     const back = ui('button', { className: 'btn tab', type: 'button', textContent: 'Back', hidden: true });
     const forward = ui('button', { className: 'btn tab', type: 'button', textContent: 'Forward', hidden: true });
@@ -171,9 +186,17 @@ window.SYSTEM_APPS = (() => {
     const viewToggle = ui('button', { className: 'btn tab', type: 'button', textContent: 'Grid view', 'aria-pressed': 'false' });
     const uploadButton = ui('button', { className: 'btn tab', type: 'button', textContent: 'Import files' });
     const upload = ui('input', { type: 'file', hidden: true, multiple: true });
+    const selectAll = ui('button', { className: 'btn tab', type: 'button', textContent: 'Select all' });
+    const bulkMove = ui('button', { className: 'btn tab', type: 'button', textContent: 'Move selected', disabled: true });
+    const bulkDelete = ui('button', { className: 'btn tab', type: 'button', textContent: 'Delete selected', disabled: true });
+    const sortButton = ui('button', { className: 'btn tab', type: 'button', textContent: 'Sort: Name A–Z' });
+    const selectionCount = ui('span', { className: 'count file-selection-count', textContent: '0 selected', 'aria-live': 'polite' });
     const body = ui('div', { className: 'file-list' });
 
-    const persist = () => write(FILES_KEY, entries);
+    const persist = () => {
+      write(FILES_KEY, entries);
+      window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', key: FILES_KEY } }));
+    };
     const idFor = name => `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
     let previewURL = '';
 
@@ -250,6 +273,82 @@ window.SYSTEM_APPS = (() => {
       renderFolder();
     };
 
+    const visibleEntries = () => {
+      const query = search.value.trim().toLowerCase();
+      return entries.filter(item => item.parent === current && (!query || item.name.toLowerCase().includes(query)));
+    };
+
+    const isDescendant = (folderId, parentId) => {
+      let cursor = folderId;
+      while (cursor) {
+        if (cursor === parentId) return true;
+        cursor = entries.find(item => item.id === cursor)?.parent || '';
+      }
+      return false;
+    };
+
+    const syncSelectionControls = visible => {
+      selected.forEach(id => { if (!entries.some(item => item.id === id)) selected.delete(id); });
+      const count = selected.size;
+      selectionCount.textContent = `${count} selected`;
+      bulkMove.disabled = count === 0;
+      bulkDelete.disabled = count === 0;
+      selectAll.disabled = visible.length === 0;
+      selectAll.textContent = visible.length && visible.every(item => selected.has(item.id)) ? 'Clear selection' : 'Select all';
+      selectAll.setAttribute('aria-pressed', String(Boolean(visible.length && visible.every(item => selected.has(item.id)))));
+    };
+
+    const sortLabel = () => {
+      const name = sortKey === 'updated' ? 'Updated' : sortKey === 'size' ? 'Size' : 'Name';
+      return `Sort: ${name} ${sortDirection === 'asc' ? (sortKey === 'size' ? 'smallest first' : 'A–Z') : (sortKey === 'size' ? 'largest first' : 'Z–A')}`;
+    };
+
+    const sortVisible = items => items.sort((a, b) => {
+      const folderOrder = Number(b.type === 'folder') - Number(a.type === 'folder');
+      if (folderOrder) return folderOrder;
+      const value = item => sortKey === 'updated' ? Number(item.updated || 0) : sortKey === 'size' ? Number(item.size ?? item.content?.length ?? 0) : item.name.toLowerCase();
+      const first = value(a), second = value(b);
+      if (first === second) return a.name.localeCompare(b.name);
+      const result = first > second ? 1 : -1;
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    const bulkRemove = async () => {
+      const chosen = entries.filter(item => selected.has(item.id));
+      if (!chosen.length || !window.confirm(`Delete ${chosen.length} selected item${chosen.length === 1 ? '' : 's'}?`)) return;
+      const ids = new Set();
+      const collect = entry => {
+        if (ids.has(entry.id)) return;
+        ids.add(entry.id);
+        entries.filter(item => item.parent === entry.id).forEach(collect);
+      };
+      chosen.forEach(collect);
+      for (const entry of entries.filter(item => ids.has(item.id))) {
+        if (entry.storage === 'indexeddb') await deleteBlob(entry.id).catch(() => {});
+      }
+      for (let index = entries.length - 1; index >= 0; index -= 1) if (ids.has(entries[index].id)) entries.splice(index, 1);
+      selected.clear();
+      persist();
+      window.OS?.notify('Files', `${chosen.length} item${chosen.length === 1 ? '' : 's'} deleted.`, 'success');
+      renderFolder();
+    };
+
+    const bulkMoveEntries = () => {
+      const chosen = entries.filter(item => selected.has(item.id));
+      if (!chosen.length) return;
+      const folders = entries.filter(item => item.type === 'folder' && !selected.has(item.id));
+      const destination = window.prompt(`Move selected items to a folder name, or leave blank for C:\\IDK root.\nAvailable: ${folders.map(item => item.name).join(', ') || 'none'}`, current ? entries.find(item => item.id === current)?.name || '' : '');
+      if (destination === null) return;
+      const folder = folders.find(item => item.name.toLowerCase() === destination.trim().toLowerCase());
+      if (destination.trim() && !folder) return window.OS?.notify('Files', 'That folder was not found.');
+      if (folder && chosen.some(entry => entry.type === 'folder' && isDescendant(folder.id, entry.id))) return window.OS?.notify('Files', 'A folder cannot be moved inside itself.');
+      chosen.forEach(entry => { entry.parent = folder?.id || ''; entry.updated = Date.now(); });
+      selected.clear();
+      persist();
+      window.OS?.notify('Files', `${chosen.length} item${chosen.length === 1 ? '' : 's'} moved.`, 'success');
+      renderFolder();
+    };
+
     const downloadBlob = (blob, name) => {
       if (!blob) return;
       const href = URL.createObjectURL(blob);
@@ -262,11 +361,13 @@ window.SYSTEM_APPS = (() => {
       clearPreview();
       path.textContent = `C:\\IDK\\${entry.name}`;
       back.hidden = forward.hidden = true;
-      search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = true;
+      search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = selectAll.hidden = bulkMove.hidden = bulkDelete.hidden = sortButton.hidden = viewToggle.hidden = selectionCount.hidden = true;
       body.replaceChildren(ui('div', { className: 'empty-state', textContent: 'Opening file…' }));
       try {
         const blob = await blobFor(entry);
         if (!blob) throw new Error('This file is no longer available. Import it again.');
+        const backToFiles = ui('button', { className: 'btn tab', type: 'button', textContent: 'Back to folder' });
+        backToFiles.addEventListener('click', renderFolder);
         if (!isTextFile(entry)) {
           const download = ui('button', { className: 'btn', type: 'button', textContent: 'Download file' });
           download.addEventListener('click', () => downloadBlob(blob, entry.name));
@@ -291,7 +392,7 @@ window.SYSTEM_APPS = (() => {
             preview,
             ui('h3', { textContent: entry.name }),
             ui('p', { textContent: `${entry.mime || 'Unknown type'} · ${formatBytes(entry.size ?? blob.size)} · ${formatDate(entry.updated)}` }),
-            ui('div', { className: 'file-preview-actions' }, [download, rename, remove])
+             ui('div', { className: 'file-preview-actions' }, [backToFiles, download, rename, remove])
           ]));
           return;
         }
@@ -322,7 +423,7 @@ window.SYSTEM_APPS = (() => {
           status.textContent = 'Renamed just now';
         });
         remove.addEventListener('click', () => removeEntry(entry));
-        body.replaceChildren(ui('div', { className: 'file-editor-bar' }, [save, download, rename, remove, status]), area);
+        body.replaceChildren(ui('div', { className: 'file-editor-bar' }, [backToFiles, save, download, rename, remove, status]), area);
       } catch (error) {
         body.replaceChildren(ui('div', { className: 'empty-state', textContent: error.message }));
       }
@@ -332,26 +433,31 @@ window.SYSTEM_APPS = (() => {
       clearPreview();
       path.textContent = current ? `C:\\IDK\\${entries.find(item => item.id === current)?.name || ''}` : 'C:\\IDK';
       updateNavigation();
-      search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = false;
+      search.hidden = newFolder.hidden = newFile.hidden = uploadButton.hidden = selectAll.hidden = bulkMove.hidden = bulkDelete.hidden = sortButton.hidden = viewToggle.hidden = selectionCount.hidden = false;
       viewToggle.hidden = false;
       viewToggle.textContent = view === 'list' ? 'Grid view' : 'List view';
       viewToggle.setAttribute('aria-pressed', String(view === 'grid'));
+      sortButton.textContent = sortLabel();
       body.dataset.view = view;
       body.replaceChildren();
-      const query = search.value.trim().toLowerCase();
-      const visible = entries.filter(item => item.parent === current && (!query || item.name.toLowerCase().includes(query)))
-        .sort((a, b) => Number(b.type === 'folder') - Number(a.type === 'folder') || a.name.localeCompare(b.name));
+      const visible = sortVisible(visibleEntries());
+      syncSelectionControls(visible);
       if (!visible.length) {
         body.append(ui('div', { className: 'empty-state', textContent: 'This folder is empty.' }));
         return;
       }
        visible.forEach(entry => {
-         const row = ui('div', { className: 'file-entry', role: 'button', tabIndex: 0 });
-         const open = ui('button', { className: 'btn tab file-entry-open', type: 'button', textContent: 'Open' });
-         const actions = ui('span', { className: 'file-entry-actions' });
-         const action = (text, handler) => { const button = ui('button', { className: 'btn tab', type: 'button', textContent: text }); button.addEventListener('click', event => { event.stopPropagation(); handler(); }); return button; };
-         row.append(
-           ui('span', { className: 'file-entry-icon', textContent: entry.type === 'folder' ? '📁' : '📄' }),
+          const row = ui('div', { className: 'file-entry', role: 'button', tabIndex: 0 });
+          const checkbox = ui('input', { className: 'file-entry-check', type: 'checkbox', checked: selected.has(entry.id), 'aria-label': `Select ${entry.name}` });
+          const open = ui('button', { className: 'btn tab file-entry-open', type: 'button', textContent: 'Open' });
+          const actions = ui('span', { className: 'file-entry-actions' });
+          const action = (text, handler) => { const button = ui('button', { className: 'btn tab', type: 'button', textContent: text }); button.addEventListener('click', event => { event.stopPropagation(); handler(); }); return button; };
+          checkbox.addEventListener('click', event => event.stopPropagation());
+          checkbox.addEventListener('change', () => { if (checkbox.checked) selected.add(entry.id); else selected.delete(entry.id); row.classList.toggle('selected', checkbox.checked); syncSelectionControls(visible); });
+          row.classList.toggle('selected', selected.has(entry.id));
+          row.append(
+            checkbox,
+            ui('span', { className: 'file-entry-icon', textContent: entry.type === 'folder' ? '📁' : '📄' }),
            ui('span', { className: 'file-entry-name' }, [
              ui('strong', { textContent: entry.name }),
              ui('small', { textContent: entry.type === 'folder' ? 'Folder' : `${formatDate(entry.updated)} · ${entry.mime || 'Text file'} · ${formatBytes(entry.size ?? entry.content?.length)}` })
@@ -366,7 +472,7 @@ window.SYSTEM_APPS = (() => {
          row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEntry(); } });
          actions.append(open, action('Rename', () => renameEntry(entry)), action('Copy', () => copyEntry(entry)), action('Move', () => moveEntry(entry)), action('Delete', () => removeEntry(entry)));
          body.append(row);
-       });
+      });
     };
 
     back.addEventListener('click', () => {
@@ -384,6 +490,20 @@ window.SYSTEM_APPS = (() => {
       }
     });
     viewToggle.addEventListener('click', () => { view = view === 'list' ? 'grid' : 'list'; renderFolder(); });
+    selectAll.addEventListener('click', () => {
+      const visible = visibleEntries();
+      const allSelected = visible.length && visible.every(item => selected.has(item.id));
+      visible.forEach(item => allSelected ? selected.delete(item.id) : selected.add(item.id));
+      renderFolder();
+    });
+    bulkMove.addEventListener('click', bulkMoveEntries);
+    bulkDelete.addEventListener('click', bulkRemove);
+    sortButton.addEventListener('click', () => {
+      const sequence = ['name', 'updated', 'size'];
+      if (sortDirection === 'asc') sortDirection = 'desc';
+      else { sortDirection = 'asc'; sortKey = sequence[(sequence.indexOf(sortKey) + 1) % sequence.length]; }
+      renderFolder();
+    });
     search.addEventListener('input', renderFolder);
     newFolder.addEventListener('click', () => {
       const name = window.prompt('Folder name');
@@ -440,7 +560,7 @@ window.SYSTEM_APPS = (() => {
       }
       if (event.key === 'Backspace' && event.target === root && historyIndex > 0) back.click();
     });
-    root.append(ui('div', { className: 'system-toolbar' }, [back, forward, path, search, ui('span', { className: 'toolbar-spacer' }), viewToggle, newFolder, newFile, uploadButton, upload]), body);
+    root.append(ui('div', { className: 'system-toolbar file-toolbar' }, [back, forward, path, search, ui('span', { className: 'toolbar-spacer' }), selectionCount, selectAll, bulkMove, bulkDelete, sortButton, viewToggle, newFolder, newFile, uploadButton, upload]), body);
     renderFolder();
     return root;
   }
@@ -973,7 +1093,8 @@ window.SYSTEM_APPS = (() => {
   window.IDKFiles = {
     openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
     writeTextFile,
-    getFiles
+    getFiles,
+    removeEntries: removeFileEntries
   };
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, readBlob: blobFor, getFiles, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, readBlob: blobFor, getFiles, removeEntries: removeFileEntries, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
 })();

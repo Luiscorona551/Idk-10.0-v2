@@ -47,7 +47,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.6.0',
+  version: process.env.IDK_VERSION || '10.8.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -64,10 +64,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.6.0',
+  version: '10.8.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch eight: Downloads Manager, bulk Files actions, Device Handoff startup checks, and reliability polish.',
     'Batch six: Files-backed Gallery, Contacts, Control Center, workspace controls, and Chat Room 2.0 attachments, mentions, replies, and reactions.',
     'Batch five: live open-window taskbar, desktop window actions, System Monitor, workspace save access, and responsive shell polish.',
     'Batch four: functional Files locations, canonical text-file writes, richer Browser persistence, Notes-to-Files export, local Calendar dates, app change events, and safer snapshot restore.',

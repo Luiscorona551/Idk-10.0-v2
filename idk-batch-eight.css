@@ -1,0 +1,94 @@
+.idk-downloads-app,
+.idk-handoff-app {
+  min-height: 100%;
+  padding: 18px;
+  color: var(--text, #eaf0ff);
+  background: linear-gradient(145deg, rgba(9, 19, 44, .98), rgba(11, 25, 48, .96));
+}
+
+.idk-downloads-head,
+.idk-handoff-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.idk-downloads-head h2,
+.idk-handoff-head h2 { margin: 0 0 5px; font-size: 22px; }
+.idk-downloads-head p,
+.idk-handoff-head p { margin: 0; color: var(--muted, #aebdd8); font-size: 11px; line-height: 1.45; }
+.idk-downloads-mark { color: #7ef6a8; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+
+.idk-downloads-stats,
+.idk-handoff-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 13px; }
+.idk-downloads-stat,
+.idk-handoff-card { min-width: 0; padding: 11px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .045); }
+.idk-downloads-stat strong,
+.idk-downloads-stat small,
+.idk-handoff-card strong,
+.idk-handoff-card small { display: block; }
+.idk-downloads-stat strong { font-size: 18px; }
+.idk-downloads-stat small,
+.idk-handoff-card small { margin-top: 4px; color: var(--muted, #aebdd8); font-size: 10px; }
+
+.idk-downloads-toolbar,
+.idk-downloads-actions,
+.idk-download-actions,
+.idk-handoff-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.idk-downloads-toolbar { margin-bottom: 12px; }
+.idk-downloads-toolbar .field { min-width: 0; flex: 1; }
+.idk-downloads-list { display: grid; gap: 8px; }
+.idk-download-item { display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .04); }
+.idk-download-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 9px; color: #7ef6a8; background: rgba(126, 246, 168, .1); font-size: 18px; }
+.idk-download-info { min-width: 0; flex: 1; }
+.idk-download-info strong,
+.idk-download-info small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idk-download-info strong { font-size: 12px; }
+.idk-download-info small { margin-top: 4px; color: var(--muted, #aebdd8); font-size: 10px; }
+.idk-download-empty,
+.idk-handoff-note { padding: 14px; border: 1px dashed rgba(255, 255, 255, .16); border-radius: 10px; color: var(--muted, #aebdd8); font-size: 11px; line-height: 1.5; }
+.idk-handoff-card { display: flex; align-items: flex-start; gap: 9px; }
+.idk-handoff-card > span { font-size: 18px; }
+.idk-handoff-card.good { border-color: rgba(126, 246, 168, .3); }
+.idk-handoff-card.warn { border-color: rgba(255, 205, 115, .38); }
+.idk-handoff-card.bad { border-color: rgba(255, 120, 120, .4); }
+.idk-handoff-card div { min-width: 0; }
+.idk-handoff-status { margin: 0 0 13px; color: #7ef6a8; font-size: 11px; }
+.idk-handoff-actions { margin-top: 13px; }
+
+.file-toolbar { gap: 6px; }
+.file-selection-count { min-width: 58px; text-align: right; }
+.file-entry { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.file-entry-check { width: 15px; height: 15px; accent-color: #7ef6a8; }
+.file-entry.selected { border-color: rgba(126, 246, 168, .65); background: rgba(126, 246, 168, .09); }
+
+#idk-handoff-check {
+  position: fixed;
+  inset: 0;
+  z-index: 310000;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(0, 4, 15, .62);
+  backdrop-filter: blur(7px);
+}
+
+.idk-handoff-dialog { width: min(600px, 100%); padding: 18px; border: 1px solid rgba(126, 246, 168, .4); border-radius: 15px; background: #071226; box-shadow: 0 25px 100px #000b; }
+.idk-handoff-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.idk-handoff-dialog header h2 { margin: 0 0 5px; font-size: 20px; }
+.idk-handoff-dialog header p { margin: 0; color: #aebdd8; font-size: 11px; }
+.idk-handoff-dialog [data-close] { border: 0; background: transparent; color: #fff; font-size: 21px; cursor: pointer; }
+
+@media (max-width: 700px) {
+  .idk-downloads-app,
+  .idk-handoff-app { padding: 13px; }
+  .idk-downloads-stats,
+  .idk-handoff-grid { grid-template-columns: 1fr; }
+  .idk-download-item { align-items: flex-start; flex-wrap: wrap; }
+  .idk-download-info { min-width: calc(100% - 54px); }
+  .idk-download-actions { width: 100%; margin-left: 44px; }
+  .file-toolbar { align-items: stretch; }
+  .file-selection-count { order: -1; width: 100%; text-align: left; }
+}
