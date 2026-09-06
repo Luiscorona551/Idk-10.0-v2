@@ -1,0 +1,45 @@
+.idk-flow-full-review { margin-top: 10px; }
+.idk-flow-full-review > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.idk-flow-full-review h3 { margin: 0; font-size: 13px; }
+.idk-flow-conflicts { display: grid; gap: 5px; max-height: 180px; overflow: auto; margin: 10px 0; }
+.idk-flow-conflicts div { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 7px; background: rgba(255, 179, 92, .09); }
+.idk-flow-conflicts strong { font-size: 11px; }
+.idk-flow-conflicts small { color: var(--muted, #aebdd8); font-size: 10px; }
+.idk-copy-files { position: fixed; inset: 0; z-index: 500000; display: grid; place-items: center; padding: 16px; background: rgba(0, 4, 15, .76); backdrop-filter: blur(9px); }
+.idk-copy-dialog { width: min(520px, 100%); padding: 20px; border: 1px solid rgba(126, 246, 168, .42); border-radius: 16px; background: linear-gradient(145deg, #071226, #0d2341); box-shadow: 0 25px 100px #000c; color: var(--text, #eaf0ff); }
+.idk-copy-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.idk-copy-dialog h2 { margin: 4px 0; font-size: 24px; }
+.idk-copy-dialog p { margin: 0; color: var(--muted, #aebdd8); font-size: 11px; }
+.idk-copy-dialog header button { border: 0; background: transparent; color: inherit; font-size: 22px; cursor: pointer; }
+.idk-copy-transfer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 28px 0 18px; }
+.idk-copy-location { display: grid; justify-items: center; gap: 7px; min-width: 92px; text-align: center; }
+.idk-copy-location strong { font-size: 10px; }
+.idk-copy-folder { position: relative; display: block; width: 60px; height: 43px; border: 2px solid #7ef6a8; border-radius: 5px; background: rgba(126, 246, 168, .16); box-shadow: inset 0 -8px rgba(126, 246, 168, .08); }
+.idk-copy-folder::before { content: ''; position: absolute; top: -9px; left: 5px; width: 23px; height: 10px; border: 2px solid #7ef6a8; border-bottom: 0; border-radius: 5px 5px 0 0; background: #0d2341; }
+.idk-copy-travel { display: flex; align-items: center; gap: 5px; color: #7ef6a8; }
+.idk-copy-travel i { display: block; width: 6px; height: 6px; border-radius: 50%; background: #7ef6a8; animation: idk-copy-dot 1s infinite ease-in-out; }
+.idk-copy-travel i:nth-child(2) { animation-delay: .16s; }
+.idk-copy-travel i:nth-child(3) { animation-delay: .32s; }
+@keyframes idk-copy-dot { 0%, 100% { transform: translateX(-4px); opacity: .3; } 50% { transform: translateX(4px); opacity: 1; } }
+.idk-copy-count { margin: 8px 0; color: #7ef6a8; font-size: 13px; font-weight: 800; text-align: center; }
+.idk-copy-dialog progress { display: block; width: 100%; height: 9px; margin: 8px 0 18px; accent-color: #7ef6a8; }
+.idk-copy-dialog progress.error { accent-color: #ff7b8e; }
+.idk-copy-dialog [data-done] { display: block; margin-left: auto; }
+.idk-browser-workspaces { min-height: 100%; padding: 19px; color: var(--text, #eaf0ff); background: linear-gradient(145deg, rgba(8, 18, 40, .98), rgba(12, 27, 51, .96)); }
+.idk-workspace-save { display: flex; gap: 7px; margin-bottom: 14px; padding: 10px; border: 1px solid rgba(126, 246, 168, .24); border-radius: 10px; background: rgba(126, 246, 168, .07); }
+.idk-workspace-save .field { flex: 1; min-width: 0; }
+.idk-workspace-list { display: grid; gap: 8px; }
+.idk-workspace-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .045); }
+.idk-workspace-card > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.idk-workspace-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.idk-workspace-card small { color: var(--muted, #aebdd8); font-size: 10px; }
+.idk-reminder-toast { position: fixed; right: 18px; bottom: 72px; z-index: 410000; display: flex; align-items: center; justify-content: space-between; gap: 18px; width: min(420px, calc(100vw - 36px)); padding: 14px; border: 1px solid rgba(126, 246, 168, .35); border-radius: 12px; background: #071226; box-shadow: 0 16px 50px #000b; }
+.idk-reminder-toast > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.idk-reminder-toast strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.idk-reminder-toast small { color: var(--muted, #aebdd8); font-size: 10px; }
+@media (max-width: 640px) {
+  .idk-workspace-save, .idk-workspace-card, .idk-reminder-toast { align-items: stretch; flex-direction: column; }
+  .idk-workspace-save .btn { width: 100%; }
+  .idk-copy-transfer { gap: 4px; }
+  .idk-copy-folder { width: 48px; height: 36px; }
+}

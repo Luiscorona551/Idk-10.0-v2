@@ -119,7 +119,14 @@
     window.addEventListener('offline', () => notify('Connection', 'Offline mode enabled. Local changes remain available.', 'warning'));
   }
 
+  function bootNextBatch() {
+    if (window.IDKBatchNine || document.querySelector('script[src="idk-batch-nine.js"]')) return;
+    const stylesheet = document.createElement('link'); stylesheet.rel = 'stylesheet'; stylesheet.href = 'idk-batch-nine.css'; document.head.append(stylesheet);
+    const script = document.createElement('script'); script.src = 'idk-batch-nine.js'; script.async = false; document.body.append(script);
+  }
+
   function install() {
+    bootNextBatch();
     if (typeof APPS !== 'undefined') {
       APPS.downloads = { title: 'Downloads Manager', glyph: '⬇️', desktop: false, dock: false, width: 780, height: 600, render: downloadsApp };
       APPS.handoff = { title: 'Device Handoff', glyph: '⇄', desktop: false, dock: false, width: 700, height: 580, render: handoffApp };

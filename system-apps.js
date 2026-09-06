@@ -150,6 +150,26 @@ window.SYSTEM_APPS = (() => {
     return entry;
   }
 
+  async function writeBlobFile(name, blob, parent = '', mime = '', forcedId = '') {
+    const files = getFiles();
+    const safeName = String(name || 'Transferred file').trim() || 'Transferred file';
+    const existing = files.find(item => item.type === 'file' && item.parent === parent && item.name === safeName);
+    const entry = existing || { id: forcedId || `${safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`, name: safeName, type: 'file', parent };
+    entry.name = safeName;
+    entry.parent = parent;
+    entry.mime = mime || blob?.type || 'application/octet-stream';
+    entry.size = Number(blob?.size || 0);
+    entry.text = isTextFile(entry);
+    entry.storage = 'indexeddb';
+    entry.updated = Date.now();
+    delete entry.content;
+    await storeBlob(entry.id, blob);
+    if (!existing) files.push(entry);
+    write(FILES_KEY, files);
+    window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', key: FILES_KEY, entry } }));
+    return entry;
+  }
+
   async function removeFileEntries(targets = []) {
     const entries = getFiles();
     const ids = new Set(targets.map(item => item?.id).filter(Boolean));
@@ -1093,8 +1113,9 @@ window.SYSTEM_APPS = (() => {
   window.IDKFiles = {
     openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
     writeTextFile,
+    writeBlobFile,
     getFiles,
     removeEntries: removeFileEntries
   };
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, readBlob: blobFor, getFiles, removeEntries: removeFileEntries, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, writeBlobFile, readBlob: blobFor, getFiles, removeEntries: removeFileEntries, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
 })();

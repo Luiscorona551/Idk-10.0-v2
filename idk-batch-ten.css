@@ -1,0 +1,65 @@
+.idk-flow-today,
+.idk-flow-transfer { min-height: 100%; padding: 19px; color: var(--text, #eaf0ff); background: linear-gradient(145deg, rgba(8, 18, 40, .98), rgba(12, 27, 51, .96)); }
+.idk-flow-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.idk-flow-head h2 { margin: 3px 0 5px; font-size: 24px; letter-spacing: -.5px; }
+.idk-flow-head p { max-width: 600px; margin: 0; color: var(--muted, #aebdd8); font-size: 11px; line-height: 1.55; }
+.idk-flow-kicker { color: #7ef6a8; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
+.idk-flow-head-actions, .idk-flow-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.idk-flow-capture { display: grid; grid-template-columns: 125px minmax(0, 1fr) 150px auto; gap: 7px; margin-bottom: 13px; padding: 10px; border: 1px solid rgba(126, 246, 168, .24); border-radius: 10px; background: rgba(126, 246, 168, .07); }
+.idk-flow-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 13px; }
+.idk-flow-summary article { display: grid; gap: 4px; padding: 11px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .045); }
+.idk-flow-summary strong { font-size: 18px; }
+.idk-flow-summary span, .idk-flow-card small, .idk-flow-note, .idk-flow-status { color: var(--muted, #aebdd8); font-size: 10px; line-height: 1.45; }
+.idk-flow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.idk-flow-card { min-width: 0; padding: 14px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px; background: rgba(255, 255, 255, .04); }
+.idk-flow-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.idk-flow-card h3 { margin: 0; font-size: 13px; }
+.idk-flow-row { display: flex; width: 100%; align-items: center; gap: 9px; padding: 9px 5px; border: 0; border-bottom: 1px solid rgba(255, 255, 255, .07); background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.idk-flow-row:last-child { border-bottom: 0; }
+.idk-flow-row:hover { background: rgba(126, 246, 168, .08); }
+.idk-flow-row > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.idk-flow-row strong, .idk-flow-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idk-flow-row strong { font-size: 11px; }
+.idk-flow-row small { color: var(--muted, #aebdd8); font-size: 10px; }
+.idk-flow-check, .idk-flow-dot, .idk-flow-date { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border-radius: 8px; background: rgba(126, 246, 168, .12); color: #7ef6a8; font-weight: 800; }
+.idk-flow-dot { width: 9px; height: 9px; flex-basis: 9px; border-radius: 50%; }
+.idk-flow-date { width: 38px; flex-basis: 38px; font-size: 10px; }
+.idk-flow-empty { margin: 9px 0; color: var(--muted, #aebdd8); font-size: 11px; }
+.idk-flow-routines { margin-top: 10px; }
+.idk-flow-routine { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.idk-flow-routine:last-child { border-bottom: 0; }
+.idk-flow-routine div { display: grid; gap: 3px; }
+.idk-flow-transfer-layout { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.15fr); gap: 10px; }
+.idk-flow-transfer-layout > .idk-flow-card { min-height: 410px; }
+.idk-flow-categories { display: grid; gap: 7px; margin-bottom: 14px; }
+.idk-flow-category { display: flex; align-items: center; gap: 9px; padding: 10px; border: 1px solid rgba(255, 255, 255, .09); border-radius: 8px; background: rgba(255, 255, 255, .035); cursor: pointer; }
+.idk-flow-category:has(input:checked) { border-color: rgba(126, 246, 168, .35); background: rgba(126, 246, 168, .08); }
+.idk-flow-category input { accent-color: #7ef6a8; }
+.idk-flow-category span { display: grid; gap: 3px; }
+.idk-flow-category strong { font-size: 11px; }
+.idk-flow-category small { font-size: 10px; }
+.idk-flow-status { min-height: 28px; margin: 13px 0 0; }
+.idk-flow-preview { display: grid; gap: 7px; margin-bottom: 22px; }
+.idk-flow-preview-row, .idk-flow-history-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border-radius: 8px; background: rgba(255, 255, 255, .045); }
+.idk-flow-preview-row strong, .idk-flow-history-row strong { font-size: 11px; }
+.idk-flow-history { display: grid; gap: 6px; }
+.idk-flow-history-row { display: grid; align-items: start; justify-content: stretch; gap: 3px; }
+.idk-flow-search { position: fixed; inset: 0; z-index: 320000; display: grid; place-items: start center; padding: 11vh 14px 14px; background: rgba(0, 4, 15, .65); backdrop-filter: blur(8px); }
+.idk-flow-search-card { width: min(720px, 100%); max-height: 75vh; overflow: auto; padding: 17px; border: 1px solid rgba(126, 246, 168, .38); border-radius: 14px; background: #071226; box-shadow: 0 25px 100px #000b; }
+.idk-flow-search-card header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.idk-flow-search-card h2 { margin: 3px 0 0; font-size: 20px; }
+.idk-flow-search-card [data-close] { border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 20px; }
+.idk-flow-results { display: grid; gap: 5px; margin-top: 11px; }
+.idk-flow-result { display: grid; gap: 4px; padding: 10px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 8px; background: rgba(255, 255, 255, .045); color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.idk-flow-result:hover { border-color: rgba(126, 246, 168, .4); background: rgba(126, 246, 168, .08); }
+.idk-flow-result strong { font-size: 12px; }
+.idk-flow-result small { color: var(--muted, #aebdd8); font-size: 10px; }
+
+@media (max-width: 760px) {
+  .idk-flow-today, .idk-flow-transfer { padding: 13px; }
+  .idk-flow-head { flex-direction: column; }
+  .idk-flow-capture, .idk-flow-summary, .idk-flow-grid, .idk-flow-transfer-layout { grid-template-columns: 1fr; }
+  .idk-flow-capture .field, .idk-flow-capture .btn { width: 100%; }
+  .idk-flow-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .idk-flow-transfer-layout > .idk-flow-card { min-height: auto; }
+}
