@@ -89,10 +89,17 @@
   }
 
   function commandItems() {
-    const items = [];
-    if (typeof APPS === 'object') Object.entries(APPS).filter(([id, app]) => id !== 'player' && app?.title).forEach(([id, app]) => items.push({ title: `Open ${app.title}`, detail: 'App', run: () => open(id) }));
-    items.push({ title: 'Choose AI mode', detail: 'Cloud, Local, Offline', run: () => open('aiModes') }, { title: 'Open Privacy Center', detail: 'Privacy', run: () => open('privacy') }, { title: 'Open Sync Center', detail: 'Offline and cloud queues', run: () => open('syncCenter') }, { title: 'Open Backup & Recovery', detail: 'Data safety', run: () => open('recoveryCenter') }, { title: 'Open Full Backup & Restore', detail: 'Data safety', run: () => window.IDKBackup?.open?.() }, { title: 'Open Safety Center', detail: 'Permissions', run: () => window.IDKPlatformNext?.openSafetyCenter?.() });
-    return items;
+    const tools = [
+      { title: 'Choose AI mode', detail: 'Cloud, Local, Offline', run: () => open('aiModes') },
+      { title: 'Open Privacy Center', detail: 'Privacy', run: () => open('privacy') },
+      { title: 'Open Sync Center', detail: 'Offline and cloud queues', run: () => open('syncCenter') },
+      { title: 'Open Backup & Recovery', detail: 'Data safety', run: () => open('recoveryCenter') },
+      { title: 'Open Full Backup & Restore', detail: 'Data safety', run: () => window.IDKBackup?.open?.() },
+      { title: 'Open Safety Center', detail: 'Permissions', run: () => window.IDKPlatformNext?.openSafetyCenter?.() }
+    ];
+    const apps = [];
+    if (typeof APPS === 'object') Object.entries(APPS).filter(([id, app]) => id !== 'player' && app?.title).forEach(([id, app]) => apps.push({ title: `Open ${app.title}`, detail: 'App', run: () => open(id) }));
+    return [...tools, ...apps];
   }
 
   function openCommandPalette() {
