@@ -19,7 +19,7 @@ import { publicStoreRoutes } from './idk-public-store-server.js';
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
 const uvServiceWorker = readFileSync(join(uvPath, 'uv.sw.js'), 'utf8');
-const uvServiceWorkerLoader = ["importScripts('/uv/uv.bundle.js');", "importScripts('/uv/uv.config.js');", "importScripts('/uv/uv.sw.js');", "self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));", "self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));"].join('\n');
+const uvServiceWorkerLoader = ["importScripts('/uv/uv.bundle.js');", "importScripts('/uv/uv.config.js');", "importScripts('/uv/uv.sw.js');", "const uv = new self.UVServiceWorker();", "self.addEventListener('fetch', event => {", "  if (uv.route(event)) event.respondWith(uv.fetch(event));", "});", "self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));", "self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));"].join('\n');
 const root = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
