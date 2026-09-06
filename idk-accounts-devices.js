@@ -96,6 +96,30 @@
      save.onclick = async () => { const tab = activeTab(); if (!tab.url) return; const name = `${(tab.title || 'page').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'page'}.html`; let content = `URL: ${tab.url}\n`; try { const response = await fetch(tab.url); if (response.ok) content = await response.text(); } catch {} if (window.IDKFiles?.writeTextFile) window.IDKFiles.writeTextFile(name, content, '', 'text/html'); else { const files = read('idkFileSystem', []); files.unshift({ id: id('download'), name, type: 'file', parent: '', updated: Date.now(), mime: 'text/html', text: true, content, size: content.length, storage: 'local' }); write('idkFileSystem', files.slice(0, 500)); } status.textContent = `${name} saved to Files`; notify('Browser', 'Page saved into the VFS.', 'success'); };
      root.cleanup = persistSession; root.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'l') { event.preventDefault(); url.focus(); } }); drawTabs(); if (opts.url || tabs[0].url) { url.value = opts.url || tabs[0].url; navigate(); } else show(); return root; }
 
+  function installBrowserScope() {
+    const decorate = root => {
+      if (!root || root.dataset.idkBrowserScope) return;
+      const toolbar = root.querySelector('.idk-browser-toolbar');
+      const resourcePanel = root.querySelector('.idk-browser-resource-panel');
+      if (!toolbar || !resourcePanel) return;
+      root.dataset.idkBrowserScope = 'true';
+      const toggle = document.createElement('button'); toggle.className = 'btn tab'; toggle.type = 'button'; toggle.textContent = 'Server scope';
+      const panel = document.createElement('section'); panel.className = 'idk-browser-scope'; panel.hidden = true;
+      const heading = document.createElement('div'); heading.className = 'idk-browser-scope-heading'; heading.append(Object.assign(document.createElement('strong'), { textContent: 'Browser Server Scope' }), Object.assign(document.createElement('small'), { textContent: 'The server routes browser traffic through this scope.' }));
+      const grid = document.createElement('div'); grid.className = 'idk-browser-scope-grid';
+      const render = async () => {
+        let scope = {};
+        try { scope = await PROXY.serverScope(); } catch {}
+        grid.replaceChildren(...[['Status', scope.proxy ? 'Ready' : 'Unavailable'], ['Scope', scope.scope || 'Unavailable'], ['Transport', scope.transport || 'Unavailable'], ['Origin', scope.origin || location.origin]].map(([label, value]) => { const item = document.createElement('div'); item.append(Object.assign(document.createElement('small'), { textContent: label }), Object.assign(document.createElement('strong'), { textContent: value })); return item; }));
+      };
+      toggle.onclick = () => { panel.hidden = !panel.hidden; toggle.textContent = panel.hidden ? 'Server scope' : 'Hide scope'; };
+      panel.append(heading, grid); toolbar.insertBefore(toggle, toolbar.querySelector('.count')); resourcePanel.before(panel); render();
+    };
+    const scan = () => document.querySelectorAll('.idk-browser-shell').forEach(decorate);
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+
   function install() {
     migrateLegacyBlobs().catch(() => {});
     if (typeof APPS !== 'undefined') { APPS.accounts = { title: 'Accounts & Devices', glyph: '◉', desktop: false, dock: false, width: 760, height: 600, render: opts => centerRoot(opts.tab || 'overview') }; APPS.proxy.render = renderBrowser; }
@@ -107,5 +131,6 @@
   }
 
   window.IDKAccountsDevices = { open: tab => window.OS?.open('accounts', tab ? { tab } : {}), switchProfile, resetProfile, snapshot, restoreSnapshot: applySnapshot, renderBrowser };
+  installBrowserScope();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();
