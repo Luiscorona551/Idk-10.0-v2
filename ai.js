@@ -20,6 +20,12 @@ function baseURL() {
   }
 }
 
+function effectiveModel(value) {
+  const model = String(value || '').trim() || 'gpt-4o-mini';
+  if (baseURL().includes('generativelanguage.googleapis.com') && ['gpt-4o-mini', 'gemini-2.5-flash'].includes(model.toLowerCase())) return 'gemini-3.6-flash';
+  return model;
+}
+
 function cleanMessages(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(-MAX_MESSAGES).flatMap(item => {
@@ -36,7 +42,7 @@ function sendError(res, status, message) {
 export function aiStatus() {
   let provider = 'OpenAI-compatible provider';
   try { provider = new URL(baseURL()).hostname; } catch { /* use the label above */ }
-  return { configured: Boolean(configuredKey()), model: configuredModel(), provider };
+  return { configured: Boolean(configuredKey()), model: effectiveModel(configuredModel()), provider };
 }
 
 export async function aiRequest(req, res) {
@@ -45,7 +51,7 @@ export async function aiRequest(req, res) {
   const key = String(body.apiKey || configuredKey()).trim();
   if (!key) return sendError(res, 503, 'The AI key is not configured. Set AI_API_KEY on the server or add a one-time key in the AI window.');
 
-  const model = String(body.model || configuredModel()).trim().slice(0, 120) || configuredModel();
+  const model = effectiveModel(String(body.model || configuredModel()).trim().slice(0, 120));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   const image = mode === 'image';
