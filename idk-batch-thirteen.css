@@ -1,0 +1,37 @@
+.idk-control-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.idk-control-head h2 { margin:3px 0 5px; font-size:24px; }
+.idk-control-head p { max-width:680px; margin:0; color:var(--muted,#afbdd6); font-size:11px; line-height:1.55; }
+.idk-control-badge { padding:6px 8px; border:1px solid rgba(126,246,168,.35); border-radius:7px; color:#7ef6a8; font-size:9px; font-weight:800; letter-spacing:1px; white-space:nowrap; }
+.idk-control-card { margin-bottom:10px; padding:13px; border:1px solid rgba(255,255,255,.1); border-radius:11px; background:rgba(255,255,255,.045); }
+.idk-control-card p { margin:7px 0 0; color:var(--muted,#afbdd6); font-size:11px; line-height:1.5; }
+.idk-control-status { color:#bcd0ec; font-size:10px; }
+.idk-mode-grid, .idk-privacy-grid, .idk-recovery-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-bottom:10px; }
+.idk-mode-card { display:grid; gap:7px; min-height:145px; padding:13px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.04); color:inherit; text-align:left; cursor:pointer; }
+.idk-mode-card:hover, .idk-mode-card.selected { border-color:#7ef6a8; background:rgba(126,246,168,.1); }
+.idk-mode-card strong { font-size:14px; }
+.idk-mode-card small { color:var(--muted,#afbdd6); font-size:10px; line-height:1.5; }
+.idk-mode-glyph { color:#7ef6a8; font-size:9px; font-weight:800; letter-spacing:1px; }
+.idk-privacy-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.idk-recovery-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.idk-privacy-list { display:grid; gap:5px; margin-top:9px; }
+.idk-privacy-list > div, .idk-sync-queue > div { display:flex; justify-content:space-between; gap:10px; padding:8px; border-radius:7px; background:rgba(255,255,255,.04); font-size:11px; }
+.idk-privacy-list small, .idk-sync-queue small { color:var(--muted,#afbdd6); font-size:10px; }
+.idk-sync-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+.idk-sync-stats article { padding:11px; border:1px solid rgba(255,255,255,.1); border-radius:9px; background:rgba(255,255,255,.045); }
+.idk-sync-stats strong, .idk-sync-stats small { display:block; }
+.idk-sync-stats small { margin-top:4px; color:var(--muted,#afbdd6); font-size:10px; }
+.idk-sync-queue { display:grid; gap:5px; margin-top:9px; max-height:190px; overflow:auto; }
+.idk-command-palette { position:fixed; inset:0; z-index:360000; display:grid; place-items:start center; padding:11vh 16px 20px; background:rgba(2,7,18,.7); backdrop-filter:blur(8px); }
+.idk-command-card { width:min(680px,100%); overflow:hidden; border:1px solid rgba(126,246,168,.35); border-radius:14px; background:#071329; box-shadow:0 30px 100px #000b; }
+.idk-command-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 16px 10px; }
+.idk-command-card h2 { margin:3px 0 0; font-size:18px; }
+.idk-command-card > header button { border:0; background:transparent; color:#fff; font-size:24px; cursor:pointer; }
+.idk-command-card > .field { width:calc(100% - 32px); margin:0 16px; box-sizing:border-box; }
+.idk-command-list { display:grid; gap:4px; max-height:390px; overflow:auto; margin:10px 0; padding:0 10px; }
+.idk-command-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px; border:1px solid transparent; border-radius:8px; background:transparent; color:#fff; text-align:left; cursor:pointer; }
+.idk-command-row:hover, .idk-command-row.selected { border-color:rgba(126,246,168,.35); background:rgba(126,246,168,.1); }
+.idk-command-row small { color:var(--muted,#afbdd6); font-size:10px; }
+.idk-command-help { display:block; padding:0 16px 14px; color:var(--muted,#afbdd6); font-size:10px; }
+#idk-batch-thirteen-launcher { position:fixed; right:116px; top:70px; z-index:140000; width:38px; height:38px; border:1px solid #5877aa; border-radius:8px; background:#162a4b; color:#fff; cursor:pointer; }
+@media (max-width:760px) { .idk-control-head { flex-direction:column; }.idk-mode-grid, .idk-privacy-grid, .idk-recovery-grid { grid-template-columns:1fr; }.idk-sync-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }.idk-command-palette { padding:5vh 10px 12px; } #idk-batch-thirteen-launcher { right:64px; top:68px; } }
+@media (pointer:coarse) { .idk-mode-card, .idk-command-row, .idk-control-card button { min-height:44px; }.idk-command-card > header button { min-width:44px; min-height:44px; } }
