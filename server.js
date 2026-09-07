@@ -47,7 +47,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.19.0',
+  version: process.env.IDK_VERSION || '10.21.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -82,10 +82,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.19.0',
+  version: '10.21.0',
   channel: 'stable',
-  build: 'final product batch',
+  build: 'desktop core polish batch',
   changelog: [
+    'Batch twenty-one: Desktop Center, quick launcher, unified window controls, keyboard shortcuts, responsive shell behavior, and startup polish.',
     'Batch nineteen: ciphertext-only Vault cloud backups, one-time Vault transfer codes, printable recovery codes, privacy history, and remote device lock/wipe commands.',
     'Batch eighteen: encrypted local Vault, secure notes, password generation, privacy audit, auto-lock, and encrypted backup import/export.',
     'Batch seventeen: Planner app with Board, Agenda, Calendar, recurring items, drag-and-drop planning, and ICS import/export.',
