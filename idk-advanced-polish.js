@@ -89,7 +89,7 @@
     document.getElementById('idk-advanced-context')?.remove();
     const menu = document.createElement('menu');
     menu.id = 'idk-advanced-context';
-    [['Open Files', () => window.OS?.open('files')], ['New folder', () => { createEntry('folder'); window.OS?.open('files'); }], ['New text file', () => { createEntry('file'); window.OS?.open('files'); }], ['Open Settings', () => window.OS?.open('settings')], ['Refresh desktop', () => location.reload()]].forEach(([label, action]) => {
+    [['Widget Library', () => window.OS?.open('widgetLibrary')], ['Personalization', () => window.OS?.open('personalization')], ['Open IDK Calls', () => window.OS?.open('calls')], ['Open Files', () => window.OS?.open('files')], ['New folder', () => { createEntry('folder'); window.OS?.open('files'); }], ['New text file', () => { createEntry('file'); window.OS?.open('files'); }], ['Open Settings', () => window.OS?.open('settings')], ['Refresh desktop', () => location.reload()]].forEach(([label, action]) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
