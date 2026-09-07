@@ -1,0 +1,2 @@
+.idk-desktop-center{contain:content}
+html[data-idk-desktop-ready="true"] #desktop{contain:style}
