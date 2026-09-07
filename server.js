@@ -47,13 +47,31 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.15.0',
+  version: process.env.IDK_VERSION || '10.16.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
   uptime: Math.round(process.uptime()),
   checkedAt: new Date().toISOString()
 }));
+function iceServers() {
+  const fallback = [{ urls: ['stun:stun.l.google.com:19302'] }];
+  const raw = String(process.env.IDK_ICE_SERVERS || '').trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    const values = Array.isArray(parsed) ? parsed : [parsed];
+    const safe = values.map(value => {
+      if (typeof value === 'string') return { urls: value };
+      if (!value || typeof value !== 'object') return null;
+      const urls = Array.isArray(value.urls) ? value.urls.filter(url => typeof url === 'string').slice(0, 8) : String(value.urls || '').trim();
+      if (!urls || (Array.isArray(urls) && !urls.length)) return null;
+      return { urls, ...(value.username ? { username: String(value.username).slice(0, 160) } : {}), ...(value.credential ? { credential: String(value.credential).slice(0, 320) } : {}) };
+    }).filter(Boolean).slice(0, 8);
+    return safe.length ? safe : fallback;
+  } catch { return fallback; }
+}
+app.get('/api/call/config', (req, res) => res.json({ ok: true, iceServers: iceServers(), activeTransport: 'peer-to-peer', recording: false }));
 app.get('/api/browser/scope', async (req, res) => res.json({
   ok: true,
   name: 'IDK Browser',
@@ -64,10 +82,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.15.0',
+  version: '10.16.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch sixteen: WebRTC ICE fallback, long-call expiry, reconnect diagnostics, browser notifications, and production health checks.',
     'Batch fifteen: call reliability, synced call history, optional video, Messenger inbox, notification preferences, and personalization-driven widgets.',
     'Batch fourteen: Widget Library, optional personalization setup, direct-chat call entry, and friend-only voice call signaling.',
     'Batch thirteen: AI mode and privacy controls, Sync Center, Backup & Recovery hub, command palette, and Chromebook/mobile polish.',

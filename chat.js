@@ -9,6 +9,8 @@ const MAX_PER_ROOM = 50;
 const MAX_MUTE_MINUTES = 60;
 const MAX_METADATA = 180000;
 const HEARTBEAT_MS = 30000;
+const CALL_RING_MS = 120000;
+const CALL_ACTIVE_MS = 4 * 60 * 60 * 1000;
 const rooms = new Map();
 const userSockets = new Map();
 const calls = new Map();
@@ -23,6 +25,8 @@ function addUserSocket(socket) { if (!socket.userId) return; const sockets = use
 function removeUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId); sockets?.delete(socket); if (sockets && !sockets.size) userSockets.delete(socket.userId); }
 function callData(value) { if (!value || typeof value !== 'object') return null; try { return JSON.parse(JSON.stringify(value).slice(0, MAX_METADATA)); } catch { return null; } }
 function sendToUser(userId, payload) { userSockets.get(userId)?.forEach(socket => send(socket, payload)); return Boolean(userSockets.get(userId)?.size); }
+function expireCall(call) { if (calls.get(call.id) !== call) return; calls.delete(call.id); [call.initiator, call.recipient].forEach(userId => sendToUser(userId, { type: 'call', action: 'expired', callId: call.id })); }
+function scheduleCall(call, active = false) { clearTimeout(call.expiry); call.phase = active ? 'active' : 'ringing'; call.expiresAt = Date.now() + (active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry = setTimeout(() => expireCall(call), active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry.unref?.(); }
 async function areFriends(userId, friendId) { if (!accountDbEnabled() || !userId || !friendId) return false; try { const { rows } = await getAccountPool().query('SELECT 1 FROM idk_friendships f WHERE f.user_id=$1 AND f.friend_id=$2 AND NOT EXISTS (SELECT 1 FROM idk_user_blocks b WHERE (b.user_id=$1 AND b.blocked_id=$2) OR (b.user_id=$2 AND b.blocked_id=$1)) LIMIT 1', [userId, friendId]); return Boolean(rows[0]); } catch { return false; } }
 function messageMeta(data) { const value = { mentions: Array.isArray(data.mentions) ? data.mentions.map(item => String(item).slice(0, 32)).filter(Boolean).slice(0, 12) : [], attachments: Array.isArray(data.attachments) ? data.attachments.map(item => ({ fileId: String(item.fileId || '').slice(0, 120), name: String(item.name || 'attachment').slice(0, 120), mime: String(item.mime || 'application/octet-stream').slice(0, 80), size: Math.min(Math.max(Number(item.size) || 0, 0), 200000), content: typeof item.content === 'string' && item.content.length <= 160000 ? item.content : '' })).slice(0, 4) : [], replyTo: data.replyTo && typeof data.replyTo === 'object' ? { id: String(data.replyTo.id || '').slice(0, 80), name: String(data.replyTo.name || '').slice(0, 32), text: String(data.replyTo.text || '').slice(0, 180) } : null }; return JSON.stringify(value).length <= MAX_METADATA ? value : { mentions: value.mentions, attachments: [], replyTo: value.replyTo }; }
 function applyMeta(row, base) { const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}; return { ...base, id: row.id, mentions: metadata.mentions || [], attachments: metadata.attachments || [], replyTo: metadata.replyTo || null }; }
@@ -49,7 +53,7 @@ chat.on('connection', (socket, req) => {
         if (!userSockets.get(targetUserId)?.size) return send(socket, { type: 'call', action: 'error', text: 'That friend is not online right now.' });
         const call = { id: callId, initiator: socket.userId, recipient: targetUserId };
         calls.set(callId, call);
-        const expiry = setTimeout(() => { if (calls.get(callId) === call) calls.delete(callId); }, 120000); expiry.unref?.();
+        scheduleCall(call);
         sendToUser(targetUserId, { type: 'call', action: 'invite', callId, fromUserId: socket.userId, fromName: socket.nick || 'IDK user', targetUserId, payload: callData(data.payload) });
         send(socket, { type: 'call', action: 'ringing', callId, targetUserId });
         return;
@@ -58,7 +62,9 @@ chat.on('connection', (socket, req) => {
       if (!call || ![call.initiator, call.recipient].includes(socket.userId)) return send(socket, { type: 'call', action: 'error', text: 'That call is no longer available.' });
       const targetUserId = call.initiator === socket.userId ? call.recipient : call.initiator;
       sendToUser(targetUserId, { type: 'call', action, callId, fromUserId: socket.userId, fromName: socket.nick || 'IDK user', targetUserId, payload: callData(data.payload) });
-      if (action === 'reject' || action === 'end') calls.delete(callId);
+      if (action === 'accept') scheduleCall(call, true);
+      else if (action === 'signal' && call.phase === 'active') scheduleCall(call, true);
+      else if (action === 'reject' || action === 'end') { clearTimeout(call.expiry); calls.delete(callId); }
       return;
     }
 
@@ -146,5 +152,5 @@ chat.on('connection', (socket, req) => {
     }
   });
 
-  socket.on('close', () => { removeUserSocket(socket); [...calls.entries()].forEach(([id, call]) => { if (call.initiator === socket.userId || call.recipient === socket.userId) calls.delete(id); }); const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); if (!current.clients.size) return rooms.delete(socket.code); if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) current.members.get(nextOwner.peerId).role = 'owner'; } presence(socket.code, `${socket.nick} left`); });
+  socket.on('close', () => { removeUserSocket(socket); [...calls.entries()].forEach(([id, call]) => { if (call.initiator === socket.userId || call.recipient === socket.userId) { clearTimeout(call.expiry); calls.delete(id); } }); const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); if (!current.clients.size) return rooms.delete(socket.code); if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) current.members.get(nextOwner.peerId).role = 'owner'; } presence(socket.code, `${socket.nick} left`); });
 });
