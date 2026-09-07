@@ -12,6 +12,8 @@ export async function initFriendsDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idk_friend_requests_recipient_idx ON idk_friend_requests(recipient_id,status,created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idk_friend_requests_requester_idx ON idk_friend_requests(requester_id,status,created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idk_friendships_user_idx ON idk_friendships(user_id,created_at DESC);`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS idk_user_blocks (user_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, blocked_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(user_id,blocked_id), CHECK(user_id <> blocked_id));`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS idk_user_reports (id UUID PRIMARY KEY, reporter_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, reported_id UUID NOT NULL REFERENCES idk_users(id) ON DELETE CASCADE, reason TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
 }
 
 function requireUser(req, res) {
@@ -36,7 +38,7 @@ export function friendRoutes(app) {
     const me = requireUser(req,res); if (!me) return;
     try {
       const pool = getAccountPool();
-      const friends = await pool.query(`SELECT u.id,u.username,u.avatar FROM idk_friendships f JOIN idk_users u ON u.id=f.friend_id WHERE f.user_id=$1 ORDER BY lower(u.username)`, [me]);
+      const friends = await pool.query(`SELECT u.id,u.username,u.avatar FROM idk_friendships f JOIN idk_users u ON u.id=f.friend_id WHERE f.user_id=$1 AND NOT EXISTS (SELECT 1 FROM idk_user_blocks b WHERE b.user_id=$1 AND b.blocked_id=f.friend_id) ORDER BY lower(u.username)`, [me]);
       const incoming = await pool.query(`SELECT r.id,u.id AS "userId",u.username,u.avatar,r.created_at AS "createdAt" FROM idk_friend_requests r JOIN idk_users u ON u.id=r.requester_id WHERE r.recipient_id=$1 AND r.status='pending' ORDER BY r.created_at DESC`, [me]);
       const outgoing = await pool.query(`SELECT r.id,u.id AS "userId",u.username,u.avatar,r.created_at AS "createdAt" FROM idk_friend_requests r JOIN idk_users u ON u.id=r.recipient_id WHERE r.requester_id=$1 AND r.status='pending' ORDER BY r.created_at DESC`, [me]);
       res.json({ ok:true, friends:friends.rows.map(publicUser), incoming:incoming.rows, outgoing:outgoing.rows });
@@ -86,5 +88,27 @@ export function friendRoutes(app) {
     const friendId = String(req.params.friendId || '').slice(0,64); if (!friendId || friendId === me) return res.status(400).json({ok:false,error:'Invalid friend.'});
     try { const pool=getAccountPool(); await pool.query('DELETE FROM idk_friendships WHERE (user_id=$1 AND friend_id=$2) OR (user_id=$2 AND friend_id=$1)',[me,friendId]); res.json({ok:true}); }
     catch(error){ console.error('Remove friend failed:',error); res.status(500).json({ok:false,error:'Could not remove friend.'}); }
+  });
+
+  app.post('/api/friends/:friendId/block', async (req,res) => {
+    const me = requireUser(req,res); if (!me) return;
+    const friendId = String(req.params.friendId || '').slice(0,64); if (!friendId || friendId === me) return res.status(400).json({ok:false,error:'Invalid friend.'});
+    try { await getAccountPool().query('INSERT INTO idk_user_blocks(user_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [me,friendId]); res.json({ok:true}); }
+    catch { res.status(500).json({ok:false,error:'Could not block that user.'}); }
+  });
+
+  app.delete('/api/friends/:friendId/block', async (req,res) => {
+    const me = requireUser(req,res); if (!me) return;
+    const friendId = String(req.params.friendId || '').slice(0,64);
+    try { await getAccountPool().query('DELETE FROM idk_user_blocks WHERE user_id=$1 AND blocked_id=$2', [me,friendId]); res.json({ok:true}); }
+    catch { res.status(500).json({ok:false,error:'Could not unblock that user.'}); }
+  });
+
+  app.post('/api/friends/:friendId/report', async (req,res) => {
+    const me = requireUser(req,res); if (!me) return;
+    const friendId = String(req.params.friendId || '').slice(0,64), reason = cleanUsername(req.body?.reason) || 'No reason provided';
+    if (!friendId || friendId === me) return res.status(400).json({ok:false,error:'Invalid report target.'});
+    try { await getAccountPool().query('INSERT INTO idk_user_reports(id,reporter_id,reported_id,reason) VALUES($1,$2,$3,$4)', [randomUUID(),me,friendId,reason]); res.json({ok:true}); }
+    catch { res.status(500).json({ok:false,error:'Could not submit that report.'}); }
   });
 }

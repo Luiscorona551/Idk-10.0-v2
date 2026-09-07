@@ -31,7 +31,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(self), bluetooth=(self), gamepad=(self), clipboard-read=(self), clipboard-write=(self)');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(self), bluetooth=(self), gamepad=(self), clipboard-read=(self), clipboard-write=(self)');
   res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: ws: wss:; frame-src 'self' https: data: blob:; worker-src 'self' blob:");
   if (req.path === '/desktop.html' || req.path === '/') res.setHeader('Cache-Control', 'no-store');
   if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -47,7 +47,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.13.0',
+  version: process.env.IDK_VERSION || '10.15.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -64,10 +64,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.14.0',
+  version: '10.15.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch fifteen: call reliability, synced call history, optional video, Messenger inbox, notification preferences, and personalization-driven widgets.',
     'Batch fourteen: Widget Library, optional personalization setup, direct-chat call entry, and friend-only voice call signaling.',
     'Batch thirteen: AI mode and privacy controls, Sync Center, Backup & Recovery hub, command palette, and Chromebook/mobile polish.',
     'Batch twelve: Local Agent with Ollama and LM Studio support, permissioned IDK actions, and offline-first local chat.',

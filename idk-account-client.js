@@ -41,7 +41,7 @@
       cards: readJSON('idkDesktopCards', []),
       sheets: readJSON('idkSheetsData', {}),
       messenger: { chatName: readJSON('chatName', ''), profile: readJSON('idkProfile', null) },
-      featureState: readJSON('idkUltimateState', {})
+      featureState: { ...readJSON('idkUltimateState', {}), batchFifteen: { callHistory: readJSON('idkCallHistory', []), messengerRecents: readJSON('idkMessengerRecents', []), notificationPrefs: readJSON('idkNotificationPrefs', {}), personalization: readJSON('idkPersonalization', {}) } }
     };
   }
 
@@ -110,7 +110,7 @@
     if (s.sheets) localStorage.setItem('idkSheetsData', JSON.stringify(s.sheets));
     if (s.messenger?.chatName !== undefined) localStorage.setItem('chatName', JSON.stringify(s.messenger.chatName));
     if (s.messenger?.profile !== undefined) localStorage.setItem('idkProfile', JSON.stringify(s.messenger.profile));
-    if (s.feature_state !== undefined) writeJSON('idkUltimateState', s.feature_state || {});
+    if (s.feature_state !== undefined) { writeJSON('idkUltimateState', s.feature_state || {}); const batch = s.feature_state?.batchFifteen; if (batch) { if (batch.callHistory) writeJSON('idkCallHistory', batch.callHistory); if (batch.messengerRecents) writeJSON('idkMessengerRecents', batch.messengerRecents); if (batch.notificationPrefs) writeJSON('idkNotificationPrefs', batch.notificationPrefs); if (batch.personalization) writeJSON('idkPersonalization', batch.personalization); } }
     restored = true;
     await restoreFiles();
     window.dispatchEvent(new CustomEvent('idk-account-restored', { detail: { user, state: s } }));

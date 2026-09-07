@@ -27,6 +27,17 @@
 
   function save() { write(KEY, instances); }
 
+  async function weatherCoordinates() {
+    const location = read('idkLocation', {}), saved = read('idkWidgetCoordinates', null);
+    if (saved?.latitude && saved?.longitude) return saved;
+    if (location.region || location.state) {
+      try { const name = [location.state, location.region].filter(Boolean).join(', '); const data = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`).then(response => response.json()); const result = data.results?.[0]; if (result) { const coords = { latitude: result.latitude, longitude: result.longitude, name: result.name }; write('idkWidgetCoordinates', coords); return coords; } } catch {}
+    }
+    let coords = { latitude: 34.05, longitude: -118.25 };
+    if (navigator.geolocation) coords = await new Promise(resolve => navigator.geolocation.getCurrentPosition(position => resolve(position.coords), () => resolve(coords), { timeout: 2200 }));
+    return coords;
+  }
+
   function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
 
   async function refresh(card, type) {
@@ -34,22 +45,18 @@
     body.innerHTML = '<span class="idk-widget-loading">Updating...</span>';
     try {
       if (type === 'weather') {
-        let coords = { latitude: 34.05, longitude: -118.25 };
-        if (navigator.geolocation) {
-          coords = await new Promise(resolve => navigator.geolocation.getCurrentPosition(
-            position => resolve(position.coords), () => resolve(coords), { timeout: 2200 }
-          ));
-        }
+        const coords = await weatherCoordinates();
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code,wind_speed_10m`);
         const data = await response.json();
-        body.innerHTML = `<strong>${Math.round(data.current.temperature_2m)}${esc(data.current_units.temperature_2m)}</strong><span>Current conditions · wind ${Math.round(data.current.wind_speed_10m)} km/h</span>`;
+        body.innerHTML = `<strong>${Math.round(data.current.temperature_2m)}${esc(data.current_units.temperature_2m)}</strong><span>${esc(coords.name || read('idkLocation', {}).state || 'Current conditions')} · wind ${Math.round(data.current.wind_speed_10m)} km/h</span>`;
       } else if (type === 'calendar') {
         const todos = read('idkTodos', []).filter(item => item && !item.done).slice(0, 4);
         const events = read('idkCalendarEvents', []).filter(item => item && item.title).slice(0, 4);
         const items = [...events, ...todos];
         body.innerHTML = `<strong>${new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</strong>${items.length ? items.map(item => `<span class="idk-widget-line">${esc(item.title || item.text)}</span>`).join('') : '<span>No open events or tasks.</span>'}`;
       } else if (type === 'news') {
-        const response = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page');
+        const interests = read('idkPersonalization', {}).interests || read('idkInterests', []), query = Array.isArray(interests) ? interests[0] : interests;
+        const response = await fetch(query ? `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=4` : 'https://hn.algolia.com/api/v1/search?tags=front_page');
         const data = await response.json();
         const items = (data.hits || []).filter(item => item.title).slice(0, 4);
         body.innerHTML = items.length ? items.map(item => `<a class="idk-widget-line" href="${esc(item.url || '#')}" target="_blank" rel="noopener">${esc(item.title)}</a>`).join('') : '<span>No headlines available.</span>';
