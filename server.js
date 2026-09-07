@@ -64,10 +64,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.13.0',
+  version: '10.14.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch fourteen: Widget Library, optional personalization setup, direct-chat call entry, and friend-only voice call signaling.',
     'Batch thirteen: AI mode and privacy controls, Sync Center, Backup & Recovery hub, command palette, and Chromebook/mobile polish.',
     'Batch twelve: Local Agent with Ollama and LM Studio support, permissioned IDK actions, and offline-first local chat.',
     'Batch eleven: full-content file transfers with Copy Files progress, conflict review, named Browser Workspaces, handoff links, and direct Today reminders.',

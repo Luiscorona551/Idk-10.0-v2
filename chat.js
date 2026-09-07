@@ -10,6 +10,8 @@ const MAX_MUTE_MINUTES = 60;
 const MAX_METADATA = 180000;
 const HEARTBEAT_MS = 30000;
 const rooms = new Map();
+const userSockets = new Map();
+const calls = new Map();
 
 function room(code) { if (!rooms.has(code)) rooms.set(code, { clients: new Set(), history: [], members: new Map(), bans: new Map(), ownerId: null }); return rooms.get(code); }
 function nickKey(value) { return String(value).trim().toLowerCase(); }
@@ -17,6 +19,11 @@ function send(socket, payload) { if (socket.readyState === WebSocket.OPEN) socke
 function broadcast(code, payload) { const current = rooms.get(code); if (!current) return; if (payload.type === 'message' && !payload.private) { current.history.push(payload); if (current.history.length > MAX_HISTORY) current.history.shift(); } current.clients.forEach(client => send(client, payload)); }
 function users(code) { const current = rooms.get(code); return [...(current?.clients ?? [])].map(client => { const member = current.members.get(client.peerId); return { id: client.peerId, userId: client.userId || null, name: client.nick, role: member?.role || (client.peerId === current.ownerId ? 'owner' : 'member'), mutedUntil: member?.mutedUntil || 0 }; }); }
 function presence(code, text) { const current = rooms.get(code); if (!current) return; broadcast(code, { type: 'presence', text, users: users(code), ownerId: current.ownerId }); }
+function addUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId) || new Set(); sockets.add(socket); userSockets.set(socket.userId, sockets); }
+function removeUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId); sockets?.delete(socket); if (sockets && !sockets.size) userSockets.delete(socket.userId); }
+function callData(value) { if (!value || typeof value !== 'object') return null; try { return JSON.parse(JSON.stringify(value).slice(0, MAX_METADATA)); } catch { return null; } }
+function sendToUser(userId, payload) { userSockets.get(userId)?.forEach(socket => send(socket, payload)); return Boolean(userSockets.get(userId)?.size); }
+async function areFriends(userId, friendId) { if (!accountDbEnabled() || !userId || !friendId) return false; try { const { rows } = await getAccountPool().query('SELECT 1 FROM idk_friendships WHERE user_id=$1 AND friend_id=$2 LIMIT 1', [userId, friendId]); return Boolean(rows[0]); } catch { return false; } }
 function messageMeta(data) { const value = { mentions: Array.isArray(data.mentions) ? data.mentions.map(item => String(item).slice(0, 32)).filter(Boolean).slice(0, 12) : [], attachments: Array.isArray(data.attachments) ? data.attachments.map(item => ({ fileId: String(item.fileId || '').slice(0, 120), name: String(item.name || 'attachment').slice(0, 120), mime: String(item.mime || 'application/octet-stream').slice(0, 80), size: Math.min(Math.max(Number(item.size) || 0, 0), 200000), content: typeof item.content === 'string' && item.content.length <= 160000 ? item.content : '' })).slice(0, 4) : [], replyTo: data.replyTo && typeof data.replyTo === 'object' ? { id: String(data.replyTo.id || '').slice(0, 80), name: String(data.replyTo.name || '').slice(0, 32), text: String(data.replyTo.text || '').slice(0, 180) } : null }; return JSON.stringify(value).length <= MAX_METADATA ? value : { mentions: value.mentions, attachments: [], replyTo: value.replyTo }; }
 function applyMeta(row, base) { const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}; return { ...base, id: row.id, mentions: metadata.mentions || [], attachments: metadata.attachments || [], replyTo: metadata.replyTo || null }; }
 async function dbRoomHistory(code) { const pool = getAccountPool(); if (!pool) return []; const { rows } = await pool.query(`SELECT id,sender_user_id AS "userId",sender_name AS name,text,metadata,EXTRACT(EPOCH FROM created_at)*1000 AS at FROM idk_room_messages WHERE room_code=$1 AND private=FALSE ORDER BY created_at DESC LIMIT $2`, [code, MAX_HISTORY]); return rows.reverse().map(row => applyMeta(row, { type: 'message', userId: row.userId, name: row.name, text: row.text, at: Number(row.at) })); }
@@ -27,9 +34,32 @@ const heartbeat = setInterval(() => { chat.clients.forEach(socket => { if (socke
 
 chat.on('connection', (socket, req) => {
   socket.code = null; socket.nick = null; socket.peerId = randomUUID(); socket.userId = accountUserId(req); socket.isAlive = true;
+  addUserSocket(socket);
   socket.on('pong', () => { socket.isAlive = true; }); socket.on('error', () => {});
   socket.on('message', async raw => {
     let data; try { data = JSON.parse(raw.toString().slice(0, MAX_PAYLOAD)); } catch { return; }
+
+    if (data.type === 'call') {
+      const action = String(data.action || '').toLowerCase();
+      const callId = String(data.callId || '').slice(0, 80);
+      if (!socket.userId || !callId || !['invite', 'accept', 'reject', 'signal', 'end'].includes(action)) return send(socket, { type: 'call', action: 'error', text: 'Sign in before starting a call.' });
+      if (action === 'invite') {
+        const targetUserId = String(data.targetUserId || '').slice(0, 64);
+        if (!targetUserId || targetUserId === socket.userId || !(await areFriends(socket.userId, targetUserId))) return send(socket, { type: 'call', action: 'error', text: 'Calls are available only between accepted friends.' });
+        if (!userSockets.get(targetUserId)?.size) return send(socket, { type: 'call', action: 'error', text: 'That friend is not online right now.' });
+        const call = { id: callId, initiator: socket.userId, recipient: targetUserId };
+        calls.set(callId, call);
+        sendToUser(targetUserId, { type: 'call', action: 'invite', callId, fromUserId: socket.userId, fromName: socket.nick || 'IDK user', targetUserId, payload: callData(data.payload) });
+        send(socket, { type: 'call', action: 'ringing', callId, targetUserId });
+        return;
+      }
+      const call = calls.get(callId);
+      if (!call || ![call.initiator, call.recipient].includes(socket.userId)) return send(socket, { type: 'call', action: 'error', text: 'That call is no longer available.' });
+      const targetUserId = call.initiator === socket.userId ? call.recipient : call.initiator;
+      sendToUser(targetUserId, { type: 'call', action, callId, fromUserId: socket.userId, fromName: socket.nick || 'IDK user', targetUserId, payload: callData(data.payload) });
+      if (action === 'reject' || action === 'end') calls.delete(callId);
+      return;
+    }
 
     if (data.type === 'join') {
       if (socket.code) return send(socket, { type: 'error', text: 'You are already in a room.' });
@@ -115,5 +145,5 @@ chat.on('connection', (socket, req) => {
     }
   });
 
-  socket.on('close', () => { const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); if (!current.clients.size) return rooms.delete(socket.code); if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) current.members.get(nextOwner.peerId).role = 'owner'; } presence(socket.code, `${socket.nick} left`); });
+  socket.on('close', () => { removeUserSocket(socket); [...calls.entries()].forEach(([id, call]) => { if (call.initiator === socket.userId || call.recipient === socket.userId) calls.delete(id); }); const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); if (!current.clients.size) return rooms.delete(socket.code); if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) current.members.get(nextOwner.peerId).role = 'owner'; } presence(socket.code, `${socket.nick} left`); });
 });

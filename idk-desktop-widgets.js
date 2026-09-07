@@ -205,7 +205,7 @@
       const rect = desktop.getBoundingClientRect();
       add(type, event.clientX - rect.left - 90, event.clientY - rect.top - 24);
     }, true);
-    window.IDKDesktopWidgets = { add, open: openTray, refresh: () => layer.querySelectorAll('.idk-free-widget').forEach(card => refresh(card, card.dataset.widgetType)) };
+    window.IDKDesktopWidgets = { add, open: openTray, catalog: () => Object.entries(TYPES).map(([id, meta]) => ({ id, ...meta })), refresh: () => layer.querySelectorAll('.idk-free-widget').forEach(card => refresh(card, card.dataset.widgetType)) };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });

@@ -106,6 +106,7 @@
     if (event.target.closest('#windows,#dock,#idk-taskbar,#start-menu,#idk-upgrade-widgets,#idk-widget-editor')) return;
     event.preventDefault();
     showMenu(event.clientX, event.clientY, [
+       { label: 'Widget Library', action: () => window.OS?.open('widgetLibrary') },
        { label: 'Open widgets', action: renderWidgets },
        { label: 'Edit widgets', action: openWidgetEditor },
        { label: 'System Monitor', action: () => window.OS?.open('system-monitor') },
