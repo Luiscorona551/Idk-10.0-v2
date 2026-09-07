@@ -41,7 +41,7 @@
       cards: readJSON('idkDesktopCards', []),
       sheets: readJSON('idkSheetsData', {}),
       messenger: { chatName: readJSON('chatName', ''), profile: readJSON('idkProfile', null) },
-       featureState: { ...readJSON('idkUltimateState', {}), batchFifteen: { callHistory: readJSON('idkCallHistory', []), messengerRecents: readJSON('idkMessengerRecents', []), notificationPrefs: readJSON('idkNotificationPrefs', {}), personalization: readJSON('idkPersonalization', {}) }, batchSixteen: { callDiagnostics: readJSON('idkCallDiagnostics', []), notificationPermission: readJSON('idkNotificationPermission', 'default') } }
+       featureState: { ...readJSON('idkUltimateState', {}), batchFifteen: { callHistory: readJSON('idkCallHistory', []), messengerRecents: readJSON('idkMessengerRecents', []), notificationPrefs: readJSON('idkNotificationPrefs', {}), personalization: readJSON('idkPersonalization', {}) }, batchSixteen: { callDiagnostics: readJSON('idkCallDiagnostics', []), notificationPermission: readJSON('idkNotificationPermission', 'default') }, batchSeventeen: { plannerView: readJSON('idkPlannerView', 'board') } }
     };
   }
 
@@ -110,7 +110,7 @@
     if (s.sheets) localStorage.setItem('idkSheetsData', JSON.stringify(s.sheets));
     if (s.messenger?.chatName !== undefined) localStorage.setItem('chatName', JSON.stringify(s.messenger.chatName));
     if (s.messenger?.profile !== undefined) localStorage.setItem('idkProfile', JSON.stringify(s.messenger.profile));
-    if (s.feature_state !== undefined) { writeJSON('idkUltimateState', s.feature_state || {}); const batch = s.feature_state?.batchFifteen; if (batch) { if (batch.callHistory) writeJSON('idkCallHistory', batch.callHistory); if (batch.messengerRecents) writeJSON('idkMessengerRecents', batch.messengerRecents); if (batch.notificationPrefs) writeJSON('idkNotificationPrefs', batch.notificationPrefs); if (batch.personalization) writeJSON('idkPersonalization', batch.personalization); } const next = s.feature_state?.batchSixteen; if (next) { if (next.callDiagnostics) writeJSON('idkCallDiagnostics', next.callDiagnostics); if (next.notificationPermission) writeJSON('idkNotificationPermission', next.notificationPermission); } }
+    if (s.feature_state !== undefined) { writeJSON('idkUltimateState', s.feature_state || {}); const batch = s.feature_state?.batchFifteen; if (batch) { if (batch.callHistory) writeJSON('idkCallHistory', batch.callHistory); if (batch.messengerRecents) writeJSON('idkMessengerRecents', batch.messengerRecents); if (batch.notificationPrefs) writeJSON('idkNotificationPrefs', batch.notificationPrefs); if (batch.personalization) writeJSON('idkPersonalization', batch.personalization); } const next = s.feature_state?.batchSixteen; if (next) { if (next.callDiagnostics) writeJSON('idkCallDiagnostics', next.callDiagnostics); if (next.notificationPermission) writeJSON('idkNotificationPermission', next.notificationPermission); } const planner = s.feature_state?.batchSeventeen; if (planner?.plannerView) writeJSON('idkPlannerView', planner.plannerView); }
     restored = true;
     await restoreFiles();
     window.dispatchEvent(new CustomEvent('idk-account-restored', { detail: { user, state: s } }));

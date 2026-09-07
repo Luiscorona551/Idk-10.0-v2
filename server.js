@@ -47,7 +47,7 @@ publicStoreRoutes(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
-  version: process.env.IDK_VERSION || '10.16.0',
+  version: process.env.IDK_VERSION || '10.17.0',
   environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
   commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_SHA || process.env.SOURCE_VERSION || 'local build',
   node: process.version,
@@ -82,10 +82,11 @@ app.get('/api/browser/scope', async (req, res) => res.json({
 }));
 app.get('/api/update', async (req, res) => res.json({
   ok: true,
-  version: '10.16.0',
+  version: '10.17.0',
   channel: 'stable',
   build: 'final product batch',
   changelog: [
+    'Batch seventeen: Planner app with Board, Agenda, Calendar, recurring items, drag-and-drop planning, and ICS import/export.',
     'Batch sixteen: WebRTC ICE fallback, long-call expiry, reconnect diagnostics, browser notifications, and production health checks.',
     'Batch fifteen: call reliability, synced call history, optional video, Messenger inbox, notification preferences, and personalization-driven widgets.',
     'Batch fourteen: Widget Library, optional personalization setup, direct-chat call entry, and friend-only voice call signaling.',
