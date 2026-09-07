@@ -72,6 +72,7 @@
   }
 
   function installStyle() { if (document.querySelector('link[href="idk-batch-nineteen.css"]')) return; const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'idk-batch-nineteen.css'; document.head.append(link); }
+  function installDesktopBatch() { if (!document.querySelector('link[href="idk-batch-twentyone.css"]')) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'idk-batch-twentyone.css'; document.head.append(link); } if (!document.querySelector('script[src="idk-batch-twentyone.js"]')) { const script = document.createElement('script'); script.src = 'idk-batch-twentyone.js'; script.defer = true; document.body.append(script); } }
 
   function devicesPane() {
     const root = document.createElement('section');
@@ -96,6 +97,7 @@
   function open(tab = 'vault') { if (typeof APPS !== 'undefined' && APPS.security && window.OS?.open) window.OS.open('security', { tab }); }
   function install() {
     installStyle();
+    installDesktopBatch();
     if (typeof APPS !== 'undefined') APPS.security ||= { title: 'Security Center', glyph: '◈', desktop: false, dock: false, width: 980, height: 720, render: securityApp };
     window.addEventListener('idk-account-restored', () => { pollCommands(); clearInterval(window.IDKBatchNineteen.commandTimer); window.IDKBatchNineteen.commandTimer = setInterval(pollCommands, 30000); });
     setTimeout(pollCommands, 2500);
