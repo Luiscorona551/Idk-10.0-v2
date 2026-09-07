@@ -72,7 +72,7 @@
   }
 
   function installStyle() { if (document.querySelector('link[href="idk-batch-nineteen.css"]')) return; const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'idk-batch-nineteen.css'; document.head.append(link); }
-  function installDesktopBatch() { if (!document.querySelector('link[href^="idk-batch-twentyone.css"]')) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'idk-batch-twentyone.css?v=21'; document.head.append(link); } if (!document.querySelector('script[src^="idk-batch-twentyone.js"]')) { const script = document.createElement('script'); script.src = 'idk-batch-twentyone.js?v=21'; script.defer = true; document.body.append(script); } }
+  function installDesktopBatch() { if (!document.querySelector('link[href^="idk-batch-twentyone.css"]')) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'idk-batch-twentyone.css?v=21'; document.head.append(link); } if (!document.querySelector('script[src^="idk-batch-twentyone.js"]')) { const script = document.createElement('script'); script.src = 'idk-batch-twentyone.js?v=21.1'; script.defer = true; document.body.append(script); } }
 
   function devicesPane() {
     const root = document.createElement('section');
