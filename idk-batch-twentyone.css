@@ -1,2 +1,73 @@
-.idk-desktop-center{contain:content}
-html[data-idk-desktop-ready="true"] #desktop{contain:style}
+.idk-desktop-center {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: radial-gradient(circle at 90% 0, rgba(89, 134, 218, .2), transparent 34%), linear-gradient(145deg, rgba(9, 22, 52, .96), rgba(4, 10, 24, .98));
+  color: #eaf3ff;
+}
+.idk-dc-header, .idk-dc-hero, .idk-dc-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.idk-dc-header h2, .idk-dc-hero h2 { margin: 4px 0; font-size: 22px; }
+.idk-dc-header p, .idk-dc-hero p, .idk-dc-section header p { margin: 0; color: #9db5d8; font-size: 11px; line-height: 1.5; }
+.idk-dc-kicker { color: #7ef6a8; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.idk-dc-tabs { display: flex; gap: 5px; flex-wrap: wrap; padding-bottom: 3px; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+.idk-dc-tabs button { border: 1px solid transparent; border-radius: 8px; background: rgba(255, 255, 255, .04); color: #abc4e9; padding: 8px 11px; font: inherit; font-size: 11px; cursor: pointer; }
+.idk-dc-tabs button:hover, .idk-dc-tabs button.active { border-color: rgba(126, 246, 168, .45); background: rgba(126, 246, 168, .12); color: #fff; }
+.idk-dc-hero { padding: 14px; border: 1px solid rgba(126, 246, 168, .2); border-radius: 12px; background: rgba(8, 28, 37, .38); }
+.idk-dc-live { flex: 0 0 auto; padding: 5px 8px; border: 1px solid rgba(126, 246, 168, .4); border-radius: 999px; color: #7ef6a8; font-size: 10px; }
+.idk-dc-live.offline { border-color: rgba(255, 154, 145, .45); color: #ffb3a7; }
+.idk-dc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+.idk-dc-stats article { display: grid; gap: 4px; min-width: 0; padding: 11px; border: 1px solid rgba(102, 161, 246, .24); border-radius: 9px; background: rgba(21, 57, 113, .22); }
+.idk-dc-stats strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.idk-dc-stats small, .idk-dc-shortcut-grid small { color: #9db5d8; font-size: 10px; }
+.idk-dc-section { display: grid; gap: 11px; padding: 13px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px; background: rgba(7, 20, 42, .45); }
+.idk-dc-section h3 { margin: 0; font-size: 13px; }
+.idk-dc-actions { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+.idk-dc-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.idk-dc-shortcut-grid span { display: grid; gap: 5px; padding: 9px; border: 1px solid rgba(255, 255, 255, .09); border-radius: 8px; background: rgba(255, 255, 255, .035); }
+.idk-dc-shortcut-grid kbd, .idk-desktop-launcher-card footer kbd { width: max-content; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; background: rgba(0, 0, 0, .2); color: #fff; font: 10px ui-monospace, monospace; }
+.idk-dc-shortcut-grid kbd + kbd, .idk-desktop-launcher-card footer kbd + kbd { margin-left: 3px; }
+.idk-dc-launch { min-height: 0; }
+.idk-dc-launch > .field { width: 100%; box-sizing: border-box; }
+.idk-dc-app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; max-height: 455px; overflow: auto; }
+.idk-dc-app-card { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border: 1px solid rgba(255, 255, 255, .11); border-radius: 9px; background: rgba(255, 255, 255, .045); color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.idk-dc-app-card:hover, .idk-dc-app-card:focus-visible { border-color: rgba(126, 246, 168, .5); background: rgba(126, 246, 168, .1); outline: none; }
+.idk-dc-app-glyph { display: grid; flex: 0 0 auto; width: 32px; height: 32px; place-items: center; font-size: 22px; }
+.idk-dc-app-card > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.idk-dc-app-card strong, .idk-dc-app-card small, .idk-dc-window-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idk-dc-app-card small, .idk-dc-window-row small { color: #9db5d8; font-size: 10px; }
+.idk-dc-window-list { display: grid; gap: 7px; max-height: 430px; overflow: auto; }
+.idk-dc-window-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 8px; background: rgba(255, 255, 255, .04); }
+.idk-dc-window-row > div:first-child { display: grid; min-width: 0; gap: 4px; }
+.idk-dc-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.idk-dc-form label { display: grid; gap: 5px; color: #c5d5eb; font-size: 10px; }
+.idk-dc-start-launcher { width: 100%; margin-top: 8px; border: 1px solid rgba(126, 246, 168, .28); border-radius: 8px; background: rgba(126, 246, 168, .1); color: #fff; padding: 8px; text-align: left; font: inherit; font-size: 11px; cursor: pointer; }
+.idk-dc-start-launcher:hover { background: rgba(126, 246, 168, .2); }
+#idk-perfect-status .idk-dc-status-button, #idk-os-next-tools .idk-dc-tool { white-space: nowrap; }
+#idk-desktop-launcher { position: fixed; inset: 0; z-index: 510000; display: grid; place-items: start center; padding: 12vh 14px 20px; background: rgba(2, 7, 18, .72); backdrop-filter: blur(10px); }
+.idk-desktop-launcher-card { display: grid; width: min(680px, 100%); max-height: min(640px, 78vh); overflow: hidden; border: 1px solid rgba(126, 246, 168, .5); border-radius: 15px; background: linear-gradient(145deg, #0d2345, #071226); box-shadow: 0 30px 100px #000c; color: #fff; }
+.idk-desktop-launcher-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 17px 10px; }
+.idk-desktop-launcher-card header strong { display: block; margin-top: 4px; font-size: 17px; }
+.idk-desktop-launcher-card header button { border: 0; background: transparent; color: #abc4e9; font-size: 24px; cursor: pointer; }
+.idk-desktop-launcher-input { box-sizing: border-box; width: calc(100% - 28px); margin: 0 14px 10px; padding: 12px 13px; border: 1px solid rgba(126, 246, 168, .36); border-radius: 9px; background: rgba(0, 0, 0, .24); color: #fff; font: inherit; outline: none; }
+.idk-desktop-launcher-input:focus { border-color: #7ef6a8; box-shadow: 0 0 0 3px rgba(126, 246, 168, .1); }
+.idk-desktop-launcher-list { display: grid; gap: 5px; min-height: 80px; overflow: auto; padding: 0 14px 10px; }
+.idk-desktop-launcher-item { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.idk-desktop-launcher-item:hover, .idk-desktop-launcher-item:focus, .idk-desktop-launcher-item.selected { border-color: rgba(126, 246, 168, .38); background: rgba(126, 246, 168, .1); outline: none; }
+.idk-desktop-launcher-item > span { font-size: 20px; text-align: center; }
+.idk-desktop-launcher-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.idk-desktop-launcher-item small { color: #9db5d8; font-size: 10px; }
+.idk-desktop-launcher-card footer { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid rgba(255, 255, 255, .1); color: #9db5d8; font-size: 10px; }
+html[data-idk-desktop-ready="true"] #desktop { contain: style; }
+body.idk-b21-compact #windows .window { left: 8px !important; width: calc(100vw - 16px) !important; max-width: calc(100vw - 16px); height: calc(100vh - 92px) !important; max-height: calc(100vh - 92px); border-radius: 10px; }
+@media (max-width: 760px) {
+  .idk-dc-header, .idk-dc-hero, .idk-dc-section > header { display: grid; }
+  .idk-dc-shortcut-grid, .idk-dc-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .idk-dc-window-row { align-items: flex-start; flex-direction: column; }
+  .idk-dc-window-row .idk-dc-actions { width: 100%; }
+  .idk-dc-window-row .idk-dc-actions .btn { flex: 1; }
+  .idk-desktop-launcher { padding-top: 8vh; }
+  .idk-desktop-launcher-card { max-height: 84vh; }
+}
+@media (max-width: 480px) { .idk-dc-shortcut-grid, .idk-dc-form { grid-template-columns: 1fr; } }
