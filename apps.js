@@ -122,16 +122,23 @@ async function gameBlobURL(name) {
 }
 
 function openGame(name, title) {
-  const gameWindow = window.open('about:blank', '_blank');
-  if (!gameWindow) throw new Error('Allow pop-ups for IDK to open games in a separate tab.');
-  gameWindow.document.title = `Loading ${title}…`;
-  return gameBlobURL(name).then(src => {
-    gameWindow.location.href = src;
-    setTimeout(() => URL.revokeObjectURL(src), 60000);
-  }).catch(error => {
-    gameWindow.close();
-    throw error;
+  return OS.open('game-player', { title, gameName: name });
+}
+
+async function gamePlayerApp(options = {}) {
+  const root = el('div', { className: 'game-player' });
+  const frame = el('iframe', {
+    className: 'game-player-frame',
+    title: options.title || 'IDK game',
+    allow: 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write'
   });
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  const source = await gameBlobURL(options.gameName);
+  frame.src = source;
+  root.append(frame);
+  root.cleanup = () => URL.revokeObjectURL(source);
+  return root;
 }
 
 function el(tag, props = {}, children = []) {
@@ -1674,6 +1681,15 @@ const APPS = {
     width: 760,
     height: 500,
     render: () => window.SYSTEM_APPS.terminal()
+  },
+
+  'game-player': {
+    title: 'Game Player',
+    glyph: '🎮',
+    multi: true,
+    width: 1040,
+    height: 700,
+    render: gamePlayerApp
   },
 
   roblox: {

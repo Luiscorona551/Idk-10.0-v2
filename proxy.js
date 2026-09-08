@@ -5,12 +5,12 @@ const PROXY = (() => {
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
-      if (existing) return resolve();
+      const existing = [...document.scripts].find(tag => tag.src && new URL(tag.src, location.href).pathname === src);
+      if (existing) existing.remove();
       const tag = document.createElement('script');
       tag.src = src;
       tag.onload = resolve;
-      tag.onerror = () => reject(new Error(`Could not load ${src}`));
+      tag.onerror = () => { tag.remove(); reject(new Error(`Could not load ${src}. Check the browser server and try again.`)); };
       document.head.append(tag);
     });
   }
@@ -55,8 +55,12 @@ const PROXY = (() => {
     await loadScript('/uv/uv.bundle.js');
     await loadScript('/uv/uv.config.js');
     await loadScript('/baremux/index.js');
+    if (!window.Ultraviolet || !window.__uv$config || !window.BareMux?.BareMuxConnection) {
+      throw new Error('The browser service loaded incompletely. Try again.');
+    }
 
     const registration = await navigator.serviceWorker.register(__uv$config.sw, { scope: __uv$config.prefix });
+    await registration.update().catch(() => {});
     const deadline = Date.now() + 10000;
     while (!registration.active && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 50));
