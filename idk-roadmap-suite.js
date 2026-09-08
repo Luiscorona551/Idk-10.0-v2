@@ -1,4 +1,4 @@
-(() => {
+cards.find(card => card[2] === nav.querySelector('.active')?.textContent)?.[0](() => {
   'use strict';
   if (window.IDKRoadmapSuite) return;
   const cards = [
