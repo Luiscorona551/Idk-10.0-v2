@@ -128,24 +128,27 @@
       root.dataset.idkBrowserRecovery = 'true';
       let retries = 0;
       let retryTimer = 0;
-      frame.addEventListener('load', () => {
+      frame.addEventListener('load', async () => {
         if (frame.src === 'about:blank') return;
         const body = frame.contentDocument?.body?.innerText || '';
         if (!/Error processing your request|Internal Server Error/i.test(body)) return;
-        if (retries >= 2) {
+        if (retries >= 3) {
           root.querySelector('.count')?.replaceChildren(document.createTextNode('Proxy error · Reload to retry'));
           return;
         }
         const source = frame.src;
         retries += 1;
-        root.querySelector('.count')?.replaceChildren(document.createTextNode(`Retrying proxy (${retries}/2)…`));
+        root.querySelector('.count')?.replaceChildren(document.createTextNode(`Retrying proxy (${retries}/3)…`));
         PROXY?.reset?.();
         clearTimeout(retryTimer);
-        retryTimer = setTimeout(() => {
+        retryTimer = setTimeout(async () => {
+          if (frame.src !== source) return;
+          const address = root.querySelector('input')?.value?.trim();
+          const next = address ? await PROXY.encode(address).catch(() => source) : source;
           if (frame.src !== source) return;
           frame.src = 'about:blank';
-          setTimeout(() => { if (frame.src === 'about:blank') frame.src = source; }, 250);
-        }, retries * 600);
+          setTimeout(() => { if (frame.src === 'about:blank') frame.src = next; }, 250);
+        }, retries * 1000);
       });
     };
     const scan = () => document.querySelectorAll('.idk-browser-shell').forEach(attach);
