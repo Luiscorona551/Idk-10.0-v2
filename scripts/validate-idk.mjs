@@ -30,6 +30,25 @@ for (const reference of references) {
 const apps = readFileSync(join(root, 'apps.js'), 'utf8');
 if (!apps.includes('https://open.spotify.com/')) { console.error('Official Spotify entry is missing.'); process.exitCode = 1; }
 if (/7reels\.cc/i.test(apps)) { console.error('Unapproved movie source found.'); process.exitCode = 1; }
+if (!apps.includes('GAME_FAVORITES_KEY') || !apps.includes('game-player-toolbar')) { console.error('Game quality controls are missing.'); process.exitCode = 1; }
+const server = readFileSync(join(root, 'server.js'), 'utf8');
+if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
+if (process.argv.includes('--smoke')) {
+  const base = String(process.env.IDK_BASE_URL || '').replace(/\/$/, '');
+  if (!base) { console.error('Set IDK_BASE_URL when using --smoke.'); process.exitCode = 1; }
+  else {
+    for (const path of ['/healthz', '/api/call/config', '/api/browser/scope']) {
+      try {
+        const response = await fetch(`${base}${path}`, { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || data.ok === false) throw new Error(`${response.status}`);
+        console.log(`Smoke check passed: ${path}`);
+      } catch (error) {
+        console.error(`Smoke check failed: ${path} (${error.message})`);
+        process.exitCode = 1;
+      }
+    }
+  }
+}
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`IDK validation passed: ${files.length} JavaScript files and ${references.length} local assets checked.`);
-
