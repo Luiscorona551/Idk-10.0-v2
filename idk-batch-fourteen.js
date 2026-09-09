@@ -58,11 +58,31 @@
     root.innerHTML = '<header class="idk-control-head"><div><span class="idk-flow-kicker">IDK CALLS</span><h2>Call a friend</h2><p>Choose an accepted friend to start a private voice call. Video is optional and stays off until you enable it.</p></div><div class="idk-call-preferences"><label><input type="checkbox" data-video-preference> Start with video</label><span class="idk-control-badge">VOICE FIRST</span></div></header><div class="idk-call-intro"><strong>Private by default</strong><span>Calls use peer-to-peer media, are not recorded, and only use your microphone or camera after you choose to call.</span></div><div class="idk-call-status" data-status>Checking your friends…</div><section class="idk-call-current" data-current hidden><div class="idk-call-peer"><span class="idk-call-avatar" data-avatar>?</span><div><strong data-peer>Not connected</strong><small data-call-state>Preparing call</small></div></div><audio data-audio autoplay></audio><video data-video autoplay playsinline hidden></video><div class="idk-call-actions"><button class="btn" data-mute>Mute mic</button><button class="btn" data-video-toggle>Turn video on</button><button class="btn danger" data-end>End call</button></div></section><section class="idk-call-incoming" data-incoming hidden><strong data-incoming-title>Incoming call</strong><p data-incoming-copy></p><div class="idk-call-actions"><button class="btn" data-accept>Accept call</button><button class="btn tab" data-reject>Decline</button></div></section><section class="idk-call-section"><div class="idk-call-section-head"><div><strong>Choose a friend</strong><small>Calls are only available to accepted friends.</small></div><button class="btn tab" data-reload>Refresh</button></div><label class="idk-call-search"><span>Find a friend</span><input class="field" data-friend-search type="search" placeholder="Search accepted friends" aria-label="Search accepted friends"></label><div class="idk-call-friends" data-friends></div></section><section class="idk-call-section"><div class="idk-call-section-head"><strong>Recent calls</strong><small>History syncs with your IDK account when signed in.</small></div><div class="idk-call-history" data-history></div></section>';
     const status = root.querySelector('[data-status]'), friendsList = root.querySelector('[data-friends]'), friendSearch = root.querySelector('[data-friend-search]'), current = root.querySelector('[data-current]'), incoming = root.querySelector('[data-incoming]'), audio = root.querySelector('[data-audio]'), video = root.querySelector('[data-video]'), history = root.querySelector('[data-history]'), videoPreference = root.querySelector('[data-video-preference]');
     let friends = [], socket = null, socketReady = null, pc = null, stream = null, call = null, connected = false, videoEnabled = false, reconnectTimer = 0, reconnectAttempts = 0, iceRestarts = 0, iceRestartTimer = 0;
+    const pendingCandidates = [];
+    const attachRemoteMedia = event => {
+      const remote = event.streams?.[0] || new MediaStream([event.track]);
+      audio.srcObject = remote;
+      video.srcObject = remote;
+      video.hidden = !remote.getVideoTracks?.().length;
+      audio.play().catch(error => diagnostic('remote-audio-blocked', { message: error?.message || 'Playback was blocked.' }));
+      diagnostic('remote-track', { video: Boolean(remote.getVideoTracks?.().length) });
+    };
+    const flushCandidates = () => {
+      if (!pc?.remoteDescription || !pendingCandidates.length) return;
+      const candidates = pendingCandidates.splice(0);
+      candidates.forEach(candidate => pc.addIceCandidate(candidate).catch(error => diagnostic('ice-candidate-failed', { message: error?.message || 'Candidate rejected.' })));
+    };
+    const queueCandidate = candidate => {
+      if (!candidate) return;
+      if (!pc) return pendingCandidates.push(candidate);
+      if (!pc.remoteDescription) return pendingCandidates.push(candidate);
+      pc.addIceCandidate(candidate).catch(error => diagnostic('ice-candidate-failed', { message: error?.message || 'Candidate rejected.' }));
+    };
     const setStatus = value => { status.textContent = value; };
     const record = entry => { const items = read('idkCallHistory', []); write('idkCallHistory', [{ ...entry, at: Date.now() }, ...items].slice(0, 20)); renderHistory(); window.IDKAccount?.sync?.(); };
     const renderHistory = () => { const items = read('idkCallHistory', []); history.replaceChildren(...(items.length ? items.slice(0, 8).map(item => { const row = document.createElement('div'); row.className = 'idk-call-history-row'; row.innerHTML = `<span>${item.missed ? 'Missed' : item.direction === 'outgoing' ? 'Outgoing' : 'Incoming'}</span><strong>${esc(item.name || 'IDK friend')}</strong><time>${new Date(item.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time>`; return row; }) : [Object.assign(document.createElement('p'), { className: 'idk-control-status', textContent: 'No calls yet.' })])); };
     const renderCall = () => { current.hidden = !call || call.incoming; incoming.hidden = !call?.incoming; if (call) { root.querySelector('[data-peer]').textContent = call.target.name; root.querySelector('[data-avatar]').textContent = call.target.name.slice(0, 1).toUpperCase(); root.querySelector('[data-call-state]').textContent = connected ? 'Connected · private voice call' : call.incoming ? 'Waiting for your answer' : 'Ringing…'; if (call.incoming) root.querySelector('[data-incoming-copy]').textContent = `${call.target.name} is calling you.`; } };
-    const clean = () => { clearTimeout(iceRestartTimer); pc?.close(); pc = null; stream?.getTracks().forEach(track => track.stop()); stream = null; audio.srcObject = null; video.srcObject = null; video.hidden = true; connected = false; iceRestarts = 0; call = null; renderCall(); };
+    const clean = () => { clearTimeout(iceRestartTimer); pc?.close(); pc = null; pendingCandidates.length = 0; stream?.getTracks().forEach(track => track.stop()); stream = null; audio.srcObject = null; video.srcObject = null; video.hidden = true; connected = false; iceRestarts = 0; call = null; renderCall(); };
     const sendCall = (action, payload = {}) => { if (!socket || socket.readyState !== WebSocket.OPEN || !call) return; socket.send(JSON.stringify({ type: 'call', action, callId: call.id, targetUserId: call.target.id, payload })); };
     const ensureSocket = () => {
       if (socket?.readyState === WebSocket.OPEN) return Promise.resolve();
@@ -81,16 +101,34 @@
     const start = async target => {
       const friend = friends.find(item => item.id === target?.id) || target; if (!friend?.id) return setStatus('Choose an accepted friend first.');
       if (!friends.some(item => item.id === friend.id)) return setStatus('Calls are limited to accepted friends shown here.');
-      try { videoEnabled = videoPreference.checked; await ensureSocket(); await ensureMedia(); call = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, target: { id: friend.id, name: friend.username || friend.name || 'Friend' }, incoming: false, direction: 'outgoing', startedAt: Date.now() }; diagnostic('call-start', { direction: 'outgoing', video: videoEnabled }); createPeer(); renderCall(); const offer = await pc.createOffer(); await pc.setLocalDescription(offer); call.offer = pc.localDescription; sendCall('invite', { sdp: pc.localDescription }); setStatus(`Calling ${call.target.name}…`); } catch (error) { diagnostic('call-start-failed', { message: error?.message || 'unknown' }); clean(); setStatus(error.message || 'Could not start the call.'); }
+      try {
+        videoEnabled = videoPreference.checked;
+        await ensureSocket();
+        await ensureMedia();
+        call = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, target: { id: friend.id, name: friend.username || friend.name || 'Friend' }, incoming: false, direction: 'outgoing', startedAt: Date.now(), signalReady: false, localCandidates: [] };
+        diagnostic('call-start', { direction: 'outgoing', video: videoEnabled });
+        createPeer();
+        pc.addEventListener('track', attachRemoteMedia);
+        pc.addEventListener('signalingstatechange', flushCandidates);
+        pc.onicecandidate = event => { if (event.candidate) { if (call.signalReady) sendCall('signal', { candidate: event.candidate }); else call.localCandidates.push(event.candidate); } };
+        renderCall();
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        call.offer = pc.localDescription;
+        sendCall('invite', { sdp: pc.localDescription });
+        call.signalReady = true;
+        call.localCandidates.splice(0).forEach(candidate => sendCall('signal', { candidate }));
+        setStatus(`Calling ${call.target.name}…`);
+      } catch (error) { diagnostic('call-start-failed', { message: error?.message || 'unknown' }); clean(); setStatus(error.message || 'Could not start the call.'); }
     };
-    const accept = async () => { if (!call?.incoming) return; try { videoEnabled = videoPreference.checked; await ensureSocket(); await ensureMedia(); createPeer(); await pc.setRemoteDescription(call.offer); call.incoming = false; call.direction = 'incoming'; call.startedAt = Date.now(); diagnostic('call-accept', { video: videoEnabled }); renderCall(); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); sendCall('accept', { sdp: pc.localDescription }); setStatus(`Connecting to ${call.target.name}…`); } catch (error) { diagnostic('call-accept-failed', { message: error?.message || 'unknown' }); setStatus(error.message || 'Could not accept the call.'); clean(); } };
+     const accept = async () => { if (!call?.incoming) return; try { videoEnabled = videoPreference.checked; await ensureSocket(); await ensureMedia(); call.signalReady = false; call.localCandidates = []; createPeer(); pc.addEventListener('track', attachRemoteMedia); pc.addEventListener('signalingstatechange', flushCandidates); pc.onicecandidate = event => { if (event.candidate) { if (call.signalReady) sendCall('signal', { candidate: event.candidate }); else call.localCandidates.push(event.candidate); } }; await pc.setRemoteDescription(call.offer); flushCandidates(); call.incoming = false; call.direction = 'incoming'; call.startedAt = Date.now(); diagnostic('call-accept', { video: videoEnabled }); renderCall(); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); sendCall('accept', { sdp: pc.localDescription }); call.signalReady = true; call.localCandidates.splice(0).forEach(candidate => sendCall('signal', { candidate })); setStatus(`Connecting to ${call.target.name}…`); } catch (error) { diagnostic('call-accept-failed', { message: error?.message || 'unknown' }); setStatus(error.message || 'Could not accept the call.'); clean(); } };
     const end = (remote = false) => { if (!call) return; if (!remote) sendCall('end'); diagnostic('call-end', { remote, connected }); record({ name: call.target.name, missed: !connected, direction: call.direction || (call.incoming ? 'incoming' : 'outgoing'), duration: connected && call.startedAt ? Math.max(0, Date.now() - call.startedAt) : 0 }); clean(); setStatus(remote ? 'Call ended.' : 'Call ended.'); };
     function handleSignal(data) {
       if (data.type === 'call' && data.action === 'invite') { if (!friends.some(item => item.id === data.fromUserId)) return; call = { id: data.callId, target: { id: data.fromUserId, name: data.fromName || 'Friend' }, incoming: true, direction: 'incoming', offer: data.payload?.sdp }; renderCall(); notify('Incoming IDK call', `${data.fromName || 'A friend'} is calling you.`, 'success'); return; }
       if (data.type !== 'call' || !call || data.callId !== call.id) return;
-      if (data.action === 'accept' && pc && data.payload?.sdp) pc.setRemoteDescription(data.payload.sdp).then(() => diagnostic('remote-answer')).catch(() => setStatus('The call answer was not valid.'));
-      else if (data.action === 'signal' && data.payload?.candidate) pc?.addIceCandidate(data.payload.candidate).catch(() => {});
-      else if (data.action === 'signal' && data.payload?.sdp && pc) pc.setRemoteDescription(data.payload.sdp).then(async () => { diagnostic('remote-renegotiation', { type: data.payload.sdp.type }); if (data.payload.sdp.type === 'offer') { const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); sendCall('signal', { sdp: pc.localDescription }); } }).catch(() => setStatus('The reconnect handshake was not valid.'));
+       if (data.action === 'accept' && pc && data.payload?.sdp) pc.setRemoteDescription(data.payload.sdp).then(() => { flushCandidates(); diagnostic('remote-answer'); }).catch(() => setStatus('The call answer was not valid.'));
+       else if (data.action === 'signal' && data.payload?.candidate) queueCandidate(data.payload.candidate);
+       else if (data.action === 'signal' && data.payload?.sdp && pc) pc.setRemoteDescription(data.payload.sdp).then(async () => { flushCandidates(); diagnostic('remote-renegotiation', { type: data.payload.sdp.type }); if (data.payload.sdp.type === 'offer') { const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); sendCall('signal', { sdp: pc.localDescription }); } }).catch(() => setStatus('The reconnect handshake was not valid.'));
       else if (data.action === 'reject') { record({ name: call.target.name, missed: true, direction: 'outgoing' }); clean(); setStatus(`${call.target.name} declined the call.`); }
       else if (data.action === 'end') end(true);
       else if (data.action === 'expired') { diagnostic('call-expired'); record({ name: call.target.name, missed: !connected, direction: call.direction || 'incoming' }); clean(); setStatus('The call expired. Start a new call when ready.'); }

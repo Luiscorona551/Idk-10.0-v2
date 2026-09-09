@@ -2,6 +2,7 @@
 // site is served by server.js, which supplies /uv/, /baremux/, /epoxy/ and /wisp/.
 const PROXY = (() => {
   let ready = null;
+  let connection = null;
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const existing = [...document.scripts].find(tag => tag.src && new URL(tag.src, location.href).pathname === src);
@@ -27,13 +28,14 @@ const PROXY = (() => {
     while (!registration.active && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
     if (!registration.active) throw new Error('The proxy service worker did not activate.');
     if (!navigator.serviceWorker.controller && registration.active) await new Promise(resolve => { const timer = setTimeout(resolve, 1500); navigator.serviceWorker.addEventListener('controllerchange', () => { clearTimeout(timer); resolve(); }, { once: true }); });
-    const connection = new BareMux.BareMuxConnection('/baremux/worker.js');
+    connection = new BareMux.BareMuxConnection('/baremux/worker.js');
     const wisp = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/wisp/`;
     await connection.setTransport('/epoxy/index.mjs', [{ wisp }]);
   }
+  function reset() { ready = null; connection = null; }
   function normalize(input) { const value = input.trim(); if (/^https?:\/\//i.test(value)) return value; if (/^[^\s.]+\.[^\s]{2,}$/.test(value)) return `https://${value}`; return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`; }
   async function encode(input) { if (!ready) ready = init().catch(error => { ready = null; throw error; }); await ready; return __uv$config.prefix + __uv$config.encodeUrl(normalize(input)); }
-  return { encode, backendAvailable, chatAvailable, serverScope, status };
+  return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
 })();
 (async () => {
   const files = ['/idk-batch-fourteen.css', '/idk-game-fix.js', '/idk-batch-fourteen.js', '/idk-batch-sixteen.js'];

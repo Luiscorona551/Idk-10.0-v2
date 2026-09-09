@@ -120,6 +120,39 @@
     new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
   }
 
+  function installBrowserRecovery() {
+    const attach = root => {
+      if (!root || root.dataset.idkBrowserRecovery) return;
+      const frame = root.querySelector('iframe');
+      if (!frame) return;
+      root.dataset.idkBrowserRecovery = 'true';
+      let retries = 0;
+      let retryTimer = 0;
+      frame.addEventListener('load', () => {
+        if (frame.src === 'about:blank') return;
+        const body = frame.contentDocument?.body?.innerText || '';
+        if (!/Error processing your request|Internal Server Error/i.test(body)) return;
+        if (retries >= 2) {
+          root.querySelector('.count')?.replaceChildren(document.createTextNode('Proxy error · Reload to retry'));
+          return;
+        }
+        const source = frame.src;
+        retries += 1;
+        root.querySelector('.count')?.replaceChildren(document.createTextNode(`Retrying proxy (${retries}/2)…`));
+        PROXY?.reset?.();
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => {
+          if (frame.src !== source) return;
+          frame.src = 'about:blank';
+          setTimeout(() => { if (frame.src === 'about:blank') frame.src = source; }, 250);
+        }, retries * 600);
+      });
+    };
+    const scan = () => document.querySelectorAll('.idk-browser-shell').forEach(attach);
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+
   function install() {
     migrateLegacyBlobs().catch(() => {});
     if (typeof APPS !== 'undefined') { APPS.accounts = { title: 'Accounts & Devices', glyph: '◉', desktop: false, dock: false, width: 760, height: 600, render: opts => centerRoot(opts.tab || 'overview') }; APPS.proxy.render = renderBrowser; }
@@ -132,5 +165,6 @@
 
   window.IDKAccountsDevices = { open: tab => window.OS?.open('accounts', tab ? { tab } : {}), switchProfile, resetProfile, snapshot, restoreSnapshot: applySnapshot, renderBrowser };
   installBrowserScope();
+  installBrowserRecovery();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();

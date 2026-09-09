@@ -134,7 +134,7 @@ async function gamePlayerApp(options = {}) {
   });
   frame.setAttribute('allowfullscreen', '');
   frame.setAttribute('referrerpolicy', 'no-referrer');
-  const source = await gameBlobURL(options.gameName);
+  const source = options.src || await gameBlobURL(options.gameName);
   frame.src = source;
   root.append(frame);
   root.cleanup = () => URL.revokeObjectURL(source);
