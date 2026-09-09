@@ -22,6 +22,23 @@ const app = express();
 app.set('trust proxy', 1);
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
 function backendStatus() { return { ...backend, ai: aiStatus(), database: accountDbEnabled() }; }
+function iceServers() {
+  const fallback = [{ urls: ['stun:stun.l.google.com:19302'] }];
+  const raw = String(process.env.IDK_ICE_SERVERS || '').trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    const values = Array.isArray(parsed) ? parsed : [parsed];
+    const safe = values.map(value => {
+      if (typeof value === 'string') return { urls: value };
+      if (!value || typeof value !== 'object') return null;
+      const urls = Array.isArray(value.urls) ? value.urls.filter(url => typeof url === 'string').slice(0, 8) : String(value.urls || '').trim();
+      if (!urls || (Array.isArray(urls) && !urls.length)) return null;
+      return { urls, ...(value.username ? { username: String(value.username).slice(0, 160) } : {}), ...(value.credential ? { credential: String(value.credential).slice(0, 320) } : {}) };
+    }).filter(Boolean).slice(0, 8);
+    return safe.length ? safe : fallback;
+  } catch { return fallback; }
+}
 app.use(express.json({ limit: '20mb' }));
 const healthHandler = (req, res) => res.status(200).json({ ok: true, service: 'ugs-desktop', https: req.secure, ...backendStatus() });
 app.get('/healthz', healthHandler);
@@ -30,6 +47,8 @@ setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
 app.get('/api/status', (req, res) => res.json({ ok: true, ...backendStatus() }));
+app.get('/api/call/config', (req, res) => res.json({ ok: true, iceServers: iceServers(), activeTransport: 'peer-to-peer', recording: false }));
+app.get('/api/browser/scope', (req, res) => res.json({ ok: true, name: 'IDK Browser', origin: `${req.protocol}://${req.get('host')}`, proxy: backend.proxy, scope: '/uv/service/', transport: backend.proxy ? 'Ultraviolet + Wisp' : 'Unavailable' }));
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));
