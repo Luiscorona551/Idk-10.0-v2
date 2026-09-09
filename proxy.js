@@ -60,7 +60,7 @@ const PROXY = (() => {
     }
 
     const registration = await navigator.serviceWorker.register(__uv$config.sw, { scope: __uv$config.prefix });
-    await registration.update().catch(() => {});
+    registration.update().catch(() => {});
     const deadline = Date.now() + 10000;
     while (!registration.active && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 50));
