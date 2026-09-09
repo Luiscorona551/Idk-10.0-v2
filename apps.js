@@ -43,6 +43,8 @@ const WALLPAPER_PRESETS = [
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
 const MOVIE_HISTORY_KEY = 'idkMovieHistory';
+const GAME_FAVORITES_KEY = 'idkGameFavorites';
+const GAME_RECENTS_KEY = 'idkGameRecents';
 
 function applyWallpaper(url) {
   const safeURL = String(url || '').trim().replace(/["\\\r\n]/g, '');
@@ -127,6 +129,12 @@ function openGame(name, title) {
 
 async function gamePlayerApp(options = {}) {
   const root = el('div', { className: 'game-player' });
+  const toolbar = el('div', { className: 'game-player-toolbar' });
+  const status = el('span', { className: 'count', textContent: 'Loading game…' });
+  const reload = el('button', { className: 'btn tab', type: 'button', textContent: 'Reload' });
+  const fullscreen = el('button', { className: 'btn tab', type: 'button', textContent: 'Fullscreen' });
+  const help = el('button', { className: 'btn tab', type: 'button', textContent: 'Controls help' });
+  const helpText = el('p', { className: 'game-controls-help', textContent: 'Click inside the game to focus it. Use browser fullscreen to expand the player. Press Escape to leave fullscreen.', hidden: true });
   const frame = el('iframe', {
     className: 'game-player-frame',
     title: options.title || 'IDK game',
@@ -134,10 +142,27 @@ async function gamePlayerApp(options = {}) {
   });
   frame.setAttribute('allowfullscreen', '');
   frame.setAttribute('referrerpolicy', 'no-referrer');
-  const source = options.src || await gameBlobURL(options.gameName);
-  frame.src = source;
-  root.append(frame);
-  root.cleanup = () => URL.revokeObjectURL(source);
+  toolbar.append(status, reload, fullscreen, help);
+  root.append(toolbar, helpText, frame);
+  let source = options.src || '', generatedSource = false;
+  const load = async () => {
+    status.textContent = 'Loading game…';
+    try {
+      if (generatedSource && source) URL.revokeObjectURL(source);
+      source = options.src || await gameBlobURL(options.gameName);
+      generatedSource = !options.src;
+      frame.src = source;
+      status.textContent = 'Ready';
+    } catch (error) {
+      status.textContent = error?.message || 'Game unavailable.';
+      frame.removeAttribute('src');
+    }
+  };
+  reload.onclick = load;
+  fullscreen.onclick = () => frame.requestFullscreen?.().catch(() => { status.textContent = 'Fullscreen is unavailable in this browser.'; });
+  help.onclick = () => { helpText.hidden = !helpText.hidden; };
+  await load();
+  root.cleanup = () => { if (generatedSource && source) URL.revokeObjectURL(source); };
   return root;
 }
 
@@ -1712,7 +1737,7 @@ const APPS = {
     desktop: true,
     width: 900,
     height: 620,
-    async render() {
+    render: async function gamesRender() {
       const [names, icons] = await Promise.all([
         loadJSON('games.json'),
         loadJSON('game-icons.json').catch(() => ({}))
@@ -1723,23 +1748,43 @@ const APPS = {
         iconURL: gameIconURL(icons[name]),
         search: `${name} ${gameTitle(name)}`.toLowerCase()
       }));
-      return listApp({
-        items,
-        placeholder: 'Search games…',
-        empty: 'No games found.',
-        async onOpen(item, tile) {
-          const title = tile.querySelector('.tile-title');
-          const label = title.textContent;
-          title.textContent = 'Loading…';
-          try {
-             await openGame(item.id, item.title);
-          } catch (err) {
-            alert(err.message);
-          } finally {
-            title.textContent = label;
-          }
-        }
-      });
+      const root = el('div', { className: 'games-app' });
+      const search = el('input', { className: 'field', type: 'search', placeholder: 'Search games…', 'aria-label': 'Search games' });
+      const filter = el('select', { className: 'field', 'aria-label': 'Game list filter' }, [
+        el('option', { value: 'all', textContent: 'All games' }),
+        el('option', { value: 'favorites', textContent: 'Favorites' }),
+        el('option', { value: 'recent', textContent: 'Recently played' })
+      ]);
+      const count = el('span', { className: 'count' });
+      const grid = el('div', { className: 'tile-grid' });
+      const toolbar = el('div', { className: 'toolbar' }, [search, filter, count]);
+      root.append(toolbar, grid);
+      const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
+      const recents = () => store.get(GAME_RECENTS_KEY, []);
+      const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); };
+      const render = () => {
+        const query = search.value.trim().toLowerCase();
+        const saved = favorites();
+        let matches = items.filter(item => !query || item.search.includes(query));
+        if (filter.value === 'favorites') matches = matches.filter(item => saved.has(item.id));
+        if (filter.value === 'recent') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches = matches.filter(item => order.has(item.id)).sort((a, b) => order.get(a.id) - order.get(b.id)); }
+        if (!query && filter.value === 'all') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches.sort((a, b) => (order.has(a.id) ? order.get(a.id) : 9999) - (order.has(b.id) ? order.get(b.id) : 9999)); }
+        grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
+        if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
+        matches.slice(0, 400).forEach(item => {
+          const card = el('article', { className: 'game-tile-card' });
+          const tile = el('button', { className: 'tile', type: 'button' });
+          const icon = el('span', { className: 'tile-icon' });
+          if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
+          const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
+          const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
+          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); render(); };
+          tile.onclick = async () => { title.textContent = 'Loading…'; tile.disabled = true; try { remember(item); await openGame(item.id, item.title); } catch (error) { window.OS?.notify?.('Games', error?.message || 'Game unavailable.', 'danger'); } finally { title.textContent = item.title; tile.disabled = false; } };
+          card.append(tile, favorite); grid.append(card);
+        });
+      };
+      search.oninput = render; filter.onchange = render; render();
+      return root;
     }
   },
 
@@ -2407,3 +2452,4 @@ window.IDKPermissions = {
     setAppPermission(appId, permission, allowed);
   }
 };
+window.IDKGamesUI = { render: APPS.games.render };

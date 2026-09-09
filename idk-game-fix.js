@@ -14,6 +14,7 @@
   };
   const install = () => {
     if (typeof APPS === 'undefined' || !APPS.games || typeof listApp !== 'function') return false;
+    if (window.IDKGamesUI?.render) { APPS.games.render = window.IDKGamesUI.render; return true; }
     APPS.games.render = async () => {
       const [names, icons] = await Promise.all([loadJSON('games.json'), loadJSON('game-icons.json').catch(() => ({}))]);
       const items = names.map(name => ({ id: name, title: typeof gameTitle === 'function' ? gameTitle(name) : name, iconURL: typeof gameIconURL === 'function' ? gameIconURL(icons[name]) : '', search: `${name} ${typeof gameTitle === 'function' ? gameTitle(name) : name}`.toLowerCase() }));

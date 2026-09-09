@@ -71,7 +71,11 @@ function iceServers() {
     return safe.length ? safe : fallback;
   } catch { return fallback; }
 }
-app.get('/api/call/config', (req, res) => res.json({ ok: true, iceServers: iceServers(), activeTransport: 'peer-to-peer', recording: false }));
+app.get('/api/call/config', (req, res) => {
+  const servers = iceServers();
+  const hasTurn = servers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(url => /^turns?:/i.test(String(url))));
+  res.json({ ok: true, iceServers: servers, activeTransport: hasTurn ? 'peer-to-peer + TURN relay' : 'peer-to-peer (STUN fallback)', hasTurn, recording: false, checkedAt: new Date().toISOString() });
+});
 app.get('/api/browser/scope', async (req, res) => res.json({
   ok: true,
   name: 'IDK Browser',

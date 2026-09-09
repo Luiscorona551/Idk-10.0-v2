@@ -1,0 +1,68 @@
+.game-player-toolbar,
+.idk-call-health,
+.idk-release-device-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+.game-player-toolbar {
+  background: color-mix(in srgb, var(--panel-solid, #0d1226) 92%, white 8%);
+  border-bottom: 1px solid color-mix(in srgb, var(--text, #eaf0ff) 12%, transparent);
+  padding: .55rem .7rem;
+}
+
+.game-player-toolbar .count,
+.idk-call-health small {
+  color: var(--muted, #a9b6d6);
+  flex: 1;
+}
+
+.game-controls-help {
+  background: color-mix(in srgb, var(--accent, #5986da) 14%, transparent);
+  margin: 0;
+  padding: .55rem .8rem;
+}
+
+.game-tile-card {
+  min-width: 0;
+  position: relative;
+}
+
+.game-tile-card > .tile {
+  width: 100%;
+}
+
+.game-favorite {
+  background: color-mix(in srgb, var(--panel-solid, #0d1226) 86%, transparent);
+  border: 0;
+  border-radius: 999px;
+  color: var(--accent, #8bb4ff);
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: .35rem .5rem;
+  position: absolute;
+  right: .45rem;
+  top: .45rem;
+}
+
+.idk-call-health {
+  background: color-mix(in srgb, var(--accent, #5986da) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #5986da) 24%, transparent);
+  border-radius: .8rem;
+  margin: .8rem 0;
+  padding: .7rem .8rem;
+}
+
+.idk-call-health > div:first-child {
+  display: grid;
+  gap: .15rem;
+  min-width: 12rem;
+}
+
+.idk-call-health > span {
+  color: var(--muted, #a9b6d6);
+  font-size: .82rem;
+}
