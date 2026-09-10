@@ -21,9 +21,9 @@
     return item;
   };
 
-  const open = id => {
+  const open = (id, options = {}) => {
     if (id === 'sheets') return window.IDKSheets?.open?.();
-    if (typeof APPS !== 'undefined' && APPS[id]) return window.OS?.open?.(id);
+    if (typeof APPS !== 'undefined' && APPS[id]) return window.OS?.open?.(id, options);
     notify('IDK', `${id} is not available in this build.`, 'warning');
   };
   const list = key => {
@@ -146,12 +146,50 @@
   async function fileContents(entry) { if (entry.storage === 'indexeddb' && window.SYSTEM_APPS?.readBlob) { const blob = await window.SYSTEM_APPS.readBlob(entry); if (!blob) return null; const bytes = new Uint8Array(await blob.arrayBuffer()); return { value: entry.text ? await blob.text() : briefDataUrl(bytes), encoding: entry.text ? 'text' : 'base64', size: bytes.length }; } return { value: String(entry.content || ''), encoding: 'text', size: Number(entry.size || 0) }; }
   async function snapshotFile(entry) { const content = await fileContents(entry); if (!content || content.size > 450000) throw new Error('This file is too large for local version history.'); const versions = read(VERSION_KEY, []), version = { id: `version-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, fileId: entry.id, name: entry.name, parent: entry.parent || '', mime: entry.mime || 'text/plain', ...content, at: Date.now() }; versions.unshift(version); try { localStorage.setItem(VERSION_KEY, JSON.stringify(versions.slice(0, 120))); } catch { throw new Error('Local storage is full. Export a backup or remove old versions.'); } return version; }
   async function restoreVersion(version) { if (version.encoding === 'text') return window.SYSTEM_APPS?.writeTextFile?.(version.name, version.value, version.parent, version.mime); return window.SYSTEM_APPS?.writeBlobFile?.(version.name, new Blob([bytesFromBase64(version.value)], { type: version.mime }), version.parent, version.mime, version.fileId); }
-  function versionHistoryApp() {
+  function versionHistoryApp(options = {}) {
     const root = document.createElement('div'); root.className = 'app idk-version-history'; root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK FILES</span><h2>Version History</h2><p>Save local checkpoints and restore an earlier copy of a file without leaving IDK.</p></div><span class="idk-nonchat-badge" data-count></span></header><div class="idk-version-layout"><section><label class="idk-version-label">File<select class="field" data-file></select></label><div class="idk-version-actions"><button class="btn" data-snapshot>Save current version</button><button class="btn tab" data-open>Open Files</button></div><p class="idk-nonchat-status" data-status></p></section><section><div class="idk-version-list" data-list></div></section></div>';
     const select = root.querySelector('[data-file]'), listNode = root.querySelector('[data-list]'), status = root.querySelector('[data-status]');
-    const renderFiles = () => { const entries = files().filter(item => item.type === 'file'); select.replaceChildren(...entries.map(item => Object.assign(document.createElement('option'), { value: item.id, textContent: item.name }))); root.querySelector('[data-count]').textContent = `${read(VERSION_KEY, []).length} saved`; renderVersions(); };
+    const renderFiles = () => { const entries = files().filter(item => item.type === 'file'); select.replaceChildren(...entries.map(item => Object.assign(document.createElement('option'), { value: item.id, textContent: item.name }))); if (options.fileId && entries.some(item => item.id === options.fileId)) select.value = options.fileId; root.querySelector('[data-count]').textContent = `${read(VERSION_KEY, []).length} saved`; renderVersions(); };
     const renderVersions = () => { const id = select.value, items = read(VERSION_KEY, []).filter(item => item.fileId === id); listNode.replaceChildren(...(items.length ? items.map(item => { const row = document.createElement('article'); row.className = 'idk-version-row'; row.innerHTML = `<div><strong>${esc(item.name)}</strong><small>${new Date(item.at).toLocaleString()} · ${Math.round(item.size / 1024)} KB</small></div><div class="idk-versions-actions"></div>`; row.querySelector('.idk-versions-actions').append(button('Restore', async () => { try { await restoreVersion(item); status.textContent = 'Version restored to Files.'; notify('Version History', `${item.name} was restored.`, 'success'); } catch (error) { status.textContent = error.message; } }, 'btn'), button('Delete', () => { localStorage.setItem(VERSION_KEY, JSON.stringify(read(VERSION_KEY, []).filter(value => value.id !== item.id))); renderFiles(); }, 'btn tab')); return row; }) : [Object.assign(document.createElement('p'), { className: 'idk-nonchat-empty', textContent: select.value ? 'No versions saved for this file yet.' : 'Import or create a file first.' })])); };
     select.onchange = renderVersions; root.querySelector('[data-snapshot]').onclick = async () => { const entry = files().find(item => item.id === select.value); if (!entry) return; try { await snapshotFile(entry); status.textContent = 'Current file saved as a new version.'; notify('Version History', `Saved ${entry.name}.`, 'success'); renderFiles(); } catch (error) { status.textContent = error.message; } }; root.querySelector('[data-open]').onclick = () => open('files'); window.addEventListener('idk-data-changed', renderFiles); root.cleanup = () => window.removeEventListener('idk-data-changed', renderFiles); renderFiles(); return root;
+  }
+
+  function wrapApp(id, enhance) {
+    const target = typeof APPS !== 'undefined' && APPS[id];
+    if (!target?.render || target.render.__idkEnhanced) return;
+    const render = target.render;
+    const wrapped = options => { const root = render(options); return enhance(root, options) || root; };
+    wrapped.__idkEnhanced = true;
+    target.render = wrapped;
+  }
+  function enhanceDailyApp(root, kind) {
+    const host = root?.querySelector('.idk-flow-head-actions, .idk-planner-toolbar');
+    if (!host || host.querySelector('[data-idk-daily-tools]')) return root;
+    const add = (label, id, action, className = 'btn tab') => { const item = button(label, action, className); item.dataset.idkDailyTools = id; host.prepend(item); };
+    const notifications = button('Notifications', () => open('notificationCenter'), 'btn tab'); notifications.dataset.idkDailyTools = 'notifications'; host.prepend(notifications);
+    add('Voice capture', 'voice', () => open('voiceCapture'));
+    add('Focus Mode', 'focus', () => open('focusMode'), 'btn');
+    if (kind === 'today') add('Daily Brief', 'brief', () => open('dailyBrief'));
+    const updateNotifications = () => { const count = window.OS?.getActivityHistory?.()?.length || 0; notifications.textContent = count ? `Notifications (${count})` : 'Notifications'; };
+    const cleanup = root.cleanup; window.addEventListener('idk-activity', updateNotifications); root.cleanup = () => { window.removeEventListener('idk-activity', updateNotifications); cleanup?.(); }; updateNotifications();
+    return root;
+  }
+  function enhanceFiles(root) {
+    if (!root || root.dataset.idkFileHistory) return root;
+    root.dataset.idkFileHistory = 'true';
+    const decorate = () => root.querySelectorAll('.file-entry').forEach(row => {
+      if (row.querySelector('[data-idk-history]')) return;
+      const name = row.querySelector('.file-entry-name strong')?.textContent?.trim();
+      const entry = files().find(item => item.type === 'file' && item.name === name);
+      const actions = row.querySelector('.file-entry-actions');
+      if (!entry || !actions) return;
+      const history = button('History', () => open('versionHistory', { fileId: entry.id }), 'btn tab');
+      history.dataset.idkHistory = 'true';
+      actions.append(history);
+    });
+    const observer = new MutationObserver(decorate); observer.observe(root, { childList: true, subtree: true }); decorate();
+    const cleanup = root.cleanup; root.cleanup = () => { observer.disconnect(); cleanup?.(); };
+    return root;
   }
 
   function voiceCaptureApp() {
@@ -412,6 +450,9 @@
     APPS.automationRecipes ||= { title: 'Automation Recipes', glyph: '⚡', desktop: false, dock: false, width: 760, height: 620, render: automationRecipesApp };
     APPS.extensionMarketplace ||= { title: 'Extension Marketplace', glyph: '◇', desktop: false, dock: false, width: 820, height: 640, render: extensionMarketplaceApp };
     APPS.workspaceCenter ||= { title: 'Workspace Center', glyph: '◫', desktop: true, dock: false, width: 980, height: 720, render: workspaceApp };
+    wrapApp('today', root => enhanceDailyApp(root, 'today'));
+    wrapApp('planner', root => enhanceDailyApp(root, 'planner'));
+    wrapApp('files', enhanceFiles);
     const host = document.getElementById('idk-os-next-tools') || document.getElementById('dock');
     if (host && !host.querySelector('[data-idk-workspace-center]')) {
       const launcher = button('◫ Workspace', () => open('workspaceCenter'), 'idk-nonchat-launcher');
@@ -426,6 +467,7 @@
   window.IDKReminders = { check: checkReminders };
   window.IDKFocus = { get: focusState, set: setFocus, start: startFocus, stop: () => setFocus({ enabled: false }) };
   window.IDKVersions = { snapshot: snapshotFile, restore: restoreVersion };
+  window.IDKFileHistory = { open: fileId => open('versionHistory', { fileId }) };
   window.IDKUnifiedSearch = { ...(window.IDKUnifiedSearch || {}), open: openUniversalSearch };
   window.IDKFlowSearch = { ...(window.IDKFlowSearch || {}), open: openUniversalSearch };
   if (window.IDKProductFeatures) window.IDKProductFeatures.unifiedSearch = openUniversalSearch;
