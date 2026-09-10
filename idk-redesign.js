@@ -15,6 +15,7 @@
     games: ['games'],
     files: ['files']
   };
+  const appRegistry = () => (typeof APPS !== 'undefined' ? APPS : {});
 
   const create = (tag, props = {}, children = []) => {
     const node = document.createElement(tag);
@@ -28,7 +29,8 @@
   };
 
   function openApp(id) {
-    const target = (appAliases[id] || [id]).find(candidate => window.APPS?.[candidate]);
+    const apps = appRegistry();
+    const target = (appAliases[id] || [id]).find(candidate => apps[candidate]);
     if (target) window.OS?.open?.(target);
   }
 
@@ -84,7 +86,7 @@
     if (openWindows && !home.dataset.manual) setHomeVisible(false);
     const appCount = home.querySelector('[data-redesign-app-count]');
     const recentCount = home.querySelector('[data-redesign-recent-count]');
-    if (appCount) appCount.textContent = String(Object.keys(window.APPS || {}).length);
+    if (appCount) appCount.textContent = String(Object.keys(appRegistry()).length);
     if (recentCount) recentCount.textContent = String(JSON.parse(localStorage.getItem('recentApps') || '[]').length);
   }
 
