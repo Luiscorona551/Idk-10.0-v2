@@ -15,15 +15,16 @@ const rooms = new Map();
 const userSockets = new Map();
 const calls = new Map();
 
-function room(code) { if (!rooms.has(code)) rooms.set(code, { clients: new Set(), history: [], members: new Map(), bans: new Map(), ownerId: null }); return rooms.get(code); }
+function room(code) { if (!rooms.has(code)) rooms.set(code, { clients: new Set(), history: [], members: new Map(), bans: new Map(), ownerId: null, config: { name: code, theme: 'midnight', readOnlyGuests: false } }); return rooms.get(code); }
 function nickKey(value) { return String(value).trim().toLowerCase(); }
 function send(socket, payload) { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
 function broadcast(code, payload) { const current = rooms.get(code); if (!current) return; if (payload.type === 'message' && !payload.private) { current.history.push(payload); if (current.history.length > MAX_HISTORY) current.history.shift(); } current.clients.forEach(client => send(client, payload)); }
-function users(code) { const current = rooms.get(code); return [...(current?.clients ?? [])].map(client => { const member = current.members.get(client.peerId); return { id: client.peerId, userId: client.userId || null, name: client.nick, role: member?.role || (client.peerId === current.ownerId ? 'owner' : 'member'), mutedUntil: member?.mutedUntil || 0 }; }); }
+function users(code) { const current = rooms.get(code); return [...(current?.clients ?? [])].map(client => { const member = current.members.get(client.peerId); return { id: client.peerId, userId: client.userId || null, name: client.nick, guest: Boolean(member?.guest), role: member?.role || (client.peerId === current.ownerId ? 'owner' : 'member'), mutedUntil: member?.mutedUntil || 0 }; }); }
 function presence(code, text) { const current = rooms.get(code); if (!current) return; broadcast(code, { type: 'presence', text, users: users(code), ownerId: current.ownerId }); }
 function addUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId) || new Set(); sockets.add(socket); userSockets.set(socket.userId, sockets); }
 function removeUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId); sockets?.delete(socket); if (sockets && !sockets.size) userSockets.delete(socket.userId); }
 function callData(value) { if (!value || typeof value !== 'object') return null; try { return JSON.parse(JSON.stringify(value).slice(0, MAX_METADATA)); } catch { return null; } }
+function safeRoomConfig(value, fallback = {}) { const config = value && typeof value === 'object' ? value : {}; return { name: String(config.name || fallback.name || 'IDK Room').trim().slice(0, 40) || 'IDK Room', theme: ['midnight', 'tide', 'sunset', 'graphite'].includes(config.theme) ? config.theme : (fallback.theme || 'midnight'), readOnlyGuests: Boolean(config.readOnlyGuests) }; }
 function sendToUser(userId, payload) { userSockets.get(userId)?.forEach(socket => send(socket, payload)); return Boolean(userSockets.get(userId)?.size); }
 function expireCall(call) { if (calls.get(call.id) !== call) return; calls.delete(call.id); [call.initiator, call.recipient].forEach(userId => sendToUser(userId, { type: 'call', action: 'expired', callId: call.id })); }
 function scheduleCall(call, active = false) { clearTimeout(call.expiry); call.phase = active ? 'active' : 'ringing'; call.expiresAt = Date.now() + (active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry = setTimeout(() => expireCall(call), active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry.unref?.(); }
@@ -78,19 +79,32 @@ chat.on('connection', (socket, req) => {
       const target = room(code);
       if (target.clients.size >= MAX_PER_ROOM) return send(socket, { type: 'error', text: 'That room is full.' });
       if (target.bans.has(nickKey(nick))) { send(socket, { type: 'error', text: 'You are banned from that room.' }); return socket.close(4003, 'Banned'); }
-      socket.code = code; socket.nick = nick;
-      if (!target.ownerId) target.ownerId = socket.peerId;
-      target.members.set(socket.peerId, { id: socket.peerId, name: nick, role: target.ownerId === socket.peerId ? 'owner' : 'member', mutedUntil: 0 });
+       socket.code = code; socket.nick = nick;
+       if (!target.ownerId) { target.ownerId = socket.peerId; target.config = safeRoomConfig(data.roomConfig, target.config); }
+       target.members.set(socket.peerId, { id: socket.peerId, name: nick, guest: Boolean(data.guestMode), role: target.ownerId === socket.peerId ? 'owner' : 'member', mutedUntil: 0 });
       target.clients.add(socket);
       if (accountDbEnabled()) { try { target.history = await dbRoomHistory(code); } catch {} }
-      send(socket, { type: 'joined', room: code, name: nick, peerId: socket.peerId, userId: socket.userId, role: target.members.get(socket.peerId).role, ownerId: target.ownerId, history: target.history, users: users(code) });
+       send(socket, { type: 'joined', room: code, name: nick, peerId: socket.peerId, userId: socket.userId, role: target.members.get(socket.peerId).role, ownerId: target.ownerId, config: target.config, history: target.history, users: users(code) });
       presence(code, `${nick} joined`);
       return;
     }
 
-    if (data.type === 'message' && socket.code) {
-      const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
-      if (member?.mutedUntil > Date.now()) return send(socket, { type: 'error', text: `You are muted for ${Math.ceil((member.mutedUntil - Date.now()) / 60000)} more minute(s).` });
+     if (data.type === 'room-config' && socket.code) {
+       const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
+       if (!current || member?.role !== 'owner') return send(socket, { type: 'error', text: 'Only the room host can change room settings.' });
+       current.config = safeRoomConfig(data.config, current.config); broadcast(socket.code, { type: 'room-config', config: current.config }); return;
+     }
+
+     if (data.type === 'workspace-share' && socket.code) {
+       const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
+       if (!current || (member?.guest && current.config.readOnlyGuests)) return send(socket, { type: 'error', text: 'Guests cannot share workspace details in this room.' });
+       broadcast(socket.code, { type: 'workspace-share', name: socket.nick, userId: socket.userId || null, workspace: callData(data.workspace) || {} }); return;
+     }
+
+     if (data.type === 'message' && socket.code) {
+       const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
+       if (member?.mutedUntil > Date.now()) return send(socket, { type: 'error', text: `You are muted for ${Math.ceil((member.mutedUntil - Date.now()) / 60000)} more minute(s).` });
+       if (member?.guest && current.config.readOnlyGuests) return send(socket, { type: 'error', text: 'Guest view mode is enabled for this room.' });
       const text = String(data.text ?? '').trim().slice(0, MAX_MESSAGE); if (!text && !data.attachments?.length) return;
       const metadata = messageMeta(data), payload = { type: 'message', id: randomUUID(), name: socket.nick, userId: socket.userId || null, text, at: Date.now(), ...metadata };
       if (socket.userId) { const pool = getAccountPool(); try { await pool.query('INSERT INTO idk_room_messages(id,room_code,sender_user_id,sender_name,text,metadata,private) VALUES($1,$2,$3,$4,$5,$6,FALSE)', [payload.id, socket.code, socket.userId, socket.nick, text, metadata]); } catch {} }
