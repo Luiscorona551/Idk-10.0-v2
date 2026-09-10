@@ -88,6 +88,20 @@
     button?.setAttribute('aria-expanded', String(open));
   }
 
+  function enhanceAccountSurfaces() {
+    const account = document.querySelector('#idk-account-overlay .idk-account-card');
+    if (account && !account.dataset.idkRedesign) {
+      account.dataset.idkRedesign = '1';
+      account.insertBefore(create('span', { class: 'idk-account-kicker', text: 'IDK 10.0 / account' }), account.firstElementChild);
+    }
+    const onboarding = document.getElementById('idk-onboarding');
+    const content = onboarding?.querySelector('.idk-modal-content');
+    if (content && !content.dataset.idkRedesign) {
+      content.dataset.idkRedesign = '1';
+      content.insertBefore(create('span', { class: 'idk-onboarding-kicker', text: 'IDK 10.0 / getting started' }), content.firstElementChild);
+    }
+  }
+
   function sync() {
     const home = document.getElementById('idk-redesign-home');
     if (!home) return;
@@ -103,9 +117,11 @@
     document.body.classList.add('idk-redesign');
     createNav();
     createHome();
+    enhanceAccountSurfaces();
     sync();
     document.addEventListener('idk-recent-changed', sync);
     new MutationObserver(sync).observe(document.getElementById('windows') || document.body, { childList: true, subtree: true });
+    new MutationObserver(enhanceAccountSurfaces).observe(document.body, { childList: true, subtree: true });
     window.IDKRedesign = { openApp, showHome: () => { const home = document.getElementById('idk-redesign-home'); if (home) home.dataset.manual = '1'; setHomeVisible(true); } };
   }
 
