@@ -78,6 +78,7 @@
 
   function install() {
     if (typeof APPS !== 'undefined') APPS.rooms ||= { title: 'IDK Rooms', glyph: '◌', desktop: true, dock: false, width: 980, height: 700, render: roomApp };
+    else return setTimeout(install, 250);
     const hash = location.hash.match(/^#room=([A-Za-z0-9]+)/); if (hash) setTimeout(() => open('rooms', { roomCode: hash[1].toUpperCase() }), 300);
   }
 

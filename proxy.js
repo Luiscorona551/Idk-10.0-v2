@@ -38,6 +38,7 @@ const PROXY = (() => {
   return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
 })();
 (async () => {
+  if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
   const files = ['/idk-batch-fourteen.css', '/idk-game-fix.js', '/idk-batch-fourteen.js', '/idk-batch-sixteen.js', '/idk-release-batch.css', '/idk-release-next.js', '/idk-redesign.css', '/idk-redesign.js', '/idk-all-six.css', '/idk-all-six.js', '/idk-rooms.css', '/idk-rooms.js'];
   for (const src of files) try {
     if (src.endsWith('.css')) { const existing = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => new URL(link.href, location.href).pathname === src); if (!existing) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = src; document.head.append(link); } }
