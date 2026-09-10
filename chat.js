@@ -71,7 +71,7 @@ chat.on('connection', (socket, req) => {
 
     if (data.type === 'join') {
       if (socket.code) return send(socket, { type: 'error', text: 'You are already in a room.' });
-      if (accountDbEnabled() && !socket.userId) return send(socket, { type: 'error', text: 'Sign in to IDK Messenger first.' });
+       if (accountDbEnabled() && !socket.userId && !data.guestMode) return send(socket, { type: 'error', text: 'Sign in to IDK Messenger first.' });
       const code = String(data.room ?? '').trim().toLowerCase().slice(0, 32);
       const requestedNick = String(data.name ?? '').trim().slice(0, 24);
       const nick = socket.userId ? (requestedNick || 'IDK user') : (requestedNick || 'anon');
@@ -97,7 +97,7 @@ chat.on('connection', (socket, req) => {
 
      if (data.type === 'workspace-share' && socket.code) {
        const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
-       if (!current || (member?.guest && current.config.readOnlyGuests)) return send(socket, { type: 'error', text: 'Guests cannot share workspace details in this room.' });
+       if (!current || (member?.guest && member.role !== 'owner' && current.config.readOnlyGuests)) return send(socket, { type: 'error', text: 'Guests cannot share workspace details in this room.' });
        broadcast(socket.code, { type: 'workspace-share', name: socket.nick, userId: socket.userId || null, workspace: callData(data.workspace) || {} }); return;
      }
 
