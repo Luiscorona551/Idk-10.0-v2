@@ -4,6 +4,7 @@
   const PROFILE_KEY = 'idkMessengerProfile';
   const readProfile = () => { try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; } catch { return {}; } };
   const saveProfile = value => { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(value)); } catch {} };
+  const currentPresence = () => window.IDKPresence?.get?.() || { status: 'online', message: '' };
   let socket = null, controller = null, pendingTarget = null;
 
   function addStyles() {
@@ -86,7 +87,7 @@
     function renderUsers() {
       const query = memberSearch.value.trim().toLowerCase(); members.replaceChildren(); const visible = state.users.filter(user => !query || user.name.toLowerCase().includes(query));
       if (!visible.length) { members.append(Object.assign(document.createElement('span'), { className: 'muted', textContent: state.users.length ? 'No matching people.' : 'No one else is connected.' })); return; }
-      visible.forEach(user => { const isSelf = user.id === state.mePeerId || Boolean(state.meUserId && user.userId === state.meUserId); const button = document.createElement('button'); button.type = 'button'; button.className = 'idk-live-member' + ((state.selectedUserId && state.selectedUserId === user.userId) || (!state.selectedUserId && state.selected === user.id) ? ' selected' : ''); button.innerHTML = `<span class="idk-live-dot"></span><span><strong>${esc(user.name)}</strong><small>${user.id === state.selected ? 'Selected' : isSelf ? 'You' : 'Online'}</small></span>`; if (!isSelf) button.onclick = () => selectTarget(user); members.append(button); });
+       visible.forEach(user => { const isSelf = user.id === state.mePeerId || Boolean(state.meUserId && user.userId === state.meUserId), userPresence = user.presence || {}; const button = document.createElement('button'); button.type = 'button'; button.className = 'idk-live-member' + ((state.selectedUserId && state.selectedUserId === user.userId) || (!state.selectedUserId && state.selected === user.id) ? ' selected' : ''); button.innerHTML = `<span class="idk-live-dot idk-live-dot-${esc(userPresence.status || 'online')}"></span><span><strong>${esc(user.name)}</strong><small>${user.id === state.selected ? 'Selected' : isSelf ? 'You' : userPresence.status || 'Online'}${userPresence.message ? ` · ${esc(userPresence.message)}` : ''}</small></span>`; if (!isSelf) button.onclick = () => selectTarget(user); members.append(button); });
       if (pendingTarget) { const target = pendingTarget; pendingTarget = null; selectTarget(target); }
     }
 
@@ -110,7 +111,7 @@
     }
 
     function connect() {
-      const requestedName = accountUser?.username || name.value.trim() || 'anon'; const requestedRoom = room.value.trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 32) || 'general'; saveProfile({ name: requestedName, room: requestedRoom }); state.room = requestedRoom; roomTitle.textContent = requestedRoom; status.textContent = 'Connecting…'; if (socket) socket.close(); const thisConnection = ++connectionId; state.joined = false; state.users = []; const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; socket = new WebSocket(`${protocol}://${location.host}/chat`); socket.addEventListener('open', () => { if (thisConnection === connectionId) send({ type: 'join', name: requestedName, room: requestedRoom }); }); socket.addEventListener('message', event => { if (thisConnection !== connectionId) return; let data; try { data = JSON.parse(event.data); } catch { return; } handleMessage(data); }); socket.addEventListener('close', () => { if (thisConnection !== connectionId) return; state.joined = false; state.users = []; renderUsers(); status.textContent = 'Offline'; });
+       const requestedName = accountUser?.username || name.value.trim() || 'anon'; const requestedRoom = room.value.trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 32) || 'general'; saveProfile({ name: requestedName, room: requestedRoom }); state.room = requestedRoom; roomTitle.textContent = requestedRoom; status.textContent = 'Connecting…'; if (socket) socket.close(); const thisConnection = ++connectionId; state.joined = false; state.users = []; const protocol = location.protocol === 'https:' ? 'wss' : 'ws'; socket = new WebSocket(`${protocol}://${location.host}/chat`); socket.addEventListener('open', () => { if (thisConnection === connectionId) send({ type: 'join', name: requestedName, room: requestedRoom, presence: currentPresence() }); }); socket.addEventListener('message', event => { if (thisConnection !== connectionId) return; let data; try { data = JSON.parse(event.data); } catch { return; } handleMessage(data); }); socket.addEventListener('close', () => { if (thisConnection !== connectionId) return; state.joined = false; state.users = []; renderUsers(); status.textContent = 'Offline'; });
     }
 
     function emitTyping(kind, active) { const privateMessage = kind === 'dm'; if (!state.joined || (privateMessage && !state.selected)) return; send({ type: 'typing', private: privateMessage, targetId: privateMessage ? state.selected : '', typing: Boolean(active) }); }
@@ -124,7 +125,9 @@
        input.addEventListener('input', () => { renderSuggestions(); if (!input.value.trim()) { state.localTyping[kind] = false; emitTyping(kind, false); return; } if (!state.localTyping[kind]) { state.localTyping[kind] = true; emitTyping(kind, true); } clearTimeout(state.typingTimers[`local-${kind}`]); state.typingTimers[`local-${kind}`] = setTimeout(() => { state.localTyping[kind] = false; emitTyping(kind, false); }, 1300); });
      }
 
-    root.querySelector('.idk-live-close').onclick = () => { overlay.remove(); if (socket) { socket.close(); socket = null; } controller = null; };
+     const presenceChanged = () => send({ type: 'presence-update', presence: currentPresence() });
+     window.addEventListener('idk-presence-changed', presenceChanged);
+     root.querySelector('.idk-live-close').onclick = () => { window.removeEventListener('idk-presence-changed', presenceChanged); overlay.remove(); if (socket) { socket.close(); socket = null; } controller = null; };
     root.querySelector('[data-m-connect]').onclick = connect; memberSearch.oninput = renderUsers; bindComposer(root.querySelector('[data-room-form]'), 'room'); bindComposer(root.querySelector('[data-dm-form]'), 'dm');
     tabs.forEach(tab => tab.onclick = () => { tabs.forEach(item => item.classList.toggle('active', item === tab)); panes.forEach(pane => { pane.hidden = pane.dataset.pane !== tab.dataset.tab; }); if (tab.dataset.tab === 'room') { state.unreadRoom = 0; setBadge(roomBadge, 0); } else { state.unreadDm = 0; setBadge(dmBadge, 0); } });
     controller = { selectUser: selectTarget }; if (accountUser?.username || profile.name || initialTarget) setTimeout(connect, 80); else name.focus(); if (initialTarget) pendingTarget = initialTarget;

@@ -80,7 +80,7 @@
     render(); return root;
   }
 
-  function installSearch() { window.IDKFlowSearch = { open: openSearch }; window.IDKUnifiedSearch = { ...(window.IDKUnifiedSearch || {}), open: openSearch }; if (window.IDKProductFeatures) window.IDKProductFeatures.unifiedSearch = openSearch; document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); event.stopImmediatePropagation(); openSearch(); } }, true); }
+  function installSearch() { window.IDKFlowSearch = { open: openSearch }; window.IDKUnifiedSearch = { ...(window.IDKUnifiedSearch || {}), open: openSearch }; if (window.IDKProductFeatures) window.IDKProductFeatures.unifiedSearch = openSearch; document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); event.stopImmediatePropagation(); window.IDKUnifiedSearch?.open?.() || openSearch(); } }, true); }
   function install() { injectStyle(); if (typeof APPS !== 'undefined') { APPS.today = { title: 'Today', glyph: '◷', desktop: true, dock: false, width: 920, height: 680, render: todayApp }; APPS.transfer = { title: 'Transfer Center', glyph: '⇄', desktop: false, dock: false, width: 900, height: 650, render: transferApp }; } installSearch(); }
   window.IDKBatchTen = { today: todayApp, transfer: transferApp, search: openSearch, snapshot, applyTransfer };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
