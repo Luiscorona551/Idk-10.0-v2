@@ -34,6 +34,9 @@
   const queueSize = () => list('idkOfflineQueue').length + list('idkCloudSyncQueue').length;
   const app = (id, title, glyph, detail, action = () => open(id)) => ({ id, title, glyph, detail, action });
   const PRESENCE_KEY = 'idkPresence';
+  const FOCUS_KEY = 'idkFocusModeState';
+  const VERSION_KEY = 'idkFileVersions';
+  const EXTENSION_KEY = 'idkEnabledExtensions';
 
   const today = () => {
     const date = new Date();
@@ -93,6 +96,79 @@
     window.setInterval(checkReminders, 30000);
     window.addEventListener('idk-data-changed', checkReminders);
     window.addEventListener('visibilitychange', checkReminders);
+  }
+
+  const focusState = () => ({ enabled: false, mode: 'deep', endsAt: 0, apps: ['notes', 'planner'], ...read(FOCUS_KEY, {}) });
+  function setFocus(next = {}) {
+    const current = focusState(), enabled = Boolean(next.enabled ?? current.enabled), endsAt = enabled ? Number(next.endsAt || current.endsAt || Date.now() + 50 * 60000) : 0;
+    const value = { ...current, ...next, enabled, endsAt, apps: Array.isArray(next.apps || current.apps) ? [...new Set(next.apps || current.apps)].slice(0, 6) : current.apps };
+    try { localStorage.setItem(FOCUS_KEY, JSON.stringify(value)); } catch {}
+    if (enabled) setPresence({ status: 'busy', message: `Focused · ${value.mode}` });
+    else if (presenceState().message.startsWith('Focused')) setPresence({ status: 'online', message: '' });
+    window.dispatchEvent(new CustomEvent('idk-focus-changed', { detail: value }));
+    return value;
+  }
+  function startFocus(minutes = 50, mode = 'deep', apps = focusState().apps) {
+    const value = setFocus({ enabled: true, mode, apps, endsAt: Date.now() + Math.max(5, Number(minutes) || 50) * 60000 });
+    value.apps.forEach((id, index) => setTimeout(() => open(id), index * 180));
+    notify('Focus Mode', `${presenceLabel('busy')} for ${Math.round((value.endsAt - Date.now()) / 60000)} minutes.`, 'success');
+    return value;
+  }
+  function tickFocus() { const current = focusState(); if (current.enabled && current.endsAt && current.endsAt <= Date.now()) { setFocus({ enabled: false }); notify('Focus Mode', 'Your focus session is complete.', 'success'); } }
+  function installFocusScheduler() { tickFocus(); window.setInterval(tickFocus, 30000); window.addEventListener('visibilitychange', tickFocus); }
+
+  function notificationCenterApp() {
+    const root = document.createElement('div'); root.className = 'app idk-notification-center';
+    root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK INBOX</span><h2>Notifications Center</h2><p>System updates, reminders, messages, and workspace activity in one place.</p></div><span class="idk-nonchat-badge" data-count></span></header><div class="idk-notification-toolbar"><button class="btn tab" data-refresh>Refresh</button><button class="btn tab" data-clear>Clear history</button><button class="btn" data-settings>Notification settings</button></div><div class="idk-notification-list" data-list></div>';
+    const listNode = root.querySelector('[data-list]');
+    const render = () => { const items = window.OS?.getActivityHistory?.() || []; root.querySelector('[data-count]').textContent = `${items.length} saved`; listNode.replaceChildren(...(items.length ? items.map(item => { const row = document.createElement('article'); row.className = `idk-notification-row ${esc(item.kind || 'info')}`; row.innerHTML = `<div><strong>${esc(item.title)}</strong><p>${esc(item.message)}</p></div><time>${new Date(item.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time>`; return row; }) : [Object.assign(document.createElement('p'), { className: 'idk-nonchat-empty', textContent: 'You are all caught up.' })])); };
+    root.querySelector('[data-refresh]').onclick = render; root.querySelector('[data-clear]').onclick = () => { window.OS?.clearActivity?.(); render(); notify('Notifications', 'Notification history cleared.', 'success'); }; root.querySelector('[data-settings]').onclick = () => open('settings'); window.addEventListener('idk-activity', render); root.cleanup = () => window.removeEventListener('idk-activity', render); render(); return root;
+  }
+
+  function dailyBriefApp() {
+    const root = document.createElement('div'); root.className = 'app idk-daily-brief';
+    root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK MORNING DESK</span><h2>Daily Brief</h2><p>A short, useful summary of what deserves your attention today.</p></div><span class="idk-nonchat-badge" data-date></span></header><div class="idk-brief-grid" data-grid></div><div class="idk-nonchat-actions"><button class="btn" data-focus>Start Focus Mode</button><button class="btn tab" data-today>Open Today</button><button class="btn tab" data-notifications>Notifications</button></div>';
+    const grid = root.querySelector('[data-grid]');
+    const render = () => { const tasks = list('idkTodos').filter(item => !item.done), due = tasks.filter(item => item.due && item.due <= today()), events = list('idkCalendarEvents').filter(item => item.date === today()), notes = list('idkRichNotes').filter(item => !item.trashed).slice(0, 3), activity = window.OS?.getActivityHistory?.() || []; root.querySelector('[data-date]').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }); const item = (title, value, detail, action) => { const node = document.createElement('article'); node.className = 'idk-brief-card'; node.innerHTML = `<strong>${esc(value)}</strong><span>${esc(title)}</span><small>${esc(detail)}</small>`; if (action) node.append(button('Open', action, 'btn tab')); return node; }; grid.replaceChildren(item('Open tasks', tasks.length, due.length ? `${due.length} due or overdue` : 'Nothing due today', () => open('planner')), item('Today’s reminders', events.length, events.length ? events.map(value => value.title).slice(0, 2).join(' · ') : 'Your calendar is clear', () => open('calendar')), item('Unread activity', activity.length, activity[0]?.title || 'No recent alerts', () => open('notificationCenter')), item('Recent notes', notes.length, notes[0]?.title || 'No notes waiting', () => open('notes'))); };
+    root.querySelector('[data-focus]').onclick = () => startFocus(50, 'deep'); root.querySelector('[data-today]').onclick = () => open(typeof APPS !== 'undefined' && APPS.today ? 'today' : 'planner'); root.querySelector('[data-notifications]').onclick = () => open('notificationCenter'); window.addEventListener('idk-data-changed', render); window.addEventListener('idk-activity', render); root.cleanup = () => { window.removeEventListener('idk-data-changed', render); window.removeEventListener('idk-activity', render); }; render(); return root;
+  }
+
+  function focusModeApp() {
+    const current = focusState(), root = document.createElement('div'); root.className = 'app idk-focus-mode';
+    root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK FOCUS</span><h2>Focus Mode</h2><p>Quiet the desktop, set your presence to busy, and keep the work that matters in view.</p></div><span class="idk-nonchat-badge" data-state></span></header><div class="idk-focus-timer" data-timer></div><div class="idk-focus-form"><label>Session<select class="field" data-minutes><option value="25">25 minutes</option><option value="50">50 minutes</option><option value="90">90 minutes</option><option value="120">2 hours</option></select></label><label>Mode<select class="field" data-mode><option value="deep">Deep work</option><option value="study">Study</option><option value="creative">Creative</option><option value="private">Private session</option></select></label></div><div class="idk-focus-apps"><strong>Open with focus</strong><label><input type="checkbox" value="notes" checked> Notes</label><label><input type="checkbox" value="planner" checked> Planner</label><label><input type="checkbox" value="dashboard"> Dashboard</label><label><input type="checkbox" value="timer"> Timer</label></div><div class="idk-nonchat-actions"><button class="btn" data-start>Start focus</button><button class="btn tab" data-end>End session</button></div><p class="idk-nonchat-status" data-status></p>';
+    const timer = root.querySelector('[data-timer]'), stateBadge = root.querySelector('[data-state]'), status = root.querySelector('[data-status]');
+    const render = () => { const value = focusState(), remaining = Math.max(0, value.endsAt - Date.now()); stateBadge.textContent = value.enabled ? 'ACTIVE' : 'READY'; timer.textContent = value.enabled ? `${String(Math.floor(remaining / 60000)).padStart(2, '0')}:${String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0')}` : '00:00'; status.textContent = value.enabled ? `Presence is busy · ${value.mode} · ends ${new Date(value.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Start a session when you want fewer distractions.'; };
+    root.querySelector('[data-start]').onclick = () => { const apps = [...root.querySelectorAll('.idk-focus-apps input:checked')].map(item => item.value); startFocus(Number(root.querySelector('[data-minutes]').value), root.querySelector('[data-mode]').value, apps); render(); }; root.querySelector('[data-end]').onclick = () => { setFocus({ enabled: false }); render(); }; window.addEventListener('idk-focus-changed', render); const interval = window.setInterval(render, 1000); root.cleanup = () => { clearInterval(interval); window.removeEventListener('idk-focus-changed', render); }; render(); return root;
+  }
+
+  function briefDataUrl(data) { const bytes = new Uint8Array(data), chunk = 0x8000; let binary = ''; for (let index = 0; index < bytes.length; index += chunk) binary += String.fromCharCode(...bytes.subarray(index, index + chunk)); return btoa(binary); }
+  function bytesFromBase64(value) { const binary = atob(value || ''); return Uint8Array.from(binary, char => char.charCodeAt(0)); }
+  async function fileContents(entry) { if (entry.storage === 'indexeddb' && window.SYSTEM_APPS?.readBlob) { const blob = await window.SYSTEM_APPS.readBlob(entry); if (!blob) return null; const bytes = new Uint8Array(await blob.arrayBuffer()); return { value: entry.text ? await blob.text() : briefDataUrl(bytes), encoding: entry.text ? 'text' : 'base64', size: bytes.length }; } return { value: String(entry.content || ''), encoding: 'text', size: Number(entry.size || 0) }; }
+  async function snapshotFile(entry) { const content = await fileContents(entry); if (!content || content.size > 450000) throw new Error('This file is too large for local version history.'); const versions = read(VERSION_KEY, []), version = { id: `version-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, fileId: entry.id, name: entry.name, parent: entry.parent || '', mime: entry.mime || 'text/plain', ...content, at: Date.now() }; versions.unshift(version); try { localStorage.setItem(VERSION_KEY, JSON.stringify(versions.slice(0, 120))); } catch { throw new Error('Local storage is full. Export a backup or remove old versions.'); } return version; }
+  async function restoreVersion(version) { if (version.encoding === 'text') return window.SYSTEM_APPS?.writeTextFile?.(version.name, version.value, version.parent, version.mime); return window.SYSTEM_APPS?.writeBlobFile?.(version.name, new Blob([bytesFromBase64(version.value)], { type: version.mime }), version.parent, version.mime, version.fileId); }
+  function versionHistoryApp() {
+    const root = document.createElement('div'); root.className = 'app idk-version-history'; root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK FILES</span><h2>Version History</h2><p>Save local checkpoints and restore an earlier copy of a file without leaving IDK.</p></div><span class="idk-nonchat-badge" data-count></span></header><div class="idk-version-layout"><section><label class="idk-version-label">File<select class="field" data-file></select></label><div class="idk-version-actions"><button class="btn" data-snapshot>Save current version</button><button class="btn tab" data-open>Open Files</button></div><p class="idk-nonchat-status" data-status></p></section><section><div class="idk-version-list" data-list></div></section></div>';
+    const select = root.querySelector('[data-file]'), listNode = root.querySelector('[data-list]'), status = root.querySelector('[data-status]');
+    const renderFiles = () => { const entries = files().filter(item => item.type === 'file'); select.replaceChildren(...entries.map(item => Object.assign(document.createElement('option'), { value: item.id, textContent: item.name }))); root.querySelector('[data-count]').textContent = `${read(VERSION_KEY, []).length} saved`; renderVersions(); };
+    const renderVersions = () => { const id = select.value, items = read(VERSION_KEY, []).filter(item => item.fileId === id); listNode.replaceChildren(...(items.length ? items.map(item => { const row = document.createElement('article'); row.className = 'idk-version-row'; row.innerHTML = `<div><strong>${esc(item.name)}</strong><small>${new Date(item.at).toLocaleString()} · ${Math.round(item.size / 1024)} KB</small></div><div class="idk-versions-actions"></div>`; row.querySelector('.idk-versions-actions').append(button('Restore', async () => { try { await restoreVersion(item); status.textContent = 'Version restored to Files.'; notify('Version History', `${item.name} was restored.`, 'success'); } catch (error) { status.textContent = error.message; } }, 'btn'), button('Delete', () => { localStorage.setItem(VERSION_KEY, JSON.stringify(read(VERSION_KEY, []).filter(value => value.id !== item.id))); renderFiles(); }, 'btn tab')); return row; }) : [Object.assign(document.createElement('p'), { className: 'idk-nonchat-empty', textContent: select.value ? 'No versions saved for this file yet.' : 'Import or create a file first.' })])); };
+    select.onchange = renderVersions; root.querySelector('[data-snapshot]').onclick = async () => { const entry = files().find(item => item.id === select.value); if (!entry) return; try { await snapshotFile(entry); status.textContent = 'Current file saved as a new version.'; notify('Version History', `Saved ${entry.name}.`, 'success'); renderFiles(); } catch (error) { status.textContent = error.message; } }; root.querySelector('[data-open]').onclick = () => open('files'); window.addEventListener('idk-data-changed', renderFiles); root.cleanup = () => window.removeEventListener('idk-data-changed', renderFiles); renderFiles(); return root;
+  }
+
+  function voiceCaptureApp() {
+    const root = document.createElement('div'); root.className = 'app idk-voice-capture'; root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK QUICK CAPTURE</span><h2>Voice Capture</h2><p>Speak a task, note, or reminder and save it locally in one tap.</p></div><span class="idk-nonchat-badge" data-state>READY</span></header><div class="idk-voice-form"><label>Save as<select class="field" data-type><option value="task">Task</option><option value="note">Note</option><option value="event">Reminder</option></select></label><textarea class="field" data-text rows="6" placeholder="Your transcript will appear here…"></textarea><div class="idk-nonchat-actions"><button class="btn" data-record>Start listening</button><button class="btn tab" data-save>Save capture</button></div></div><p class="idk-nonchat-status" data-status></p>';
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition, text = root.querySelector('[data-text]'), record = root.querySelector('[data-record]'), state = root.querySelector('[data-state]'), status = root.querySelector('[data-status]'); let recognition = null;
+    if (!Recognition) { state.textContent = 'UNAVAILABLE'; status.textContent = 'Voice capture needs a browser with speech recognition. You can still type and save a capture.'; } else { recognition = new Recognition(); recognition.continuous = false; recognition.interimResults = true; recognition.lang = navigator.language || 'en-US'; recognition.onstart = () => { state.textContent = 'LISTENING'; record.textContent = 'Stop listening'; }; recognition.onresult = event => { text.value = [...event.results].map(result => result[0].transcript).join(''); }; recognition.onerror = event => { status.textContent = `Voice capture: ${event.error}.`; state.textContent = 'READY'; record.textContent = 'Start listening'; }; recognition.onend = () => { state.textContent = 'READY'; record.textContent = 'Start listening'; }; }
+    record.onclick = () => { if (!recognition) return text.focus(); try { recognition.start(); } catch { recognition.stop(); } }; root.querySelector('[data-save]').onclick = () => { const value = text.value.trim(); if (!value) return status.textContent = 'Speak or type something first.'; const type = root.querySelector('[data-type]').value; if (type === 'task') { const items = list('idkTodos'); items.unshift({ id: `task-${Date.now()}`, text: value, done: false, priority: 'normal', due: today(), repeat: 'none', added: Date.now(), completed: 0 }); localStorage.setItem('idkTodos', JSON.stringify(items)); } else if (type === 'note') { const items = list('idkRichNotes'); items.unshift({ id: `note-${Date.now()}`, title: value.slice(0, 64), text: value, tags: 'voice', folder: 'Personal', trashed: false, updated: Date.now() }); localStorage.setItem('idkRichNotes', JSON.stringify(items)); } else { const items = list('idkCalendarEvents'); items.unshift({ id: `event-${Date.now()}`, title: value, date: today(), time: '', repeat: 'none', reminded: false }); localStorage.setItem('idkCalendarEvents', JSON.stringify(items)); } window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type } })); notify('Quick Capture', `${type[0].toUpperCase() + type.slice(1)} saved.`, 'success'); text.value = ''; status.textContent = 'Capture saved locally.'; }; return root;
+  }
+
+  function automationRecipesApp() {
+    const root = document.createElement('div'); root.className = 'app idk-automation-recipes'; root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK AUTOMATIONS</span><h2>Automation Recipes</h2><p>Start with a useful recipe, then customize it in Echo Automations.</p></div><span class="idk-nonchat-badge">LOCAL FIRST</span></header><div class="idk-recipe-grid" data-list></div><div class="idk-nonchat-actions"><button class="btn" data-manager>Open Echo Automations</button></div><p class="idk-nonchat-status" data-status></p>';
+    const recipes = [{ name: 'Deep Work', detail: 'Start Focus Mode for 50 minutes with Notes and Planner.', action: 'focus', minutes: 50 }, { name: 'Morning Brief', detail: 'Open Daily Brief and Notifications Center.', action: 'brief' }, { name: 'Backup before travel', detail: 'Open Backup & Restore before you leave.', action: 'backup' }, { name: 'Quiet evening', detail: 'Set your presence to away and open your dashboard.', action: 'evening' }]; const listNode = root.querySelector('[data-list]'); recipes.forEach(recipe => { const card = document.createElement('article'); card.className = 'idk-recipe-card'; card.innerHTML = `<div><strong>${esc(recipe.name)}</strong><small>${esc(recipe.detail)}</small></div>`; card.append(button('Run', () => { if (recipe.action === 'focus') startFocus(recipe.minutes); else if (recipe.action === 'brief') { open('dailyBrief'); open('notificationCenter'); } else if (recipe.action === 'backup') window.IDKPerfectOS?.exportBackup?.() || window.IDKBackup?.open?.(); else { setPresence({ status: 'away', message: 'Quiet evening' }); open('dashboard'); } }, 'btn')); listNode.append(card); }); root.querySelector('[data-manager]').onclick = () => window.IDKPlatformNext?.openAutomationManager?.() || open('settings'); root.querySelector('[data-status]').textContent = 'Recipes run locally. Nothing is sent to a server unless you choose account sync.'; return root;
+  }
+
+  function extensionMarketplaceApp() {
+    const enabled = read(EXTENSION_KEY, []), root = document.createElement('div'); root.className = 'app idk-extension-marketplace'; root.innerHTML = '<header class="idk-nonchat-head"><div><span class="idk-nonchat-kicker">IDK ECOSYSTEM</span><h2>Extension Marketplace</h2><p>Discover safe IDK capabilities. Built-in extensions never get more access than the features they use.</p></div><span class="idk-nonchat-badge">PERMISSION AWARE</span></header><div class="idk-extension-grid" data-list></div><div class="idk-nonchat-actions"><button class="btn" data-store>Open App Store</button><button class="btn tab" data-permissions>Review permissions</button></div>';
+    const catalog = [{ id: 'focus', title: 'Focus Pack', detail: 'Focus sessions, presence, and workspace launch.', permissions: 'local workspace, notifications' }, { id: 'brief', title: 'Daily Brief', detail: 'A calm start-of-day summary.', permissions: 'local tasks, calendar, activity' }, { id: 'capture', title: 'Voice Capture', detail: 'Speech-to-task, note, or reminder.', permissions: 'microphone only when recording' }, { id: 'versions', title: 'File History', detail: 'Local file checkpoints and restore.', permissions: 'local Files only' }]; const listNode = root.querySelector('[data-list]'); catalog.forEach(item => { const card = document.createElement('article'); card.className = 'idk-extension-card'; card.innerHTML = `<div><strong>${esc(item.title)}</strong><p>${esc(item.detail)}</p><small>${esc(item.permissions)}</small></div><button class="btn ${enabled.includes(item.id) ? 'tab' : ''}" type="button">${enabled.includes(item.id) ? 'Enabled' : 'Enable'}</button>`; card.querySelector('button').onclick = event => { const next = new Set(read(EXTENSION_KEY, [])); next.has(item.id) ? next.delete(item.id) : next.add(item.id); localStorage.setItem(EXTENSION_KEY, JSON.stringify([...next])); event.currentTarget.textContent = next.has(item.id) ? 'Enabled' : 'Enable'; event.currentTarget.classList.toggle('tab', next.has(item.id)); notify('Extensions', `${item.title} ${next.has(item.id) ? 'enabled' : 'disabled'}.`, 'success'); }; listNode.append(card); }); root.querySelector('[data-store]').onclick = () => window.IDKPlatformNext?.openDiscovery?.() || window.IDKProductFeatures?.appCenter?.() || open('apps'); root.querySelector('[data-permissions]').onclick = () => open('permissions'); return root;
   }
 
   function openUniversalSearch(seed = '') {
@@ -275,27 +351,35 @@
       app('notes', 'Notes', '🗒️', 'Write locally and save notes into Files.'),
       app('calendar', 'Calendar', '📅', 'Keep events and reminders in one place.'),
       app('planner', 'Planner', '☷', 'Plan projects and priorities.', () => open(typeof APPS !== 'undefined' && APPS.planner ? 'planner' : 'todo')),
-      app('sheets', 'IDK Sheets', '📊', 'Edit CSV-style data and export it again.')
+      app('sheets', 'IDK Sheets', '📊', 'Edit CSV-style data and export it again.'),
+      app('versionHistory', 'File History', '↺', 'Save checkpoints and restore earlier file versions.')
     ]);
     category(sections, 'Create & Explore', 'AI, browser, terminal, media, and creative tools.', [
       app('aiModes', 'AI Modes', '◈', 'Choose Cloud, Local, or Offline AI.'),
       app('ai', 'IDK Echo AI', '✦', 'Ask, code, or generate images.'),
       app('terminal', 'Terminal', '>_', 'Use IDK commands to open apps and files.'),
       app('proxy', 'Browser', '◎', 'Browse through the IDK browser workspace.'),
-      app('paint', 'Paint', '🎨', 'Create and export images locally.')
+      app('paint', 'Paint', '🎨', 'Create and export images locally.'),
+      app('voiceCapture', 'Voice Capture', '◉', 'Speak a task, note, or reminder.')
     ]);
     category(sections, 'Protect & Recover', 'Privacy, permissions, sync, backups, and health.', [
       app('privacy', 'Privacy Center', '🛡', 'Review AI, storage, and browser permission choices.'),
       app('security', 'Security Center', '◈', 'Manage app trust, permissions, and recovery.', () => window.IDKPlatformNext?.openSafetyCenter?.() || open('security')),
       app('syncCenter', 'Sync Center', '⇄', 'Retry offline and cloud changes.'),
       app('recoveryCenter', 'Backup & Recovery', '↺', 'Protect and restore local work.'),
-      app('health', 'System Health', '♥', 'Check storage, services, and offline readiness.')
+      app('health', 'System Health', '♥', 'Check storage, services, and offline readiness.'),
+      app('notificationCenter', 'Notifications Center', '●', 'Review and clear system activity.')
     ]);
     category(sections, 'Manage IDK', 'App lifecycle, desktop setup, and accessibility.', [
       app('dashboard', 'Personal Dashboard', '▦', 'See focus tasks, reminders, files, presence, and widgets.'),
+      app('dailyBrief', 'Daily Brief', '☀', 'Get a short summary of today.'),
+      app('focusMode', 'Focus Mode', '◉', 'Quiet the desktop and start a timed session.'),
+      app('automationRecipes', 'Automation Recipes', '⚡', 'Run useful local workflows.'),
+      app('extensionMarketplace', 'Extension Marketplace', '◇', 'Enable safe IDK capability packs.'),
       app('profile', 'Profile & Presence', '●', 'Set your name, status, and availability.'),
       app('apps', 'App Store', '▦', 'Open built-in apps and installed programs.'),
       app('settings', 'Settings', '⚙', 'Appearance, accessibility, sync, and devices.'),
+      app('handoff', 'Device Handoff', '⇄', 'Move your account and workspace to another device.'),
       app('widgetLibrary', 'Widget Library', '▦', 'Add live information to the desktop.'),
       app('reliability', 'Reliability', '🛡️', 'Review diagnostics and account/service health.'),
       app('ecosystem', 'Ecosystem', '◎', 'Virtual desktops, extensions, and local AI.'),
@@ -320,6 +404,13 @@
     APPS.universalSearch ||= { title: 'Universal Search', glyph: '⌕', desktop: false, dock: false, width: 760, height: 620, action: () => openUniversalSearch() };
     APPS.dashboard ||= { title: 'Personal Dashboard', glyph: '▦', desktop: true, dock: false, width: 940, height: 680, render: dashboardApp };
     APPS.profile ||= { title: 'Profile & Presence', glyph: '●', desktop: false, dock: false, width: 720, height: 600, render: profileApp };
+    APPS.notificationCenter ||= { title: 'Notifications Center', glyph: '●', desktop: false, dock: false, width: 760, height: 650, render: notificationCenterApp };
+    APPS.dailyBrief ||= { title: 'Daily Brief', glyph: '☀', desktop: true, dock: false, width: 820, height: 620, render: dailyBriefApp };
+    APPS.focusMode ||= { title: 'Focus Mode', glyph: '◉', desktop: true, dock: false, width: 700, height: 620, render: focusModeApp };
+    APPS.versionHistory ||= { title: 'File History', glyph: '↺', desktop: false, dock: false, width: 820, height: 620, render: versionHistoryApp };
+    APPS.voiceCapture ||= { title: 'Voice Capture', glyph: '◉', desktop: false, dock: false, width: 700, height: 560, render: voiceCaptureApp };
+    APPS.automationRecipes ||= { title: 'Automation Recipes', glyph: '⚡', desktop: false, dock: false, width: 760, height: 620, render: automationRecipesApp };
+    APPS.extensionMarketplace ||= { title: 'Extension Marketplace', glyph: '◇', desktop: false, dock: false, width: 820, height: 640, render: extensionMarketplaceApp };
     APPS.workspaceCenter ||= { title: 'Workspace Center', glyph: '◫', desktop: true, dock: false, width: 980, height: 720, render: workspaceApp };
     const host = document.getElementById('idk-os-next-tools') || document.getElementById('dock');
     if (host && !host.querySelector('[data-idk-workspace-center]')) {
@@ -333,10 +424,13 @@
 
   window.IDKPresence = { get: presenceState, set: setPresence, label: presenceLabel };
   window.IDKReminders = { check: checkReminders };
+  window.IDKFocus = { get: focusState, set: setFocus, start: startFocus, stop: () => setFocus({ enabled: false }) };
+  window.IDKVersions = { snapshot: snapshotFile, restore: restoreVersion };
   window.IDKUnifiedSearch = { ...(window.IDKUnifiedSearch || {}), open: openUniversalSearch };
   window.IDKFlowSearch = { ...(window.IDKFlowSearch || {}), open: openUniversalSearch };
   if (window.IDKProductFeatures) window.IDKProductFeatures.unifiedSearch = openUniversalSearch;
   window.IDKNonChatSuite = { open: () => open('workspaceCenter'), search: openUniversalSearch, snapshot };
   installReminderScheduler();
+  installFocusScheduler();
   registerApps();
 })();

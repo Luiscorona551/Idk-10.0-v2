@@ -1,4 +1,4 @@
-const CACHE = 'idk-shell-v27';
+const CACHE = 'idk-shell-v28';
 const ASSETS = [
   '/', '/desktop.html', '/style.css', '/idk-pwa-manifest.json', '/idk-batch-fourteen.css', '/idk-batch-fifteen.css', '/idk-batch-sixteen.css', '/idk-batch-seventeen.css', '/idk-batch-eighteen.css', '/idk-batch-nineteen.css', '/idk-batch-twentyone.css', '/idk-roadmap-suite.css',
   '/idk-os-next.css', '/idk-platform-next.css', '/idk-platform-polish.css', '/idk-batch-eight.css', '/idk-batch-nine.css', '/idk-batch-ten.css', '/idk-batch-eleven.css', '/idk-local-agent.css', '/idk-batch-thirteen.css',
