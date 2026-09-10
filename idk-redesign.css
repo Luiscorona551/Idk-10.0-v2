@@ -113,6 +113,7 @@ body.idk-redesign .content { background: rgba(3, 7, 17, .18); }
 body.idk-redesign #notifications-panel, body.idk-redesign #start-menu { border-color: var(--idk-border); border-radius: 18px; background: rgba(9, 14, 31, .94); }
 
 body.idk-redesign #idk-taskbar,
+body.idk-redesign #dock,
 body.idk-redesign #idk-left-app-rail,
 body.idk-redesign #idk-pack-taskbar,
 body.idk-redesign #idk-perfect-status,
