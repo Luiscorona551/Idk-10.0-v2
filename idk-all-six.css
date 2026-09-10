@@ -1,0 +1,32 @@
+html, body { max-width: 100%; overflow-x: hidden; }
+body.idk-redesign #desktop { max-width: 100vw; overflow-x: clip; }
+body.idk-redesign #windows { max-width: 100vw; overflow-x: clip; }
+body.idk-redesign button:focus-visible,
+body.idk-redesign input:focus-visible,
+body.idk-redesign select:focus-visible,
+body.idk-redesign [tabindex]:focus-visible { outline: 2px solid var(--idk-cyan, #67e8f9); outline-offset: 3px; }
+.idk-six-trigger { flex: 0 0 auto; padding: 8px 10px; border: 1px solid rgba(103, 232, 249, .2); border-radius: 11px; color: #fff; background: rgba(103, 232, 249, .1); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.idk-six-trigger:hover { border-color: rgba(103, 232, 249, .55); background: rgba(103, 232, 249, .18); }
+.idk-account-password-toggle { display: block; margin: 5px 0 0 auto; border: 0; color: var(--idk-cyan, #67e8f9); background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
+.idk-six-panel { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 20px; background: rgba(2, 5, 16, .68); backdrop-filter: blur(18px); }
+.idk-six-card { width: min(850px, 100%); max-height: min(720px, calc(100vh - 40px)); overflow: auto; padding: 30px; border: 1px solid rgba(167, 139, 250, .36); border-radius: 28px; color: #eaf0ff; background: linear-gradient(145deg, rgba(15, 27, 59, .98), rgba(7, 12, 29, .98)); box-shadow: 0 34px 100px rgba(0, 0, 0, .58); }
+.idk-six-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.idk-six-card header h2 { margin: 0; color: #fff; font-size: clamp(26px, 4vw, 42px); letter-spacing: -.05em; line-height: 1; }
+.idk-six-card header button { width: 34px; height: 34px; border: 1px solid rgba(185, 196, 255, .22); border-radius: 10px; color: #fff; background: rgba(255, 255, 255, .06); font-size: 18px; cursor: pointer; }
+.idk-six-intro { margin: 13px 0 20px; color: rgba(234, 240, 255, .62); font-size: 12px; }
+.idk-six-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.idk-six-grid article { display: grid; gap: 7px; min-height: 118px; padding: 16px; border: 1px solid rgba(185, 196, 255, .14); border-radius: 16px; background: rgba(255, 255, 255, .045); }
+.idk-six-grid article strong { color: #fff; font-size: 14px; }
+.idk-six-grid article > span { min-height: 28px; color: rgba(234, 240, 255, .58); font-size: 11px; line-height: 1.45; }
+.idk-six-grid article > div { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: auto; }
+.idk-six-grid .btn { min-height: 34px; padding: 7px 10px; border: 1px solid rgba(103, 232, 249, .24); border-radius: 10px; color: #fff; background: rgba(103, 232, 249, .1); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.idk-six-grid .btn:hover { border-color: var(--idk-cyan, #67e8f9); background: rgba(103, 232, 249, .18); }
+@media (max-width: 720px) {
+  .idk-six-panel { align-items: start; padding: 10px; }
+  .idk-six-card { max-height: calc(100vh - 20px); padding: 22px 18px; border-radius: 22px; }
+  .idk-six-grid { grid-template-columns: 1fr; }
+  .idk-six-trigger { padding: 7px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idk-six-panel *, .idk-six-panel *::before, .idk-six-panel *::after { transition: none !important; animation: none !important; }
+}
