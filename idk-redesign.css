@@ -112,6 +112,18 @@ body.idk-redesign .ctrl { width: 20px; height: 20px; border-radius: 7px; font-si
 body.idk-redesign .content { background: rgba(3, 7, 17, .18); }
 body.idk-redesign #notifications-panel, body.idk-redesign #start-menu { border-color: var(--idk-border); border-radius: 18px; background: rgba(9, 14, 31, .94); }
 
+body.idk-redesign #idk-taskbar,
+body.idk-redesign #idk-left-app-rail,
+body.idk-redesign #idk-pack-taskbar,
+body.idk-redesign #idk-perfect-status,
+body.idk-redesign #idk-next-bar,
+body.idk-redesign #idk-os-next-tools { display: none !important; }
+
+body.idk-redesign.idk-redesign-tools-open #idk-next-bar,
+body.idk-redesign.idk-redesign-tools-open #idk-os-next-tools { display: flex !important; }
+body.idk-redesign.idk-redesign-tools-open #idk-next-bar { top: 86px; right: 270px; z-index: 30; border-color: var(--idk-border); border-radius: 14px; background: rgba(9, 14, 31, .9); backdrop-filter: blur(18px); }
+body.idk-redesign.idk-redesign-tools-open #idk-os-next-tools { top: 86px; right: 270px; left: 287px; z-index: 29; width: auto; border-color: var(--idk-border); border-radius: 14px; background: rgba(9, 14, 31, .9); backdrop-filter: blur(18px); }
+
 @media (max-width: 1020px) {
   #idk-redesign-nav { right: 190px; left: 245px; gap: 8px; }
   .idk-redesign-brand { min-width: 110px; }
@@ -139,6 +151,8 @@ body.idk-redesign #notifications-panel, body.idk-redesign #start-menu { border-c
   .idk-redesign-home-card p { font-size: 12px; }
   body.idk-redesign #dock { right: 10px; bottom: 12px; left: 10px; justify-content: center; max-width: none; transform: none; }
   body.idk-redesign #start-toggle { right: 14px; bottom: 145px; }
+  body.idk-redesign.idk-redesign-tools-open #idk-next-bar { top: auto; right: 10px; bottom: 145px; }
+  body.idk-redesign.idk-redesign-tools-open #idk-os-next-tools { top: auto; right: 10px; bottom: 200px; left: 10px; max-width: none; }
   body.idk-redesign .window { min-width: 0; width: calc(100vw - 20px) !important; height: calc(100vh - 175px) !important; top: 66px !important; left: 10px !important; border-radius: 18px; }
   body.idk-redesign .window.maximized { height: calc(100vh - 145px) !important; }
   body.idk-redesign #icons { top: 74px; left: 10px; width: calc(100% - 20px); max-height: 150px; grid-template-rows: repeat(1, 84px); grid-auto-columns: 74px; gap: 8px; }

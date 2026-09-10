@@ -7,7 +7,8 @@
     ['apps', '▦', 'Apps'],
     ['calls', '☎', 'Calls'],
     ['games', '◈', 'Games'],
-    ['files', '□', 'Files']
+    ['files', '□', 'Files'],
+    ['more', '…', 'More']
   ];
   const appAliases = {
     apps: ['apps', 'appCenter', 'appsHub'],
@@ -61,7 +62,8 @@
       const button = create('button', { class: `idk-redesign-nav-button${index === 0 ? ' active' : ''}`, type: 'button', 'data-redesign-nav': id, 'aria-label': label }, [create('span', { text: glyph }), create('label', { text: label })]);
       button.addEventListener('click', () => {
         nav.querySelectorAll('.idk-redesign-nav-button').forEach(item => item.classList.toggle('active', item === button));
-        if (id === 'home') setHomeVisible(true);
+        if (id === 'more') toggleSecondaryTools();
+        else if (id === 'home') setHomeVisible(true);
         else { openApp(id); setHomeVisible(false); }
       });
       list.append(button);
@@ -77,6 +79,13 @@
     if (!panel) return;
     panel.hidden = !visible;
     panel.setAttribute('aria-hidden', String(!visible));
+  }
+
+  function toggleSecondaryTools() {
+    const open = document.body.classList.toggle('idk-redesign-tools-open');
+    const button = document.querySelector('[data-redesign-nav="more"]');
+    button?.classList.toggle('active', open);
+    button?.setAttribute('aria-expanded', String(open));
   }
 
   function sync() {
