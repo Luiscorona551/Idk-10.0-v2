@@ -78,5 +78,6 @@
 
   function installerDestinationPatch(){const observer=new MutationObserver(()=>{$$('.idk-install-destination span').forEach(s=>{if(/C:\\\\IDK|C:\\IDK|IDK\\Programs/i.test(s.textContent))s.innerHTML='<b>Desktop</b> · IDK 10.0 Desktop';});});observer.observe(document.body,{childList:true,subtree:true});setTimeout(()=>observer.disconnect(),120000)}
   function init(){css();initCards();addIcons();enhanceStartSearch();installerDestinationPatch();setTimeout(addIcons,1000);setInterval(()=>$$('.idk-glance-card').forEach(c=>refreshCard(c,c.dataset.cardType)),300000)}
+  window.IDKSheets={open:openSheets};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
