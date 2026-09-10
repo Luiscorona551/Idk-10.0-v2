@@ -153,9 +153,11 @@ async function gamePlayerApp(options = {}) {
       generatedSource = !options.src;
       frame.src = source;
       status.textContent = 'Ready';
+      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
     } catch (error) {
       status.textContent = error?.message || 'Game unavailable.';
       frame.removeAttribute('src');
+      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message: error?.message || 'Game unavailable.' } }));
     }
   };
   reload.onclick = load;
@@ -1761,7 +1763,7 @@ const APPS = {
       root.append(toolbar, grid);
       const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
       const recents = () => store.get(GAME_RECENTS_KEY, []);
-      const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); };
+      const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
       const render = () => {
         const query = search.value.trim().toLowerCase();
         const saved = favorites();
@@ -1772,15 +1774,16 @@ const APPS = {
         grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
         matches.slice(0, 400).forEach(item => {
-          const card = el('article', { className: 'game-tile-card' });
+          const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
           const tile = el('button', { className: 'tile', type: 'button' });
           const icon = el('span', { className: 'tile-icon' });
           if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
           const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
           const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
-          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); render(); };
+          const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
+          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
           tile.onclick = async () => { title.textContent = 'Loading…'; tile.disabled = true; try { remember(item); await openGame(item.id, item.title); } catch (error) { window.OS?.notify?.('Games', error?.message || 'Game unavailable.', 'danger'); } finally { title.textContent = item.title; tile.disabled = false; } };
-          card.append(tile, favorite); grid.append(card);
+          card.append(tile, favorite, availability); grid.append(card);
         });
       };
       search.oninput = render; filter.onchange = render; render();

@@ -38,7 +38,7 @@ const PROXY = (() => {
   return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
 })();
 (async () => {
-  const files = ['/idk-batch-fourteen.css', '/idk-game-fix.js', '/idk-batch-fourteen.js', '/idk-batch-sixteen.js', '/idk-release-batch.css', '/idk-release-batch.js'];
+  const files = ['/idk-batch-fourteen.css', '/idk-game-fix.js', '/idk-batch-fourteen.js', '/idk-batch-sixteen.js', '/idk-release-batch.css', '/idk-release-next.js'];
   for (const src of files) try {
     if (src.endsWith('.css')) { const existing = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => new URL(link.href, location.href).pathname === src); if (!existing) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = src; document.head.append(link); } }
     else await new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = reject; document.head.append(script); });
