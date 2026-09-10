@@ -11,11 +11,12 @@ const MAX_METADATA = 180000;
 const HEARTBEAT_MS = 30000;
 const CALL_RING_MS = 120000;
 const CALL_ACTIVE_MS = 4 * 60 * 60 * 1000;
+const ROOM_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
 const rooms = new Map();
 const userSockets = new Map();
 const calls = new Map();
 
-function room(code) { if (!rooms.has(code)) rooms.set(code, { clients: new Set(), history: [], members: new Map(), bans: new Map(), ownerId: null, config: { name: code, theme: 'midnight', readOnlyGuests: false } }); return rooms.get(code); }
+function room(code) { if (!rooms.has(code)) rooms.set(code, { clients: new Set(), history: [], members: new Map(), bans: new Map(), ownerId: null, config: { name: code, theme: 'midnight', readOnlyGuests: false }, loaded: false, lastActiveAt: Date.now() }); return rooms.get(code); }
 function nickKey(value) { return String(value).trim().toLowerCase(); }
 function send(socket, payload) { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
 function broadcast(code, payload) { const current = rooms.get(code); if (!current) return; if (payload.type === 'message' && !payload.private) { current.history.push(payload); if (current.history.length > MAX_HISTORY) current.history.shift(); } current.clients.forEach(client => send(client, payload)); }
@@ -24,7 +25,13 @@ function presence(code, text) { const current = rooms.get(code); if (!current) r
 function addUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId) || new Set(); sockets.add(socket); userSockets.set(socket.userId, sockets); }
 function removeUserSocket(socket) { if (!socket.userId) return; const sockets = userSockets.get(socket.userId); sockets?.delete(socket); if (sockets && !sockets.size) userSockets.delete(socket.userId); }
 function callData(value) { if (!value || typeof value !== 'object') return null; try { return JSON.parse(JSON.stringify(value).slice(0, MAX_METADATA)); } catch { return null; } }
-function safeRoomConfig(value, fallback = {}) { const config = value && typeof value === 'object' ? value : {}; return { name: String(config.name || fallback.name || 'IDK Room').trim().slice(0, 40) || 'IDK Room', theme: ['midnight', 'tide', 'sunset', 'graphite'].includes(config.theme) ? config.theme : (fallback.theme || 'midnight'), readOnlyGuests: Boolean(config.readOnlyGuests) }; }
+function safeRoomConfig(value, fallback = {}) { const config = value && typeof value === 'object' ? value : {}; const theme = ['midnight', 'tide', 'sunset', 'graphite'].includes(config.theme) ? config.theme : fallback.theme; return { name: String(config.name || fallback.name || 'IDK Room').trim().slice(0, 40) || 'IDK Room', theme: ['midnight', 'tide', 'sunset', 'graphite'].includes(theme) ? theme : 'midnight', readOnlyGuests: Boolean(config.readOnlyGuests) }; }
+async function dbRoomRecord(code) { const pool = getAccountPool(); if (!pool) return null; const { rows } = await pool.query('SELECT room_code AS code,name,theme,read_only_guests AS "readOnlyGuests",owner_user_id AS "ownerUserId",EXTRACT(EPOCH FROM last_active_at)*1000 AS "lastActiveAt" FROM idk_rooms WHERE room_code=$1', [code]); return rows[0] || null; }
+async function dbRoomBans(code) { const pool = getAccountPool(); if (!pool) return []; const { rows } = await pool.query('SELECT name_key AS "nameKey",user_id AS "userId" FROM idk_room_bans WHERE room_code=$1', [code]); return rows; }
+async function dbSaveRoom(code, config, ownerUserId = null) { const pool = getAccountPool(); if (!pool) return; await pool.query('INSERT INTO idk_rooms(room_code,name,theme,read_only_guests,owner_user_id,updated_at,last_active_at) VALUES($1,$2,$3,$4,$5,NOW(),NOW()) ON CONFLICT(room_code) DO UPDATE SET name=EXCLUDED.name,theme=EXCLUDED.theme,read_only_guests=EXCLUDED.read_only_guests,owner_user_id=COALESCE(idk_rooms.owner_user_id,EXCLUDED.owner_user_id),updated_at=NOW(),last_active_at=NOW()', [code, config.name, config.theme, config.readOnlyGuests, ownerUserId]); }
+async function dbTouchRoom(code) { const pool = getAccountPool(); if (!pool) return; await pool.query('UPDATE idk_rooms SET last_active_at=NOW() WHERE room_code=$1', [code]); }
+async function dbBanRoom(code, userId, name) { const pool = getAccountPool(); if (!pool) return; await pool.query('INSERT INTO idk_room_bans(room_code,name_key,user_id) VALUES($1,$2,$3) ON CONFLICT(room_code,name_key) DO UPDATE SET user_id=EXCLUDED.user_id', [code, nickKey(name), userId || null]); }
+async function dbUnbanRoom(code, nameKey) { const pool = getAccountPool(); if (!pool) return; await pool.query('DELETE FROM idk_room_bans WHERE room_code=$1 AND name_key=$2', [code, nickKey(nameKey)]); }
 function sendToUser(userId, payload) { userSockets.get(userId)?.forEach(socket => send(socket, payload)); return Boolean(userSockets.get(userId)?.size); }
 function expireCall(call) { if (calls.get(call.id) !== call) return; calls.delete(call.id); [call.initiator, call.recipient].forEach(userId => sendToUser(userId, { type: 'call', action: 'expired', callId: call.id })); }
 function scheduleCall(call, active = false) { clearTimeout(call.expiry); call.phase = active ? 'active' : 'ringing'; call.expiresAt = Date.now() + (active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry = setTimeout(() => expireCall(call), active ? CALL_ACTIVE_MS : CALL_RING_MS); call.expiry.unref?.(); }
@@ -77,22 +84,35 @@ chat.on('connection', (socket, req) => {
       const nick = socket.userId ? (requestedNick || 'IDK user') : (requestedNick || 'anon');
       if (!code) return send(socket, { type: 'error', text: 'Room name required.' });
       const target = room(code);
+      const firstMember = !target.ownerId;
+      if (!target.loaded) {
+        try {
+          let persisted = await dbRoomRecord(code);
+          if (persisted?.lastActiveAt && Date.now() - Number(persisted.lastActiveAt) > ROOM_IDLE_MS) { await getAccountPool()?.query('DELETE FROM idk_rooms WHERE room_code=$1', [code]); persisted = null; }
+          if (persisted) target.config = safeRoomConfig(persisted, target.config);
+          const persistedBans = await dbRoomBans(code);
+          persistedBans.forEach(item => target.bans.set(item.nameKey, item));
+        } catch {}
+        target.loaded = true;
+      }
       if (target.clients.size >= MAX_PER_ROOM) return send(socket, { type: 'error', text: 'That room is full.' });
       if (target.bans.has(nickKey(nick))) { send(socket, { type: 'error', text: 'You are banned from that room.' }); return socket.close(4003, 'Banned'); }
-       socket.code = code; socket.nick = nick;
-       if (!target.ownerId) { target.ownerId = socket.peerId; target.config = safeRoomConfig(data.roomConfig, target.config); }
-       target.members.set(socket.peerId, { id: socket.peerId, name: nick, guest: Boolean(data.guestMode), role: target.ownerId === socket.peerId ? 'owner' : 'member', mutedUntil: 0 });
+      socket.code = code; socket.nick = nick;
+      if (firstMember) { target.ownerId = socket.peerId; if (!target.config.name || target.config.name === code) target.config = safeRoomConfig(data.roomConfig, target.config); try { await dbSaveRoom(code, target.config, socket.userId); } catch {} }
+      target.members.set(socket.peerId, { id: socket.peerId, name: nick, guest: Boolean(data.guestMode), role: target.ownerId === socket.peerId ? 'owner' : 'member', mutedUntil: 0 });
       target.clients.add(socket);
+      target.lastActiveAt = Date.now();
+      try { await dbTouchRoom(code); } catch {}
       if (accountDbEnabled()) { try { target.history = await dbRoomHistory(code); } catch {} }
        send(socket, { type: 'joined', room: code, name: nick, peerId: socket.peerId, userId: socket.userId, role: target.members.get(socket.peerId).role, ownerId: target.ownerId, config: target.config, history: target.history, users: users(code) });
       presence(code, `${nick} joined`);
       return;
     }
 
-     if (data.type === 'room-config' && socket.code) {
-       const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
-       if (!current || member?.role !== 'owner') return send(socket, { type: 'error', text: 'Only the room host can change room settings.' });
-       current.config = safeRoomConfig(data.config, current.config); broadcast(socket.code, { type: 'room-config', config: current.config }); return;
+      if (data.type === 'room-config' && socket.code) {
+        const current = rooms.get(socket.code), member = current?.members.get(socket.peerId);
+        if (!current || member?.role !== 'owner') return send(socket, { type: 'error', text: 'Only the room host can change room settings.' });
+        current.config = safeRoomConfig(data.config, current.config); current.lastActiveAt = Date.now(); try { await dbSaveRoom(socket.code, current.config, socket.userId); } catch {} broadcast(socket.code, { type: 'room-config', config: current.config }); return;
      }
 
      if (data.type === 'workspace-share' && socket.code) {
@@ -161,10 +181,11 @@ chat.on('connection', (socket, req) => {
       if (action === 'promote') { if (actor.role !== 'owner' || targetMember.role !== 'member') return send(socket, { type: 'error', text: 'Only the owner can promote a member to moderator.' }); targetMember.role = 'moderator'; send(socket, { type: 'moderation-result', text: `${targetSocket.nick} is now a moderator.` }); presence(socket.code, `${targetSocket.nick} was promoted to moderator`); }
       else if (actor.role === 'moderator' && targetMember.role !== 'member') return send(socket, { type: 'error', text: 'Moderators can only manage regular members.' });
       else if (action === 'mute') { const minutes = Math.min(Math.max(Number(data.minutes) || 5, 1), MAX_MUTE_MINUTES); targetMember.mutedUntil = Date.now() + minutes * 60000; send(targetSocket, { type: 'muted', until: targetMember.mutedUntil }); send(socket, { type: 'moderation-result', text: `${targetSocket.nick} muted for ${minutes} minute(s).` }); presence(socket.code, `${targetSocket.nick} was muted`); }
-      else if (action === 'kick' || action === 'ban') { if (action === 'ban') current.bans.set(nickKey(targetSocket.nick), Date.now()); const actorLabel = actor.role === 'owner' ? 'room owner' : 'moderator'; send(targetSocket, { type: 'kicked', reason: action === 'ban' ? `You were banned by the ${actorLabel}.` : `You were kicked by the ${actorLabel}.` }); send(socket, { type: 'moderation-result', text: `${targetSocket.nick} ${action === 'ban' ? 'banned' : 'kicked'}.` }); targetSocket.close(action === 'ban' ? 4003 : 4004, action === 'ban' ? 'Banned' : 'Kicked'); }
-      return;
+       else if (action === 'kick' || action === 'ban') { if (action === 'ban') { current.bans.set(nickKey(targetSocket.nick), { nameKey: nickKey(targetSocket.nick), userId: targetSocket.userId || null }); try { await dbBanRoom(socket.code, targetSocket.userId, targetSocket.nick); } catch {} } const actorLabel = actor.role === 'owner' ? 'room owner' : 'moderator'; send(targetSocket, { type: 'kicked', reason: action === 'ban' ? `You were banned by the ${actorLabel}.` : `You were kicked by the ${actorLabel}.` }); send(socket, { type: 'moderation-result', text: `${targetSocket.nick} ${action === 'ban' ? 'banned' : 'kicked'}.` }); targetSocket.close(action === 'ban' ? 4003 : 4004, action === 'ban' ? 'Banned' : 'Kicked'); }
+       else if (action === 'unban') { if (actor.role !== 'owner') return send(socket, { type: 'error', text: 'Only the owner can remove a ban.' }); const nameKey = String(data.nameKey || ''); if (!nameKey) return; current.bans.delete(nickKey(nameKey)); try { await dbUnbanRoom(socket.code, nameKey); } catch {} send(socket, { type: 'moderation-result', text: `${nameKey} can join again.` }); }
+       return;
     }
   });
 
-  socket.on('close', () => { removeUserSocket(socket); [...calls.entries()].forEach(([id, call]) => { if (call.initiator === socket.userId || call.recipient === socket.userId) { clearTimeout(call.expiry); calls.delete(id); } }); const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); if (!current.clients.size) return rooms.delete(socket.code); if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) current.members.get(nextOwner.peerId).role = 'owner'; } presence(socket.code, `${socket.nick} left`); });
+  socket.on('close', () => { removeUserSocket(socket); [...calls.entries()].forEach(([id, call]) => { if (call.initiator === socket.userId || call.recipient === socket.userId) { clearTimeout(call.expiry); calls.delete(id); } }); const current = rooms.get(socket.code); if (!current) return; current.clients.delete(socket); current.members.delete(socket.peerId); current.lastActiveAt = Date.now(); if (!current.clients.size) { if (current.lastActiveAt < Date.now() - ROOM_IDLE_MS) rooms.delete(socket.code); return rooms.delete(socket.code); } if (current.ownerId === socket.peerId) { const nextOwner = [...current.clients][0]; current.ownerId = nextOwner?.peerId || null; if (nextOwner) { current.members.get(nextOwner.peerId).role = 'owner'; dbSaveRoom(socket.code, current.config, nextOwner.userId).catch(() => {}); } } presence(socket.code, `${socket.nick} left`); });
 });
