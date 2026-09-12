@@ -3,6 +3,7 @@
   const cache = new Map();
   const withBase = html => {
     html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', 'https://cdn.emulatorjs.org/stable/data/');
+    html = html.replace(/EJS_core\s*=\s*["']parallel_n64["']/g, 'EJS_core = "mupen64plus_next"');
     if (/\bEJS_(?:pathtodata|core)\b/i.test(html) && !/EJS_DEBUG_XX\s*=/i.test(html)) {
       const debug = '<script>window.EJS_DEBUG_XX = true;</script>';
       if (/<head\b/i.test(html)) html = html.replace(/<head\b[^>]*>/i, match => `${match}${debug}`);
