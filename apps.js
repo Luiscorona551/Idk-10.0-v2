@@ -105,6 +105,12 @@ function gameIconURL(path) {
 
 function gameSourceWithBase(html) {
   html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', GAME_EMULATOR_CDN);
+  if (/\bEJS_(?:pathtodata|core)\b/i.test(html) && !/EJS_DEBUG_XX\s*=/i.test(html)) {
+    const debug = '<script>window.EJS_DEBUG_XX = true;</script>';
+    if (/<head\b/i.test(html)) html = html.replace(/<head\b[^>]*>/i, match => `${match}${debug}`);
+    else if (/<html\b/i.test(html)) html = html.replace(/<html\b[^>]*>/i, match => `${match}<head>${debug}</head>`);
+    else html = `${debug}${html}`;
+  }
   if (/<base\b/i.test(html)) return html;
   const base = `<base href="${GAME_CDN}">`;
   if (/<head\b/i.test(html)) return html.replace(/<head\b[^>]*>/i, match => `${match}${base}`);
