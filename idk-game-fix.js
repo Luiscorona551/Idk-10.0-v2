@@ -35,7 +35,7 @@
       const items = names.map(name => ({ id: name, title: typeof gameTitle === 'function' ? gameTitle(name) : name, iconURL: typeof gameIconURL === 'function' ? gameIconURL(icons[name]) : '', search: `${name} ${typeof gameTitle === 'function' ? gameTitle(name) : name}`.toLowerCase() }));
       return listApp({ items, placeholder: 'Search games…', empty: 'No games found.', async onOpen(item, tile) {
         const title = tile.querySelector('.tile-title'); const label = title.textContent; title.textContent = 'Loading…';
-        try { const src = await load(item.id); OS.open('game-player', { title: item.title, src }); }
+        try { await openGame(item.id, item.title); }
         catch (error) { window.OS?.notify?.('Games', error.message, 'danger'); }
         finally { title.textContent = label; }
       }});
