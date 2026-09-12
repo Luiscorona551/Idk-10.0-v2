@@ -1,6 +1,14 @@
 (() => {
   'use strict';
   const cache = new Map();
+  const withBase = html => {
+    html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', 'https://cdn.emulatorjs.org/stable/data/');
+    if (/<base\b/i.test(html)) return html;
+    const base = '<base href="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/">';
+    if (/<head\b/i.test(html)) return html.replace(/<head\b[^>]*>/i, match => `${match}${base}`);
+    if (/<html\b/i.test(html)) return html.replace(/<html\b[^>]*>/i, match => `${match}<head>${base}</head>`);
+    return `${base}${html}`;
+  };
   const load = async name => {
     const file = name.includes('.') && name.lastIndexOf('.') > 0 ? name : `${name}.html`;
     let pending = cache.get(file);
@@ -9,7 +17,7 @@
       pending = fetch(url, { cache: 'force-cache' }).then(async response => { if (!response.ok) throw new Error(`Could not fetch "${name}" (${response.status})`); return response.text(); });
       cache.set(file, pending);
     }
-    try { return URL.createObjectURL(new Blob([await pending], { type: 'text/html' })); }
+    try { return URL.createObjectURL(new Blob([withBase(await pending)], { type: 'text/html' })); }
     catch (error) { cache.delete(file); throw error; }
   };
   const install = () => {
