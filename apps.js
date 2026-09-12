@@ -103,6 +103,10 @@ function gameIconURL(path) {
   return path ? `${GAME_ICON_CDN}${path.split('/').map(encodeURIComponent).join('/')}` : '';
 }
 
+function gameTabURL(name) {
+  return `game.html?game=${encodeURIComponent(name)}`;
+}
+
 function gameSourceWithBase(html) {
   html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', GAME_EMULATOR_CDN);
   html = html.replace(/EJS_core\s*=\s*["']parallel_n64["']/g, 'EJS_core = "mupen64plus_next"');
@@ -141,25 +145,12 @@ async function gameBlobURL(name) {
 }
 
 function openGame(name, title) {
-  const popup = window.open('', '_blank');
+  const popup = window.open(gameTabURL(name), '_blank', 'noopener');
   if (!popup) {
     window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
     return Promise.resolve(false);
   }
-  popup.opener = null;
-  popup.document.title = title || 'IDK game';
-  popup.document.body.style.cssText = 'margin:0;background:#071329;color:#eaf0ff;font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh';
-  popup.document.body.textContent = 'Loading game…';
-  popup.focus?.();
-  return gameBlobURL(name).then(source => {
-    popup.location.replace(source);
-    setTimeout(() => URL.revokeObjectURL(source), 300000);
-    return true;
-  }).catch(error => {
-    try { popup.document.body.textContent = error?.message || 'Game unavailable.'; } catch {}
-    window.OS?.notify?.('Games', error?.message || 'Game unavailable.', 'danger');
-    return false;
-  });
+  return Promise.resolve(true);
 }
 
 async function gamePlayerApp(options = {}) {
@@ -1811,14 +1802,14 @@ const APPS = {
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
         matches.slice(0, 400).forEach(item => {
           const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
-          const tile = el('button', { className: 'tile', type: 'button' });
+          const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
           const icon = el('span', { className: 'tile-icon' });
           if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
           const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
           const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
           const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
           favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
-          tile.onclick = async () => { title.textContent = 'Loading…'; tile.disabled = true; try { remember(item); await openGame(item.id, item.title); } catch (error) { window.OS?.notify?.('Games', error?.message || 'Game unavailable.', 'danger'); } finally { title.textContent = item.title; tile.disabled = false; } };
+          tile.onclick = () => remember(item);
           card.append(tile, favorite, availability); grid.append(card);
         });
       };
@@ -2021,6 +2012,7 @@ const APPS = {
        const typingStatus = el('span', { className: 'count chat-typing', hidden: true, textContent: '' });
        const dmUnread = el('span', { className: 'count chat-unread', hidden: true, textContent: '0', title: 'Unread personal messages' });
        const composer = el('div', { className: 'toolbar' }, [text, send, typingStatus, dmUnread]);
+
        let socket = null;
        let currentUserId = '';
        let currentRole = 'member';
