@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>IDK Game</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #071329; color: #eaf0ff; font: 16px system-ui, sans-serif; }
+    #status { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+  </style>
+</head>
+<body><main id="status">Loading game...</main>
+<script>
+(() => {
+  const GAME_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
+  const GAME_EMULATOR_CDN = 'https://cdn.emulatorjs.org/stable/data/';
+  const status = document.getElementById('status');
+
+  function fileName(name) {
+    return name.includes('.') && name.lastIndexOf('.') > 0 ? name : `${name}.html`;
+  }
+
+  function prepare(html) {
+    html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', GAME_EMULATOR_CDN);
+    html = html.replace(/EJS_core\s*=\s*["']parallel_n64["']/g, 'EJS_core = "mupen64plus_next"');
+    if (/\bEJS_(?:pathtodata|core)\b/i.test(html) && !/EJS_DEBUG_XX\s*=/i.test(html)) {
+      const debug = '<script>window.EJS_DEBUG_XX = true;<\/script>';
+      if (/<head\b/i.test(html)) html = html.replace(/<head\b[^>]*>/i, match => `${match}${debug}`);
+      else if (/<html\b/i.test(html)) html = html.replace(/<html\b[^>]*>/i, match => `${match}<head>${debug}</head>`);
+      else html = `${debug}${html}`;
+    }
+    if (/<base\b/i.test(html)) return html;
+    const base = `<base href="${GAME_CDN}">`;
+    if (/<head\b/i.test(html)) return html.replace(/<head\b[^>]*>/i, match => `${match}${base}`);
+    if (/<html\b/i.test(html)) return html.replace(/<html\b[^>]*>/i, match => `${match}<head>${base}</head>`);
+    return `${base}${html}`;
+  }
+
+  async function load() {
+    const name = new URLSearchParams(location.search).get('game')?.trim();
+    if (!name || /[\\/]/.test(name)) throw new Error('Game not found.');
+    const response = await fetch(`${GAME_CDN}${encodeURIComponent(fileName(name))}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Could not fetch "${name}" (${response.status})`);
+    document.open();
+    document.write(prepare(await response.text()));
+    document.close();
+  }
+
+  load().catch(error => { status.textContent = error?.message || 'Game unavailable.'; });
+})();
+</script>
+</body>
+</html>
+
