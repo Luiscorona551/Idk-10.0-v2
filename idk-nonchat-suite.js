@@ -247,7 +247,7 @@
       list('idkTodos').filter(item => !value || `${item.text} ${item.priority} ${item.due}`.toLowerCase().includes(value)).slice(0, 10).forEach(item => matches.push({ title: item.text, type: 'Task', detail: item.due || 'No due date', run: () => open(typeof APPS !== 'undefined' && APPS.planner ? 'planner' : 'todo') }));
       list('idkCalendarEvents').filter(item => !value || `${item.title} ${item.date} ${item.time}`.toLowerCase().includes(value)).slice(0, 10).forEach(item => matches.push({ title: item.title, type: 'Reminder', detail: `${item.date || 'No date'}${item.time ? ` · ${item.time}` : ''}`, run: () => open(typeof APPS !== 'undefined' && APPS.planner ? 'planner' : 'calendar') }));
       list('idkMessengerContacts').filter(item => !value || `${item.name || ''} ${item.username || ''}`.toLowerCase().includes(value)).slice(0, 8).forEach(item => matches.push({ title: item.name || item.username, type: 'Person', detail: 'Messenger contact', run: () => open('chat') }));
-      [['Workspace Center', 'workspaceCenter'], ['Personal Dashboard', 'dashboard'], ['Profile & Presence', 'profile'], ['Widget Library', 'widgetLibrary'], ['Settings', 'settings'], ['Privacy Center', 'privacy'], ['App Store', 'apps']].filter(([title]) => !value || title.toLowerCase().includes(value)).forEach(([title, id]) => matches.push({ title, type: 'IDK tool', run: () => open(id) }));
+      [['Workspace Center', 'workspaceCenter'], ['OS Expansion Hub', 'osExpansion'], ['Personal Dashboard', 'dashboard'], ['Profile & Presence', 'profile'], ['Widget Library', 'widgetLibrary'], ['Settings', 'settings'], ['Privacy Center', 'privacy'], ['App Store', 'apps']].filter(([title]) => !value || title.toLowerCase().includes(value)).forEach(([title, id]) => matches.push({ title, type: 'IDK tool', run: () => open(id) }));
       matches.slice(0, 30).forEach(item => addResult(item, item.type));
       if (value && window.SYSTEM_APPS?.readBlob) {
         const textFiles = files().filter(item => item.type === 'file' && item.text).slice(0, 40);
@@ -432,7 +432,8 @@
       app('widgetLibrary', 'Widget Library', '▦', 'Add live information to the desktop.'),
       app('reliability', 'Reliability', '🛡️', 'Review diagnostics and account/service health.'),
       app('ecosystem', 'Ecosystem', '◎', 'Virtual desktops, extensions, and local AI.'),
-      app('permissions', 'App Permissions', '🛡️', 'Allow or block built-in app capabilities.')
+      app('permissions', 'App Permissions', '🛡️', 'Allow or block built-in app capabilities.'),
+      app('osExpansion', 'OS Expansion Hub', '◌', 'Sessions, health, cloud drives, privacy, updates, sharing, accessibility, and mobile layout.')
     ]);
     renderStats(root);
     const rerender = () => renderStats(root);
