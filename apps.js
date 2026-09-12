@@ -141,7 +141,25 @@ async function gameBlobURL(name) {
 }
 
 function openGame(name, title) {
-  return OS.open('game-player', { title, gameName: name });
+  const popup = window.open('', '_blank');
+  if (!popup) {
+    window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
+    return Promise.resolve(false);
+  }
+  popup.opener = null;
+  popup.document.title = title || 'IDK game';
+  popup.document.body.style.cssText = 'margin:0;background:#071329;color:#eaf0ff;font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh';
+  popup.document.body.textContent = 'Loading game…';
+  popup.focus?.();
+  return gameBlobURL(name).then(source => {
+    popup.location.replace(source);
+    setTimeout(() => URL.revokeObjectURL(source), 300000);
+    return true;
+  }).catch(error => {
+    try { popup.document.body.textContent = error?.message || 'Game unavailable.'; } catch {}
+    window.OS?.notify?.('Games', error?.message || 'Game unavailable.', 'danger');
+    return false;
+  });
 }
 
 async function gamePlayerApp(options = {}) {
@@ -2003,7 +2021,6 @@ const APPS = {
        const typingStatus = el('span', { className: 'count chat-typing', hidden: true, textContent: '' });
        const dmUnread = el('span', { className: 'count chat-unread', hidden: true, textContent: '0', title: 'Unread personal messages' });
        const composer = el('div', { className: 'toolbar' }, [text, send, typingStatus, dmUnread]);
-
        let socket = null;
        let currentUserId = '';
        let currentRole = 'member';
