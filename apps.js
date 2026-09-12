@@ -1,5 +1,6 @@
 const GAME_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
 const GAME_ICON_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/';
+const GAME_EMULATOR_CDN = 'https://cdn.emulatorjs.org/stable/data/';
 const gameSourceCache = new Map();
 
 const store = {
@@ -102,6 +103,15 @@ function gameIconURL(path) {
   return path ? `${GAME_ICON_CDN}${path.split('/').map(encodeURIComponent).join('/')}` : '';
 }
 
+function gameSourceWithBase(html) {
+  html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', GAME_EMULATOR_CDN);
+  if (/<base\b/i.test(html)) return html;
+  const base = `<base href="${GAME_CDN}">`;
+  if (/<head\b/i.test(html)) return html.replace(/<head\b[^>]*>/i, match => `${match}${base}`);
+  if (/<html\b/i.test(html)) return html.replace(/<html\b[^>]*>/i, match => `${match}<head>${base}</head>`);
+  return `${base}${html}`;
+}
+
 async function gameBlobURL(name) {
   const file = gameFileName(name);
   let source = gameSourceCache.get(file);
@@ -120,7 +130,7 @@ async function gameBlobURL(name) {
     gameSourceCache.delete(file);
     throw error;
   }
-  return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  return URL.createObjectURL(new Blob([gameSourceWithBase(html)], { type: 'text/html' }));
 }
 
 function openGame(name, title) {
@@ -142,6 +152,8 @@ async function gamePlayerApp(options = {}) {
   });
   frame.setAttribute('allowfullscreen', '');
   frame.setAttribute('referrerpolicy', 'no-referrer');
+  frame.addEventListener('load', () => { status.textContent = 'Ready'; });
+  frame.addEventListener('error', () => { status.textContent = 'Game frame failed to load.'; });
   toolbar.append(status, reload, fullscreen, help);
   root.append(toolbar, helpText, frame);
   let source = options.src || '', generatedSource = false;
@@ -152,7 +164,6 @@ async function gamePlayerApp(options = {}) {
       source = options.src || await gameBlobURL(options.gameName);
       generatedSource = !options.src;
       frame.src = source;
-      status.textContent = 'Ready';
       window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
     } catch (error) {
       status.textContent = error?.message || 'Game unavailable.';
