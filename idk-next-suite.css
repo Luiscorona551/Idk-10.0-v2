@@ -4,6 +4,7 @@
   right: 72px;
   z-index: 36;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 5px;
   border: 1px solid rgba(255, 255, 255, .14);
@@ -491,9 +492,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .idk-contact-row small { color: var(--muted, #a9b9d8); }
 
 .idk-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.idk-control-center { overflow: auto; }
 .idk-control-card { display: flex; min-height: 74px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 12px; text-align: left; }
 .idk-control-card strong { font-size: 12px; }
 .idk-control-card small { color: var(--muted, #a9b9d8); font-size: 10px; }
+.idk-control-card:disabled { cursor: wait; opacity: .62; }
 
 @media (max-width: 560px) {
   .idk-gallery, .idk-contacts, .idk-control-center { padding: 13px; }
@@ -501,4 +504,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .idk-contact-row { grid-template-columns: minmax(0, 1fr) auto; }
   .idk-contact-row small { grid-column: 1; grid-row: 2; }
   .idk-contact-row .btn { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+@media (pointer: coarse) {
+  .idk-control-center .btn, .idk-control-center .idk-control-card { min-height: 44px; }
 }
