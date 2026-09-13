@@ -20,11 +20,13 @@
   }
 
   function prepare(html) {
-    if (!/EJS_(?:pathtodata|core)/i.test(html) || /EJS_DEBUG_XXs*=/i.test(html)) return html;
-    const debug = '<script>window.EJS_DEBUG_XX = true;<\/script>';
-    if (/<head/i.test(html)) return html.replace(/<head[^>]*>/i, match => match + debug);
-    if (/<html/i.test(html)) return html.replace(/<html[^>]*>/i, match => match + "<head>" + debug + "</head>");
-    return debug + html;
+    if (!html.includes("EJS_pathtodata") && !html.includes("EJS_core")) return html;
+    if (html.includes("EJS_DEBUG_XX")) return html;
+    const marker = "<script>";
+    const point = html.indexOf(marker);
+    if (point < 0) return html;
+    const insert = marker + "window.EJS_DEBUG_XX = true;";
+    return html.slice(0, point) + insert + html.slice(point + marker.length);
   }
 
   async function load() {
