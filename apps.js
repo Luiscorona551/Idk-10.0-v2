@@ -1,7 +1,5 @@
 const GAME_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
 const GAME_ICON_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/';
-const GAME_EMULATOR_CDN = 'https://cdn.emulatorjs.org/stable/data/';
-const gameSourceCache = new Map();
 
 const store = {
   get(key, fallback) {
@@ -107,43 +105,13 @@ function gameTabURL(name) {
   return `game.html?game=${encodeURIComponent(name)}`;
 }
 
-function gameSourceWithBase(html) {
-  html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', GAME_EMULATOR_CDN);
-  html = html.replace(/EJS_core\s*=\s*["']parallel_n64["']/g, 'EJS_core = "mupen64plus_next"');
-  if (/\bEJS_(?:pathtodata|core)\b/i.test(html) && !/EJS_DEBUG_XX\s*=/i.test(html)) {
-    const debug = '<script>window.EJS_DEBUG_XX = true;</script>';
-    if (/<head\b/i.test(html)) html = html.replace(/<head\b[^>]*>/i, match => `${match}${debug}`);
-    else if (/<html\b/i.test(html)) html = html.replace(/<html\b[^>]*>/i, match => `${match}<head>${debug}</head>`);
-    else html = `${debug}${html}`;
-  }
-  if (/<base\b/i.test(html)) return html;
-  const base = `<base href="${GAME_CDN}">`;
-  if (/<head\b/i.test(html)) return html.replace(/<head\b[^>]*>/i, match => `${match}${base}`);
-  if (/<html\b/i.test(html)) return html.replace(/<html\b[^>]*>/i, match => `${match}<head>${base}</head>`);
-  return `${base}${html}`;
-}
-
 async function gameBlobURL(name) {
   const file = gameFileName(name);
-  let source = gameSourceCache.get(file);
-  if (!source) {
-    const url = `${GAME_CDN}${encodeURIComponent(file)}`;
-    source = fetch(url, { cache: 'force-cache' }).then(async res => {
-      if (!res.ok) throw new Error(`Could not fetch "${name}" (${res.status})`);
-      return res.text();
-    });
-    gameSourceCache.set(file, source);
-  }
-  let html;
-  try {
-    html = await source;
-  } catch (error) {
-    gameSourceCache.delete(file);
-    throw error;
-  }
-  return URL.createObjectURL(new Blob([gameSourceWithBase(html)], { type: 'text/html' }));
+  const url = GAME_CDN + encodeURIComponent(file) + "?t=" + Date.now();
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
+  return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
 }
-
 function openGame(name, title) {
   const popup = window.open(gameTabURL(name), '_blank', 'noopener');
   if (!popup) {
