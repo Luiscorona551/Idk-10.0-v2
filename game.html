@@ -20,7 +20,11 @@
   }
 
   function prepare(html) {
-    return html;
+    if (!/EJS_(?:pathtodata|core)/i.test(html) || /EJS_DEBUG_XXs*=/i.test(html)) return html;
+    const debug = "<script>window.EJS_DEBUG_XX = true;</script>";
+    if (/<head/i.test(html)) return html.replace(/<head[^>]*>/i, match => match + debug);
+    if (/<html/i.test(html)) return html.replace(/<html[^>]*>/i, match => match + "<head>" + debug + "</head>");
+    return debug + html;
   }
 
   async function load() {
