@@ -400,10 +400,13 @@
     const desktop = document.getElementById('desktop');
     if (!desktop) return;
     const bar = el('div', { id: 'idk-next-bar', 'aria-label': 'IDK Hub shortcuts' });
-    bar.append(button('✦ Hub', () => openHub(), 'idk-next-launcher'), button('◉ Focus', () => openHub('focus'), 'idk-next-launcher'), button('⌕ Search', () => openPalette(), 'idk-next-launcher'));
+    const control = button('◉ Control', () => openApp('control-center'), 'idk-next-launcher');
+    control.setAttribute('aria-label', 'Open Control Center');
+    bar.append(button('✦ Hub', () => openHub(), 'idk-next-launcher'), button('◉ Focus', () => openHub('focus'), 'idk-next-launcher'), button('⌕ Search', () => openPalette(), 'idk-next-launcher'), control);
     desktop.append(bar);
     window.addEventListener('keydown', event => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'KeyP') { event.preventDefault(); openHub('focus'); }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'KeyC') { event.preventDefault(); openApp('control-center'); }
       if (event.key === 'Escape') document.getElementById('idk-next-palette')?.remove();
     });
   }
