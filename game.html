@@ -25,7 +25,7 @@
     const marker = "<script>";
     const point = html.indexOf(marker);
     if (point < 0) return html;
-    const insert = marker + "window.EJS_DEBUG_XX = true; const idkOpen = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function(method, url, ...rest) { if (typeof url === "string" && url.includes("wasm.data")) url += (url.includes("?") ? "&" : "?") + "idkCore=" + Date.now(); return idkOpen.call(this, method, url, ...rest); };";
+    const insert = marker + 'window.EJS_DEBUG_XX = true; const idkOpen = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function(method, url, ...rest) { if (typeof url === "string" && url.includes("wasm.data")) url += (url.includes("?") ? "&" : "?") + "idkCore=" + Date.now(); return idkOpen.call(this, method, url, ...rest); };';
     return html.slice(0, point) + insert + html.slice(point + marker.length);
   }
 
