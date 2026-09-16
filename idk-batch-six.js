@@ -7,6 +7,7 @@
   const button = (label, action, className = 'btn tab') => { const item = document.createElement('button'); item.type = 'button'; item.className = className; item.textContent = label; item.onclick = action; return item; };
   const note = text => Object.assign(document.createElement('p'), { className: 'idk-connected-note', textContent: text });
   const media = entry => entry?.type === 'file' && (/^(image|video)\//i.test(entry.mime || '') || /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov|m4v)$/i.test(entry.name || ''));
+  const notify = (title, message, kind = 'info') => window.OS?.notify?.(title, message, kind);
 
   function gallery() {
     const root = document.createElement('div'); root.className = 'app idk-gallery';
@@ -39,36 +40,65 @@
     const summary = document.createElement('div'); summary.className = 'idk-control-grid';
     const grid = document.createElement('div'); grid.className = 'idk-control-grid';
     const status = note('Checking IDK status…');
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const formatBytes = value => value >= 1048576 ? `${(value / 1048576).toFixed(1)} MB` : `${Math.round(value / 1024)} KB`;
+    const formatTime = value => value ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Never';
+    const readList = key => { const value = read(key, []); return Array.isArray(value) ? value : []; };
     const statusCard = (title, detail) => { const item = document.createElement('article'); item.className = 'idk-control-card'; item.append(Object.assign(document.createElement('strong'), { textContent: title }), Object.assign(document.createElement('small'), { textContent: detail })); return item; };
+    const openApp = id => { if (typeof APPS === 'undefined' || !APPS[id] || !window.OS?.open) return false; window.OS.open(id); return true; };
     const refresh = async () => {
       status.textContent = 'Checking IDK status…';
-      const health = await window.IDKDataLayer?.health?.().catch?.(() => ({})) || {};
-      let storage = {};
-      try { storage = await navigator.storage?.estimate?.() || {}; } catch {}
-      const sync = health.syncState === 'syncing' ? 'Syncing' : health.pending ? `${health.pending} pending` : health.account ? 'Cloud ready' : 'Local only';
-      summary.replaceChildren(
-        statusCard('Connection', health.online ? 'Online' : 'Offline'),
-        statusCard('Account', health.account ? 'Connected' : 'Local profile'),
-        statusCard('Sync', sync),
-        statusCard('Storage', storage.quota ? `${formatBytes(storage.usage || 0)} used` : 'Unavailable'),
-        statusCard('Files', `${health.files || 0} item${health.files === 1 ? '' : 's'}`),
-        statusCard('Browser data', health.indexedDB ? 'IndexedDB ready' : 'Limited storage')
-      );
-      status.textContent = `${health.online ? 'Online' : 'Offline'} · ${health.account ? 'Account sync available' : 'Changes stay on this device'}${health.pending ? ` · ${health.pending} queued` : ''}`;
+      try {
+        const health = await window.IDKDataLayer?.health?.().catch?.(() => ({})) || {};
+        const syncState = window.IDKAccount?.getSyncStatus?.() || read('idkSyncStatus', {});
+        let storage = {};
+        try { storage = await navigator.storage?.estimate?.() || {}; } catch {}
+        const pending = Number(health.pending || 0);
+        const failures = Number(syncState.failures || 0);
+        const queue = [...readList('idkOfflineQueue'), ...readList('idkCloudSyncQueue')];
+        const queueTypes = [...new Set(queue.map(item => item?.type).filter(Boolean))].slice(0, 2).join(', ');
+        const sync = health.syncState === 'syncing' ? 'Syncing' : pending ? `${pending} pending` : health.account ? 'Cloud ready' : 'Local only';
+        summary.replaceChildren(
+          statusCard('Connection', health.online ? 'Online' : 'Offline'),
+          statusCard('Account', health.account ? 'Connected' : 'Local profile'),
+          statusCard('Sync', sync),
+          statusCard('Last sync', syncState.lastSuccess ? formatTime(syncState.lastSuccess) : 'No completed sync'),
+          statusCard('Queued work', pending ? `${pending} pending${queueTypes ? ` · ${queueTypes}` : ''}` : 'Clear'),
+          statusCard('Sync health', syncState.lastError ? 'Needs attention' : failures ? `${failures} recent failure${failures === 1 ? '' : 's'}` : 'Healthy'),
+          statusCard('Storage', storage.quota ? `${formatBytes(storage.usage || 0)} used` : 'Unavailable'),
+          statusCard('Files', `${health.files || 0} item${health.files === 1 ? '' : 's'}`),
+          statusCard('Browser data', health.indexedDB ? 'IndexedDB ready' : 'Limited storage')
+        );
+        status.textContent = `${health.online ? 'Online' : 'Offline'} · ${health.account ? 'Account sync available' : 'Changes stay on this device'}${pending ? ` · ${pending} queued` : ''}${syncState.lastError ? ` · ${String(syncState.lastError).slice(0, 90)}` : ''}`;
+      } catch (error) {
+        status.textContent = `Status unavailable: ${error.message || 'try Refresh'}`;
+      }
     };
-    const syncNow = async () => { status.textContent = 'Syncing IDK…'; await window.IDKOffline?.flush?.(); const ok = await window.IDKDataLayer?.syncNow?.(); status.textContent = ok ? 'IDK sync completed.' : 'Sync did not complete. Local changes are safe.'; refresh(); };
-    const checkUpdates = async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) return status.textContent = 'Update checks are unavailable in this browser.'; status.textContent = 'Checking for an IDK update…'; await registration.update().catch(() => {}); if (registration.waiting) { registration.waiting.postMessage({ type: 'SKIP_WAITING' }); status.textContent = 'Update ready. Reloading IDK…'; setTimeout(() => location.reload(), 500); } else status.textContent = 'IDK is up to date.'; };
-    const density = () => { const values = ['compact', 'normal', 'large']; const current = localStorage.getItem('iconSize') || 'normal'; localStorage.setItem('iconSize', values[(values.indexOf(current) + 1) % values.length]); location.reload(); };
-    const action = (title, detail, run) => { const item = document.createElement('button'); item.className = 'idk-control-card'; item.type = 'button'; item.append(Object.assign(document.createElement('strong'), { textContent: title }), Object.assign(document.createElement('small'), { textContent: detail })); item.onclick = run; return item; };
+    const syncNow = async () => {
+      status.textContent = 'Syncing IDK…';
+      try {
+        await window.IDKOffline?.flush?.();
+        const ok = Boolean(await window.IDKDataLayer?.syncNow?.());
+        status.textContent = ok ? 'IDK sync completed.' : 'Sync did not complete. Local changes are safe.';
+        notify('Control Center', ok ? 'IDK sync completed.' : 'Sync did not complete. Local changes are safe.', ok ? 'success' : 'warning');
+      } catch (error) {
+        status.textContent = `Sync failed: ${error.message || 'local changes are safe.'}`;
+        notify('Control Center', status.textContent, 'warning');
+      }
+      await refresh();
+    };
+    const checkUpdates = async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) { status.textContent = 'Update checks are unavailable in this browser.'; notify('Control Center', status.textContent, 'warning'); return; } status.textContent = 'Checking for an IDK update…'; await registration.update().catch(() => {}); if (registration.waiting) { registration.waiting.postMessage({ type: 'SKIP_WAITING' }); status.textContent = 'Update ready. Reloading IDK…'; notify('Control Center', 'Update ready. Reloading IDK…', 'success'); setTimeout(() => location.reload(), 500); } else { status.textContent = 'IDK is up to date.'; notify('Control Center', status.textContent, 'success'); } };
+    const density = () => { const values = ['compact', 'normal', 'large']; const current = localStorage.getItem('iconSize') || 'normal'; const next = values[(values.indexOf(current) + 1) % values.length]; localStorage.setItem('iconSize', next); notify('Display', `Icon density set to ${next}.`, 'success'); setTimeout(() => location.reload(), 350); };
+    const openAISetup = () => openApp('aiModes') || openApp('ai') || window.IDKProductionSuite?.open?.();
+    const action = (title, detail, run) => { const item = document.createElement('button'); item.className = 'idk-control-card'; item.type = 'button'; item.title = detail; item.setAttribute('aria-label', `${title}: ${detail}`); item.append(Object.assign(document.createElement('strong'), { textContent: title }), Object.assign(document.createElement('small'), { textContent: detail })); item.onclick = async () => { if (item.disabled) return; item.disabled = true; try { await run(); } catch (error) { status.textContent = `${title} failed: ${error.message || 'try again.'}`; notify('Control Center', status.textContent, 'warning'); } finally { item.disabled = false; } }; return item; };
     grid.append(
       action('Sync now', 'Push changes or retry queued work', syncNow),
       action('Backup & Recovery', 'Protect local settings and files', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
-      action('Security & Privacy', 'Account safety and local data', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('reliability')),
+      action('Security & Privacy', 'Account safety and local data', () => window.IDKPlatformPolish?.openSecurityCenter?.() || openApp('privacy') || openApp('reliability')),
       action('Account & Devices', 'Profiles, sessions, and handoff', () => window.IDKAccountsDevices?.open?.('security') || window.IDKAccountsDevices?.open?.('profiles')),
       action('Check for updates', 'Load the newest IDK shell', checkUpdates),
-      action('System Health', 'Storage, performance, and diagnostics', () => window.OS?.open?.('system-monitor') || window.OS?.open?.('reliability')),
-      action('AI Setup', 'Choose local, cloud, or offline AI', () => window.OS?.open?.('reliability')),
+      action('System Health', 'Storage, performance, and diagnostics', () => openApp('system-monitor') || openApp('reliability')),
+      action('AI Setup', 'Choose local, cloud, or offline AI', openAISetup),
       action('Profiles', 'Switch local workspaces', () => window.IDKAccountsDevices?.open?.('profiles') || window.IDKConnectivitySuite?.openProfiles?.()),
       action('Smart Workspaces', 'Save or activate desktop setups', () => window.IDKOSNext?.workspaceView?.()),
       action('Activity Center', 'Notifications and recent activity', () => window.OS?.open?.('activity')),
