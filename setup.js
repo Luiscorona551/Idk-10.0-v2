@@ -162,7 +162,7 @@ document.querySelectorAll('.profile-avatar-button').forEach(button => {
 async function submitKey(key) {
   const normalizedKey = normalizeKey(key);
   try {
-    const res = await fetch('/api/setup', {
+    const res = await fetch(new URL('api/setup', document.baseURI), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ key: normalizedKey })
@@ -416,7 +416,7 @@ function prepareLogin() {
 }
 
 function enterDesktop() {
-  window.location.replace('/desktop.html');
+  window.location.replace(new URL('desktop.html', document.baseURI).href);
 }
 
 loginHint.addEventListener('click', () => {
