@@ -33,7 +33,7 @@
     `;
     document.head.append(style);
   };
-  const mediaExt = /.(mp4|webm|mov|m4v|ogg|ogv|avi|mkv)$/i;
+  const mediaExt = /\.(mp4|webm|mov|m4v|ogg|ogv|avi|mkv)$/i;
   function enhanceAttachmentViews(root=document) {
     root.querySelectorAll('.idk-chat-attachment').forEach(link => {
       if (link.dataset.mediaEnhanced === '1' || !link.href?.startsWith('blob:')) return;
