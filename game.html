@@ -20,6 +20,13 @@
   }
 
   function prepare(html) {
+    html = html.replaceAll('https://cdn.jsdelivr.net/gh/bubblfan/emu@master/', 'https://cdn.emulatorjs.org/stable/data/');
+    html = html.replace(/EJS_core\\s*=\\s*["']parallel_n64["']/g, 'EJS_core = "mupen64plus_next"');
+    if (!/<base\\b/i.test(html)) {
+      const base = '<base href="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/">';
+      if (/<head\\b/i.test(html)) html = html.replace(/<head\\b[^>]*>/i, match => match + base);
+      else html = base + html;
+    }
     if (!html.includes("EJS_pathtodata") && !html.includes("EJS_core")) return html;
     if (html.includes("EJS_DEBUG_XX")) return html;
     const marker = "<script>";

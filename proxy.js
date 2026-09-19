@@ -34,7 +34,20 @@ const PROXY = (() => {
   }
   function reset() { ready = null; connection = null; }
   function normalize(input) { const value = input.trim(); if (/^https?:\/\//i.test(value)) return value; if (/^[^\s.]+\.[^\s]{2,}$/.test(value)) return `https://${value}`; return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`; }
-  async function encode(input) { if (!ready) ready = init().catch(error => { ready = null; throw error; }); await ready; return __uv$config.prefix + __uv$config.encodeUrl(normalize(input)); }
+  async function encode(input) {
+    const target = normalize(input);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (!ready) ready = init();
+        await ready;
+        return __uv$config.prefix + __uv$config.encodeUrl(target);
+      } catch (error) {
+        ready = null; connection = null;
+        if (attempt === 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 120));
+      }
+    }
+  }
   return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
 })();
 (async () => {
