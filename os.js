@@ -688,7 +688,23 @@ const OS = (() => {
     renderRecent();
   }
 
+  function configureIconColumns() {
+    if (!iconLayer) return;
+    const mobile = window.matchMedia('(max-width: 700px)').matches;
+    const rows = mobile ? 4 : 6;
+    const rowHeight = mobile ? 92 : 106;
+    iconLayer.style.gridTemplateRows = `repeat(${rows}, ${rowHeight}px)`;
+    iconLayer.style.gridAutoFlow = 'column';
+    iconLayer.style.gridAutoColumns = mobile ? '82px' : '92px';
+    iconLayer.style.width = `calc(100vw - ${mobile ? 40 : 40}px)`;
+    iconLayer.style.maxWidth = `calc(100vw - ${mobile ? 40 : 40}px)`;
+    iconLayer.style.maxHeight = `calc(100vh - ${mobile ? 132 : 150}px)`;
+    iconLayer.style.overflowX = 'auto';
+    iconLayer.style.overflowY = 'hidden';
+  }
+
   function build() {
+    configureIconColumns();
     orderedDesktopApps().forEach(([id, app]) => {
       const icon = document.createElement('button');
       icon.className = 'desktop-icon';
@@ -724,6 +740,7 @@ const OS = (() => {
     buildStartMenu();
     tickClock();
     setInterval(tickClock, 1000);
+    window.addEventListener('resize', configureIconColumns);
     window.addEventListener('beforeunload', saveWorkspace);
     const params = new URLSearchParams(location.search);
     if (params.get('room') || location.hash === '#chat') setTimeout(() => launch('chat'), 0);
