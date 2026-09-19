@@ -151,19 +151,29 @@ app.use(express.static(root, { extensions: ['html'], dotfiles: 'ignore' }));
 const httpsKey = process.env.HTTPS_KEY_FILE, httpsCert = process.env.HTTPS_CERT_FILE;
 const server = httpsKey && httpsCert ? createHttpsServer({ key: readFileSync(httpsKey), cert: readFileSync(httpsCert) }, app) : createHttpServer(app);
 server.on('upgrade', (req, socket, head) => {
-  const u = req.url || '';
-  if (!hasSession(req)) socket.destroy();
-  else if (/^\/wisp(?:\/|\?|$)/.test(u)) {
+  const rawUrl = req.url || '/';
+  let pathname = rawUrl;
+  try { pathname = new URL(rawUrl, 'http://localhost').pathname; } catch {}
+  if (/^\/wisp\/?$/.test(pathname)) {
+    if (!hasSession(req)) { socket.destroy(); return; }
+    // wisp-js distinguishes the canonical /wisp/ endpoint from legacy wsproxy
+    // by the raw request URL. Normalize it so hosted proxies work even when
+    // the WebSocket client or platform adds a query string.
+    req.url = '/wisp/';
     try {
-      const result = wisp.routeRequest(req, socket, head);
-      result?.catch?.(error => { console.error('Wisp route failed:', error); socket.destroy(); });
+      wisp.routeRequest(req, socket, head);
     } catch (error) {
       console.error('Wisp route failed:', error);
       socket.destroy();
     }
+    return;
   }
-  else if (/^\/chat(?:\?|$)/.test(u)) chat.handleUpgrade(req, socket, head, ws => chat.emit('connection', ws, req));
-  else socket.destroy();
+  if (/^\/chat\/?$/.test(pathname)) {
+    if (!hasSession(req)) { socket.destroy(); return; }
+    chat.handleUpgrade(req, socket, head, ws => chat.emit('connection', ws, req));
+    return;
+  }
+  socket.destroy();
 });
 const port = Number(process.env.PORT) || 8080, host = process.env.HOST || '0.0.0.0', protocol = httpsKey && httpsCert ? 'https' : 'http';
 initAccountDb().then(() => initFriendsDb()).then(() => server.listen(port, host, () => {
