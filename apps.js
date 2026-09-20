@@ -38,7 +38,12 @@ const WALLPAPER_PRESETS = [
   { value: 'linear-gradient(135deg, #101a3d 0%, #16224a 48%, #4b1f57 100%)', label: 'Violet Horizon' },
   { value: 'radial-gradient(circle at 18% 20%, rgba(126, 246, 168, .24), transparent 26%), linear-gradient(135deg, #062a35, #071020 58%, #123f4c)', label: 'Neon Tide' },
   { value: 'linear-gradient(135deg, #27182d 0%, #6b2d50 52%, #f08a65 100%)', label: 'Sunset Bloom' },
-  { value: 'linear-gradient(135deg, #080b13 0%, #202938 48%, #596273 100%)', label: 'Graphite' }
+  { value: 'linear-gradient(135deg, #080b13 0%, #202938 48%, #596273 100%)', label: 'Graphite' },
+  { value: 'linear-gradient(135deg, #24123f 0%, #5b2a86 52%, #9b5de5 100%)', label: 'Grape' },
+  { value: 'linear-gradient(135deg, #3a0d18 0%, #8f1d35 52%, #e94f64 100%)', label: 'Red' },
+  { value: 'linear-gradient(135deg, #0b2f24 0%, #087f5b 52%, #42d392 100%)', label: 'Emerald' },
+  { value: 'linear-gradient(135deg, #121a35 0%, #263b73 52%, #526db0 100%)', label: 'Midnight' },
+  { value: 'linear-gradient(135deg, #2b163f 0%, #713f8c 50%, #c17bdc 100%)', label: 'Purple Glow' }
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
 const MOVIE_HISTORY_KEY = 'idkMovieHistory';
