@@ -23,3 +23,10 @@ services:
         value: gemini-3.6-flash
       - key: AI_BASE_URL
         value: https://generativelanguage.googleapis.com/v1beta/openai/
+      # Optional TURN relay for calls across restrictive/NAT networks.
+      - key: IDK_TURN_URL
+        sync: false
+      - key: IDK_TURN_USERNAME
+        sync: false
+      - key: IDK_TURN_CREDENTIAL
+        sync: false
