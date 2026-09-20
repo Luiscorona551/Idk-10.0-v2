@@ -1,0 +1,60 @@
+.idk-code-app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.idk-code-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text, #eaf0ff) 12%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #0d1226) 88%, transparent);
+}
+
+.idk-code-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.idk-code-title strong {
+  font-size: 14px;
+}
+
+.idk-code-title small {
+  color: var(--muted, #9ba8c7);
+  font-size: 11px;
+}
+
+.idk-code-spacer {
+  flex: 1;
+}
+
+.idk-code-app iframe {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: #10131a;
+}
+
+@media (max-width: 700px) {
+  .idk-code-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .idk-code-spacer {
+    display: none;
+  }
+
+  .idk-code-app iframe {
+    min-height: 520px;
+  }
+}
