@@ -166,7 +166,19 @@ server.on('upgrade', (req, socket, head) => {
   else socket.destroy();
 });
 const port = Number(process.env.PORT) || 8080, host = process.env.HOST || '0.0.0.0', protocol = httpsKey && httpsCert ? 'https' : 'http';
-initAccountDb().then(() => initFriendsDb()).then(() => server.listen(port, host, () => {
+server.listen(port, host, () => {
   console.log(`UGS listening on ${protocol}://${host}:${port}`);
-  console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
-})).catch(error => { console.error('IDK database initialization failed:', error); process.exit(1); });
+  console.log(`Backends starting: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
+
+  // Start database initialization after the HTTP listener is ready so
+  // deployment health checks can reach /healthz without waiting on the DB.
+  Promise.resolve()
+    .then(() => initAccountDb())
+    .then(() => initFriendsDb())
+    .then(() => {
+      console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
+    })
+    .catch(error => {
+      console.error('IDK database initialization failed; server will remain available:', error);
+    });
+});
