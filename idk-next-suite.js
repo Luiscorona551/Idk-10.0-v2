@@ -316,6 +316,11 @@
     const themes = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
     const wallpapers = [
       ['IDK Blue', 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png'],
+      ['Grape', 'linear-gradient(135deg, #170b2d 0%, #4b1f73 52%, #8b4fd6 100%)'],
+      ['Red', 'linear-gradient(135deg, #2a080d 0%, #7f1621 52%, #d63b4d 100%)'],
+      ['Emerald', 'linear-gradient(135deg, #061f18 0%, #0d5b45 52%, #2bbf83 100%)'],
+      ['Sunset', 'linear-gradient(135deg, #32110a 0%, #8a351b 52%, #e87835 100%)'],
+      ['Midnight', 'linear-gradient(135deg, #05070d 0%, #111827 52%, #303b52 100%)'],
       ['Violet Horizon', 'linear-gradient(135deg, #101a3d 0%, #16224a 48%, #4b1f57 100%)'],
       ['Neon Tide', 'radial-gradient(circle at 18% 20%, rgba(126, 246, 168, .24), transparent 26%), linear-gradient(135deg, #062a35, #071020 58%, #123f4c)'],
       ['Sunset Bloom', 'linear-gradient(135deg, #27182d 0%, #6b2d50 52%, #f08a65 100%)'],
