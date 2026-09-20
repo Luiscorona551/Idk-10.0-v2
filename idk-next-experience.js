@@ -29,14 +29,6 @@
     render();
   }
 
-  function filesPanel(root){
-    root.innerHTML='<header class="idk-next-head"><div><b>FILES 2.0</b><h2>Your files</h2><p>PostgreSQL-backed storage with previews and quick actions.</p></div><button class="btn" data-upload>Upload</button></header><div class="idk-next-file-status">Loading…</div><div class="idk-next-file-grid"></div>';
-    const status=root.querySelector('.idk-next-file-status'), grid=root.querySelector('.idk-next-file-grid');
-    const render=files=>{grid.replaceChildren(...files.map(f=>{const el=document.createElement('article');el.className='idk-next-file';el.innerHTML='<strong>'+esc(f.name)+'</strong><small>'+esc(f.mime)+' · '+Math.round((f.size||0)/1024)+' KB</small><div><button class="btn tab" data-open>Open</button><button class="btn tab" data-delete>Delete</button></div>';el.querySelector('[data-open]').onclick=()=>window.open('/api/account/files/'+encodeURIComponent(f.id)+'/content','_blank');el.querySelector('[data-delete]').onclick=async()=>{if(!confirm('Delete this file?'))return;await fetch('/api/account/files/'+encodeURIComponent(f.id),{method:'DELETE',credentials:'same-origin'});load();};return el;}));};
-    const load=async()=>{try{const d=await get('/api/account/files');render(d.files||[]);status.textContent=(d.files||[]).length+' file(s)';}catch(e){status.textContent='Sign in to use cloud files.';grid.replaceChildren();}};
-    root.querySelector('[data-upload]').onclick=()=>{const input=document.createElement('input');input.type='file';input.multiple=true;input.onchange=async()=>{for(const file of input.files){if(file.size>15*1024*1024){notify('Files',file.name+' is larger than 15 MB.','warning');continue;}const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});try{await post('/api/account/files',{id:crypto.randomUUID(),name:file.name,mime:file.type||'application/octet-stream',contentBase64:b64});}catch(e){notify('Files',e.message,'warning');}}load();};input.click();}; load();
-  }
-
   function aiPanel(root){
     const chats=read('idk-ai-conversations',[]); let active=chats[0]?.id||'';
     root.innerHTML='<header class="idk-next-head"><div><b>AI WORKSPACE</b><h2>Saved conversations</h2><p>Keep useful chats on this device and sync account state when available.</p></div><button class="btn" data-new>New chat</button></header><div class="idk-next-ai-layout"><aside data-list></aside><section><input class="field" data-title placeholder="Conversation name"><textarea class="field" data-input rows="6" placeholder="Ask AI…"></textarea><button class="btn" data-save>Save conversation</button><p data-status></p></section></div>';
@@ -66,7 +58,6 @@
 
   function install(){
     if(typeof APPS==='undefined') return;
-    APPS.files={...(APPS.files||{}),title:'Files 2.0',glyph:'▣',desktop:true,dock:true,width:980,height:720,render:()=>{const r=document.createElement('div');r.className='app';filesPanel(r);return r;}};
     APPS.ai={...(APPS.ai||{}),title:'AI Workspace',render:()=>{const r=document.createElement('div');r.className='app';aiPanel(r);return r;}};
     APPS.games={...(APPS.games||{}),title:'Game Center',render:()=>{const r=document.createElement('div');r.className='app';gamesPanel(r);return r;}};
     APPS.security={title:'Security Center',glyph:'🔐',desktop:false,dock:false,width:850,height:650,render:()=>{const r=document.createElement('div');r.className='app';securityPanel(r);return r;}};
