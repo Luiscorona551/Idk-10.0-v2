@@ -55,9 +55,20 @@ app.get('/api/deploy/status', async (req, res) => res.json({
   checkedAt: new Date().toISOString()
 }));
 function iceServers() {
-  const fallback = [{ urls: ['stun:stun.l.google.com:19302'] }];
+  const fallback = [
+    { urls: ['stun:stun.l.google.com:19302'] },
+    { urls: ['stun:stun.cloudflare.com:3478'] },
+    { urls: ['stun:stun1.l.google.com:19302'] }
+  ];
   const raw = String(process.env.IDK_ICE_SERVERS || '').trim();
-  if (!raw) return fallback;
+  if (!raw) {
+    const turnUrl = String(process.env.IDK_TURN_URL || '').trim();
+    const turnUsername = String(process.env.IDK_TURN_USERNAME || '').trim();
+    const turnCredential = String(process.env.IDK_TURN_CREDENTIAL || '').trim();
+    return turnUrl && turnUsername && turnCredential
+      ? [...fallback, { urls: turnUrl, username: turnUsername, credential: turnCredential }]
+      : fallback;
+  }
   try {
     const parsed = JSON.parse(raw);
     const values = Array.isArray(parsed) ? parsed : [parsed];
