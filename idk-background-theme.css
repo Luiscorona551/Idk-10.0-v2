@@ -1,0 +1,126 @@
+#desktop[data-background-theme] {
+  --accent: var(--bg-accent);
+  --panel: var(--bg-panel);
+  --panel-solid: var(--bg-panel-solid);
+  --muted: color-mix(in srgb, var(--text) 62%, transparent);
+}
+
+#desktop[data-background-theme] #clock,
+#desktop[data-background-theme] #dock,
+#desktop[data-background-theme] #start-toggle,
+#desktop[data-background-theme] #notification-toggle {
+  border-color: color-mix(in srgb, var(--bg-accent) 42%, white 18%);
+  box-shadow: 0 10px 30px rgba(0,0,0,.34), 0 0 18px color-mix(in srgb, var(--bg-glow) 18%, transparent);
+}
+
+#desktop[data-background-theme] #clock {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-panel-solid) 88%, var(--bg-glow) 12%), color-mix(in srgb, var(--bg-panel-solid) 78%, black 22%));
+}
+#desktop[data-background-theme] #clock-week,
+#desktop[data-background-theme] .binary,
+#desktop[data-background-theme] .notification strong,
+#desktop[data-background-theme] .notification-center-item strong,
+#desktop[data-background-theme] .echo-copy small,
+#desktop[data-background-theme] .tv-live .label,
+#desktop[data-background-theme] .stopwatch-display,
+#desktop[data-background-theme] .weather-temp {
+  color: var(--bg-accent);
+}
+#desktop[data-background-theme] #idk-battery-indicator,
+#desktop[data-background-theme] .dock-media-btn,
+#desktop[data-background-theme] .start-app:hover,
+#desktop[data-background-theme] .search-result:hover,
+#desktop[data-background-theme] .calc-key:hover,
+#desktop[data-background-theme] .calendar-day:not(.blank):hover,
+#desktop[data-background-theme] .todo-row:hover {
+  border-color: color-mix(in srgb, var(--bg-accent) 55%, white 8%);
+  background-color: color-mix(in srgb, var(--bg-glow) 22%, transparent);
+}
+#desktop[data-background-theme] .dock-btn.running,
+#desktop[data-background-theme] #start-toggle:hover,
+#desktop[data-background-theme] #start-toggle[aria-expanded="true"],
+#desktop[data-background-theme] #notification-toggle:hover,
+#desktop[data-background-theme] #notification-toggle[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--bg-glow) 42%, transparent);
+}
+#desktop[data-background-theme] .start-mark,
+#desktop[data-background-theme] .notification-panel-heading button:hover,
+#desktop[data-background-theme] .notification-close,
+#desktop[data-background-theme] .dock-media-volume,
+#desktop[data-background-theme] .paint-size,
+#desktop[data-background-theme] .paint-check input {
+  color: var(--bg-accent);
+  accent-color: var(--bg-accent);
+}
+#desktop[data-background-theme] #start-menu {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-glow) 72%, var(--bg-panel-solid)), var(--bg-panel-solid));
+}
+#desktop[data-background-theme] .start-heading {
+  background: linear-gradient(90deg, var(--bg-panel-solid), var(--bg-glow));
+}
+#desktop[data-background-theme] #notification-toggle b {
+  border-color: var(--bg-panel-solid);
+  color: var(--bg-panel-solid);
+  background: var(--bg-accent);
+}
+#desktop[data-background-theme] #notifications,
+#desktop[data-background-theme] #notifications-panel {
+  --notification-accent: var(--bg-accent);
+}
+#desktop[data-background-theme] .notification {
+  border-color: color-mix(in srgb, var(--bg-accent) 45%, transparent);
+}
+#desktop[data-background-theme] .window .titlebar {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bg-panel-solid) 94%, var(--bg-glow) 6%), color-mix(in srgb, var(--bg-glow) 28%, var(--bg-panel-solid)));
+}
+#desktop[data-background-theme] .window:focus-within .titlebar,
+#desktop[data-background-theme] .window.active .titlebar {
+  box-shadow: inset 0 -2px 0 var(--bg-accent);
+}
+#desktop[data-background-theme] .btn:hover,
+#desktop[data-background-theme] .tab.active,
+#desktop[data-background-theme] .btn.primary {
+  border-color: color-mix(in srgb, var(--bg-accent) 65%, white 10%);
+  background: color-mix(in srgb, var(--bg-glow) 34%, var(--bg-panel-solid));
+}
+#desktop[data-background-theme] input:focus,
+#desktop[data-background-theme] textarea:focus,
+#desktop[data-background-theme] select:focus,
+#desktop[data-background-theme] .field:focus {
+  border-color: var(--bg-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg-accent) 20%, transparent);
+}
+#desktop[data-background-theme] .loading-orbit {
+  border-top-color: var(--bg-accent);
+  border-right-color: var(--bg-glow);
+}
+#desktop[data-background-theme] .file-list,
+#desktop[data-background-theme] .notes-grid,
+#desktop[data-background-theme] .calculator-app,
+#desktop[data-background-theme] .paint-toolbar,
+#desktop[data-background-theme] .ai-config,
+#desktop[data-background-theme] .ai-composer {
+  --theme-accent: var(--bg-accent);
+}
+#desktop[data-background-theme] .desktop-icon:hover,
+#desktop[data-background-theme] .idk-installed-shortcut:hover,
+#desktop[data-background-theme] .idk-installed-shortcut.selected,
+#desktop[data-background-theme] .dock-btn:hover {
+  background: color-mix(in srgb, var(--bg-glow) 20%, transparent);
+}
+#desktop[data-background-theme] #echo-companion {
+  border-color: color-mix(in srgb, var(--bg-accent) 60%, transparent);
+  box-shadow: 0 10px 24px rgba(0,0,0,.38), 0 0 0 3px color-mix(in srgb, var(--bg-glow) 12%, transparent);
+}
+#desktop[data-background-theme] #echo-companion:hover,
+#desktop[data-background-theme] #echo-companion:focus-visible {
+  border-color: var(--bg-accent);
+}
+#desktop[data-background-theme] #echo-companion img,
+#desktop[data-background-theme] .ai-companion-flag {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg-glow) 34%, transparent), 0 8px 18px rgba(0,0,0,.28);
+}
+#desktop[data-background-theme] .tv-screen.live {
+  border-color: var(--bg-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg-accent) 18%, transparent), 0 0 18px color-mix(in srgb, var(--bg-glow) 35%, transparent);
+}
