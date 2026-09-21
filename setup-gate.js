@@ -18,7 +18,7 @@ const KEYS = configuredKeys.length ? configuredKeys : DEFAULT_KEYS;
 // A fresh secret per boot means restarting the server re-locks every browser.
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
 const COOKIE = 'ugs_setup';
-const MAX_AGE = 60 * 60 * 24 * 30;
+// Keep the setup gate persistent for 10 years so reopening the site does not restart setup.\nconst MAX_AGE = 60 * 60 * 24 * 3650;
 
 // Paths the setup flow itself needs before a session exists.
 const PUBLIC = [
