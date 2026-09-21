@@ -1,9 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const DEFAULT_KEYS = [
-  'A7K2-M9Q4-X3P8',
-  'R5T1-B8N6-Z2C4',
-  'H9V3-D7L2-W6F1'
+  'PZ4B-PRWS-2WCX'
 ];
 
 function normalizeKey(value) {
