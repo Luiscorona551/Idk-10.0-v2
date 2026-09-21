@@ -2,9 +2,9 @@
 // has handed out a session cookie. Without the Node backend the check falls
 // back to a hash comparison, which is cosmetic — the real gate is the server.
 const KEY_HASHES = [
-  '01b2510065bec7ddc3759e22b3a821dfeee67ffee783ddf832c3c520dc1cfaaa',
-  'c02098b59d704e21614f462778fc7f3440ef598b61b11e951b732f068e28376c',
-  'd23c6491955aa882d27fffe4ba47c79b4f7f378cd8534421157941cdd236800c'
+  '8f56a427a7bcf720e8d429f7d646b069b8c2fa414bf81150eadc0dabd3dde7cb',
+  '5b37326f27ac4a18b21026a8a29ba967bfa3cbc50a4b787f4f00907428e58985',
+  'c608172716b45867f042de3a16487d6ba194d903430a8cb79e802096262891d0'
 ];
 const KEY_GROUP_SIZE = 4;
 const KEY_GROUPS = 3;
