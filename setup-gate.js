@@ -14,7 +14,7 @@ const configuredKeys = (process.env.SETUP_KEYS || process.env.SETUP_KEY || '')
   .split(',')
   .map(key => key.trim())
   .filter(Boolean);
-const KEYS = configuredKeys.length ? configuredKeys : DEFAULT_KEYS;
+// Built-in keys always remain valid; deployment environment keys are additional.\nconst KEYS = [...new Set([...DEFAULT_KEYS, ...configuredKeys])];
 // A fresh secret per boot means restarting the server re-locks every browser.
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
 const COOKIE = 'ugs_setup';
