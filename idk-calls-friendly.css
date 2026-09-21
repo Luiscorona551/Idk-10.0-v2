@@ -5,3 +5,22 @@
 .idk-calls-app.idk-call-active .idk-call-current { box-shadow: 0 0 0 1px rgba(126,246,168,.08), 0 12px 30px rgba(0,0,0,.14); }
 .idk-calls-app .idk-call-current video { min-height: 150px; }
 @media (max-width: 760px) { .idk-call-trust-row span { min-height: 28px; display: inline-flex; align-items: center; } .idk-calls-app .idk-call-current video { min-height: 120px; } }
+
+.idk-call-mini-bar { position: fixed; left: 50%; bottom: 78px; transform: translateX(-50%); z-index: 99999; display: flex; align-items: center; gap: 8px; max-width: min(92vw, 520px); padding: 9px 11px; border: 1px solid rgba(126,246,168,.25); border-radius: 14px; background: rgba(8,15,28,.94); box-shadow: 0 12px 35px rgba(0,0,0,.35); backdrop-filter: blur(14px); color: #eaf2ff; }
+.idk-call-mini-bar[hidden] { display: none; }
+.idk-call-mini-bar strong { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.idk-call-mini-bar span:not(.idk-call-mini-dot) { color: #9db5d8; font-size: 9px; }
+.idk-call-mini-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #7ef6a8; box-shadow: 0 0 12px rgba(126,246,168,.65); }
+.idk-call-mini-bar button { border: 0; border-radius: 8px; padding: 6px 9px; background: rgba(255,255,255,.08); color: #eaf2ff; cursor: pointer; font: inherit; font-size: 9px; }
+.idk-call-mini-bar button:hover { background: rgba(255,255,255,.14); }
+.idk-call-mini-bar [data-mini-end] { color: #ffb4b4; }
+.idk-calls-app .idk-call-current { transition: box-shadow .2s ease, transform .2s ease; }
+.idk-calls-app.idk-call-active .idk-call-current { box-shadow: 0 0 0 1px rgba(126,246,168,.14), 0 16px 40px rgba(0,0,0,.18); }
+.idk-calls-app .idk-call-current audio { width: 100%; height: 28px; opacity: .72; }
+.idk-calls-app .idk-call-current video:not([hidden]) { display: block; width: 100%; max-height: 300px; margin: 8px 0; border-radius: 14px; object-fit: cover; background: #020611; }
+@media (max-width: 760px) {
+  .idk-call-mini-bar { bottom: 68px; width: max-content; max-width: 94vw; gap: 6px; padding: 8px; }
+  .idk-call-mini-bar strong { max-width: 90px; }
+  .idk-call-mini-bar span:not(.idk-call-mini-dot) { display: none; }
+  .idk-calls-app .idk-call-current video:not([hidden]) { max-height: 220px; }
+}
