@@ -96,7 +96,31 @@
       });
       return socketReady;
     };
-    const ensureMedia = async () => { if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser does not provide microphone access.'); if (window.IDKPermissions?.can && !window.IDKPermissions.can('calls', 'microphone')) throw new Error('Microphone access is blocked for IDK Calls. Open App Permissions and allow it first.'); if (videoEnabled && window.IDKPermissions?.can && !window.IDKPermissions.can('calls', 'camera')) throw new Error('Camera access is blocked for IDK Calls. Open App Permissions and allow it first.'); stream ||= await navigator.mediaDevices.getUserMedia({ audio: true, video: videoEnabled }); return stream; };
+    const ensureMedia = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser does not provide microphone access. Calls require HTTPS and a browser with microphone support.');
+      // Let the browser be the source of truth for microphone/camera permission. A stale
+      // IDK permission toggle must not silently prevent a real WebRTC media request.
+      if (stream) {
+        const audioTracks = stream.getAudioTracks();
+        if (!audioTracks.length || audioTracks.every(track => track.readyState === 'ended')) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        } else {
+          audioTracks.forEach(track => { track.enabled = true; });
+        }
+      }
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: videoEnabled
+        });
+      }
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks.length) throw new Error('No microphone track was provided. Allow microphone access and try again.');
+      audioTracks.forEach(track => { track.enabled = true; });
+      diagnostic('local-audio-ready', { tracks: audioTracks.length, enabled: audioTracks.every(track => track.enabled) });
+      return stream;
+    };
     const createPeer = () => { pc = new RTCPeerConnection({ iceServers: window.IDKCallRuntime?.iceServers || [{ urls: ['stun:stun.l.google.com:19302'] }] }); diagnostic('peer-created', { iceServers: pc.getConfiguration().iceServers?.length || 0 }); stream?.getTracks().forEach(track => pc.addTrack(track, stream)); pc.onicecandidate = event => { if (event.candidate) sendCall('signal', { candidate: event.candidate }); }; pc.ontrack = event => { audio.srcObject = event.streams[0]; video.srcObject = event.streams[0]; video.hidden = !event.streams[0]?.getVideoTracks?.().length; diagnostic('remote-track', { video: Boolean(event.streams[0]?.getVideoTracks?.().length) }); }; pc.oniceconnectionstatechange = () => { if (!pc) return; diagnostic('ice-state', { state: pc.iceConnectionState }); if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') setStatus('Network interrupted. Trying to reconnect…'); }; pc.onconnectionstatechange = () => { if (!pc) return; connected = pc.connectionState === 'connected'; diagnostic('connection-state', { state: pc.connectionState }); if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') { setStatus('Network interrupted. Trying to reconnect…'); clearTimeout(iceRestartTimer); iceRestartTimer = setTimeout(async () => { if (!pc || !call || iceRestarts >= 2) return; try { iceRestarts += 1; pc.restartIce?.(); const offer = await pc.createOffer({ iceRestart: true }); await pc.setLocalDescription(offer); sendCall('signal', { sdp: pc.localDescription }); diagnostic('ice-restart', { attempt: iceRestarts }); } catch (error) { diagnostic('ice-restart-failed', { message: error?.message || 'unknown' }); } }, 1200); } renderCall(); }; };
     const start = async target => {
       const friend = friends.find(item => item.id === target?.id) || target; if (!friend?.id) return setStatus('Choose an accepted friend first.');
