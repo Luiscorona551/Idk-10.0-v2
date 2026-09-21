@@ -4,7 +4,7 @@ import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual, rando
 const databaseURL = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_PRIVATE_URL;
 const pool = databaseURL ? new Pool({ connectionString: databaseURL, ssl: { rejectUnauthorized: false } }) : null;
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
-const MAX_AGE = 1000 * 60 * 60 * 24 * 30;
+// Keep signed-in browsers persistent for 10 years. The session remains revocable from account/device security controls.\nconst MAX_AGE = 1000 * 60 * 60 * 24 * 3650;
 const HANDOFF_MAX_AGE = 10 * 60 * 1000;
 const VAULT_TRANSFER_MAX_AGE = 15 * 60 * 1000;
 const VAULT_MAX_BYTES = 2 * 1024 * 1024;
