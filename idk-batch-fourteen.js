@@ -127,9 +127,17 @@
       }
       if (!stream) {
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          // Request the microphone without browser-specific constraint requirements.
+          // Enhancement constraints are applied afterward when the browser supports them.
+          audio: true,
           video: videoEnabled
         });
+        const acquiredAudio = stream.getAudioTracks()[0];
+        try {
+          await acquiredAudio.applyConstraints({ echoCancellation: true, noiseSuppression: true, autoGainControl: true });
+        } catch {
+          // Keep the microphone active even when a browser does not support one of these constraints.
+        }
       }
       const audioTracks = stream.getAudioTracks();
       if (!audioTracks.length) throw new Error('No microphone track was provided. Allow microphone access and try again.');
@@ -137,7 +145,14 @@
       diagnostic('local-audio-ready', { tracks: audioTracks.length, enabled: audioTracks.every(track => track.enabled) });
       return stream;
     };
-    const createPeer = () => { pc = new RTCPeerConnection({ iceServers: window.IDKCallRuntime?.iceServers || [{ urls: ['stun:stun.l.google.com:19302'] }] }); diagnostic('peer-created', { iceServers: pc.getConfiguration().iceServers?.length || 0 }); stream?.getTracks().forEach(track => pc.addTrack(track, stream)); diagnostic('local-senders', { audio: pc.getSenders().filter(sender => sender.track?.kind === 'audio').length, video: pc.getSenders().filter(sender => sender.track?.kind === 'video').length }); pc.onicecandidate = event => { if (event.candidate) sendCall('signal', { candidate: event.candidate }); }; pc.ontrack = attachRemoteMedia; pc.oniceconnectionstatechange = () => { if (!pc) return; diagnostic('ice-state', { state: pc.iceConnectionState }); if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') setStatus('Network interrupted. Trying to reconnect…'); }; pc.onconnectionstatechange = () => { if (!pc) return; connected = pc.connectionState === 'connected'; diagnostic('connection-state', { state: pc.connectionState }); if (connected) { setStatus('Connected · voice is live'); playRemoteAudio(); } if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') { setStatus('Network interrupted. Trying to reconnect…'); clearTimeout(iceRestartTimer); iceRestartTimer = setTimeout(async () => { if (!pc || !call || iceRestarts >= 2) return; try { iceRestarts += 1; pc.restartIce?.(); const offer = await pc.createOffer({ iceRestart: true }); await pc.setLocalDescription(offer); sendCall('signal', { sdp: pc.localDescription }); diagnostic('ice-restart', { attempt: iceRestarts }); } catch (error) { diagnostic('ice-restart-failed', { message: error?.message || 'unknown' }); } }, 1200); } renderCall(); }; };
+    const createPeer = () => { pc = new RTCPeerConnection({ iceServers: window.IDKCallRuntime?.iceServers || [{ urls: ['stun:stun.l.google.com:19302'] }] }); diagnostic('peer-created', { iceServers: pc.getConfiguration().iceServers?.length || 0 }); stream?.getTracks().forEach(track => pc.addTrack(track, stream));
+      const audioSender = pc.getSenders().find(sender => sender.track?.kind === 'audio');
+      const microphoneTrack = stream?.getAudioTracks?.()[0];
+      if (audioSender && microphoneTrack) {
+        microphoneTrack.enabled = true;
+        audioSender.replaceTrack(microphoneTrack).catch(() => {});
+      }
+      diagnostic('local-senders', { audio: pc.getSenders().filter(sender => sender.track?.kind === 'audio').length, video: pc.getSenders().filter(sender => sender.track?.kind === 'video').length }); pc.onicecandidate = event => { if (event.candidate) sendCall('signal', { candidate: event.candidate }); }; pc.ontrack = attachRemoteMedia; pc.oniceconnectionstatechange = () => { if (!pc) return; diagnostic('ice-state', { state: pc.iceConnectionState }); if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') setStatus('Network interrupted. Trying to reconnect…'); }; pc.onconnectionstatechange = () => { if (!pc) return; connected = pc.connectionState === 'connected'; diagnostic('connection-state', { state: pc.connectionState }); if (connected) { setStatus('Connected · voice is live'); playRemoteAudio(); } if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') { setStatus('Network interrupted. Trying to reconnect…'); clearTimeout(iceRestartTimer); iceRestartTimer = setTimeout(async () => { if (!pc || !call || iceRestarts >= 2) return; try { iceRestarts += 1; pc.restartIce?.(); const offer = await pc.createOffer({ iceRestart: true }); await pc.setLocalDescription(offer); sendCall('signal', { sdp: pc.localDescription }); diagnostic('ice-restart', { attempt: iceRestarts }); } catch (error) { diagnostic('ice-restart-failed', { message: error?.message || 'unknown' }); } }, 1200); } renderCall(); }; };
     const start = async target => {
       const friend = friends.find(item => item.id === target?.id) || target; if (!friend?.id) return setStatus('Choose an accepted friend first.');
       if (!friends.some(item => item.id === friend.id)) return setStatus('Calls are limited to accepted friends shown here.');
