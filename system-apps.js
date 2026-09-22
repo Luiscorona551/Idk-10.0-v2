@@ -1122,7 +1122,8 @@ window.SYSTEM_APPS = (() => {
     open(entry) {
       if (entry?.mime !== 'application/x-idk-browser-url' || typeof entry.content !== 'string' || !entry.content.trim()) return false;
       const url = entry.content.trim();
-      window.OS?.open?.('proxy', { title: entry.name.replace(/\\.idkurl$/i, '') || 'Saved Browser Page', url });
+      const popup = window.open(url, '_blank', 'noopener');
+      if (!popup) window.OS?.notify?.('Files', 'Allow pop-ups to open the saved browser page.', 'warning');
       return true;
     }
   };
