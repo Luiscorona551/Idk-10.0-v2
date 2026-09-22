@@ -1118,6 +1118,16 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
+  window.IDKFileAssociations = {
+    open(entry) {
+      if (entry?.mime !== 'application/x-idk-browser-url' || typeof entry.content !== 'string' || !entry.content.trim()) return false;
+      const url = entry.content.trim();
+      const popup = window.open(url, '_blank', 'noopener');
+      if (!popup) window.OS?.notify?.('Files', 'Allow pop-ups to open the saved browser page.', 'warning');
+      return true;
+    }
+  };
+
   window.IDKFiles = {
     openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
     writeTextFile,
