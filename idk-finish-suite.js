@@ -78,6 +78,31 @@
         if(frame.dataset.finishBrowser) return;
         if(!/\/uv\/service\//.test(frame.src||'')) return;
         frame.dataset.finishBrowser='1';
+        frame.setAttribute('allowfullscreen','');
+        frame.allow = frame.allow ? `${frame.allow}; fullscreen` : 'fullscreen';
+        const toolbar = root.querySelector('.toolbar');
+        if (toolbar && !toolbar.querySelector('.idk-browser-fullscreen')) {
+          const fullscreen = document.createElement('button');
+          fullscreen.className='btn tab idk-browser-fullscreen';
+          fullscreen.type='button';
+          fullscreen.textContent='Fullscreen';
+          fullscreen.onclick=async()=> {
+            try {
+              if (document.fullscreenElement) {
+                await document.exitFullscreen();
+              } else if (frame.requestFullscreen) {
+                await frame.requestFullscreen();
+              } else {
+                fullscreen.textContent='Fullscreen unavailable';
+                setTimeout(()=>{ fullscreen.textContent='Fullscreen'; },1500);
+              }
+            } catch {
+              fullscreen.textContent='Fullscreen unavailable';
+              setTimeout(()=>{ fullscreen.textContent='Fullscreen'; },1500);
+            }
+          };
+          toolbar.append(fullscreen);
+        }
         frame.addEventListener('error',()=>{
           if(root.querySelector('.idk-browser-retry')) return;
           const retry=document.createElement('button');
