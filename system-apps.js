@@ -1118,6 +1118,15 @@ window.SYSTEM_APPS = (() => {
     return root;
   }
 
+  window.IDKFileAssociations = {
+    open(entry) {
+      if (entry?.mime !== 'application/x-idk-browser-url' || typeof entry.content !== 'string' || !entry.content.trim()) return false;
+      const url = entry.content.trim();
+      window.OS?.open?.('proxy', { title: entry.name.replace(/\\.idkurl$/i, '') || 'Saved Browser Page', url });
+      return true;
+    }
+  };
+
   window.IDKFiles = {
     openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
     writeTextFile,
