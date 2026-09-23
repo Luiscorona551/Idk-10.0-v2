@@ -1,6 +1,11 @@
 (() => {
   const VM_URL = 'https://luiscorona551.github.io/idk-Virtual-Machine/';
 
+  async function proxiedVMUrl() {
+    if (!window.PROXY?.encode) throw new Error('Ultraviolet proxy is not available.');
+    return await window.PROXY.encode(VM_URL);
+  }
+
   function registerExtras() {
     if (!window.APPS || APPS.extras) return;
     const root = document.createElement('div');
@@ -15,7 +20,7 @@
 
     const vmCard = document.createElement('article');
     vmCard.className = 'idk-extra-card';
-    vmCard.innerHTML = '<div class="idk-extra-icon">▣</div><div class="idk-extra-copy"><strong>Virtual Machine</strong><span>Virt-Manager-style VM configuration and management.</span></div>';
+    vmCard.innerHTML = '<div class="idk-extra-icon">▣</div><div class="idk-extra-copy"><strong>Virtual Machine</strong><span>Virt-Manager-style VM configuration and management through Ultraviolet.</span></div>';
 
     const open = document.createElement('button');
     open.className = 'btn';
@@ -28,15 +33,26 @@
     frame.allow = 'fullscreen';
     frame.setAttribute('allowfullscreen', '');
     frame.referrerPolicy = 'no-referrer';
-    frame.src = VM_URL;
+    frame.src = 'about:blank';
 
     const status = document.createElement('span');
     status.className = 'idk-extra-status';
-    status.textContent = 'VM Manager';
+    status.textContent = 'Ready · Ultraviolet';
 
-    open.addEventListener('click', () => {
-      frame.src = VM_URL;
-      status.textContent = 'Virtual Machine Manager connected';
+    open.addEventListener('click', async () => {
+      if (open.disabled) return;
+      open.disabled = true;
+      status.textContent = 'Connecting through Ultraviolet…';
+      try {
+        frame.src = await proxiedVMUrl();
+        status.textContent = 'Virtual Machine Manager connected through Ultraviolet';
+      } catch (error) {
+        frame.src = 'about:blank';
+        status.textContent = error?.message || 'Could not connect through Ultraviolet';
+        window.OS?.notify('Virtual Machine', status.textContent, 'error');
+      } finally {
+        open.disabled = false;
+      }
     });
 
     vmCard.append(open, status);
@@ -44,9 +60,10 @@
 
     const footer = document.createElement('p');
     footer.className = 'idk-extras-note';
-    footer.textContent = 'The VM manager is hosted separately so its virtualization backend can be connected independently later.';
+    footer.textContent = 'The VM manager is hosted separately and opened through the IDK Ultraviolet proxy. Its virtualization backend can be connected independently.';
 
     root.append(hero, grid, frame, footer);
+    root.cleanup = () => { frame.src = 'about:blank'; };
     return root;
   }
 
