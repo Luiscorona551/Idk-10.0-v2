@@ -53,7 +53,7 @@
   function setWallpaper(value) {
     const safe = String(value || '').trim().replace(/["\\\\\\r\\n]/g, '');
     const gradient = /^(linear|radial|conic)-gradient\(/.test(safe);
-    document.documentElement.style.setProperty('--wallpaper', safe ? (gradient ? safe : \`url("\${safe}"), linear-gradient(135deg,#16224a,#2b1748)\`) : 'linear-gradient(135deg,#16224a,#2b1748)');
+    document.documentElement.style.setProperty('--wallpaper', safe ? (gradient ? safe : 'url("' + safe + '"), linear-gradient(135deg,#16224a,#2b1748)') : 'linear-gradient(135deg,#16224a,#2b1748)');
     localStorage.setItem('idkWallpaper', JSON.stringify(safe));
     localStorage.setItem('wallpaper', JSON.stringify(safe));
   }
