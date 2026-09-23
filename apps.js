@@ -104,6 +104,50 @@ function gameTabURL(name) {
   return `game.html?game=${encodeURIComponent(name)}`;
 }
 
+const GAMING_CLOUD_PROVIDERS = [
+  { id: 'xbox', title: 'Xbox Cloud Gaming', url: 'https://www.xbox.com/play', glyph: 'X' },
+  { id: 'geforce', title: 'GeForce NOW', url: 'https://play.geforcenow.com/', glyph: 'N' },
+  { id: 'luna', title: 'Amazon Luna', url: 'https://luna.amazon.com/', glyph: 'L' },
+  { id: 'boosteroid', title: 'Boosteroid', url: 'https://cloud.boosteroid.com/', glyph: 'B' },
+  { id: 'blacknut', title: 'Blacknut', url: 'https://www.blacknut.com/', glyph: 'B' }
+];
+
+function gamingCloudApp() {
+  const root = el('section', { className: 'gaming-cloud-panel' });
+  const intro = el('div', { className: 'gaming-cloud-intro' }, [
+    el('div', { className: 'gaming-cloud-badge', textContent: 'ULTRAVIOLET' }),
+    el('h3', { textContent: 'Gaming Cloud' }),
+    el('p', { textContent: 'Cloud gaming services open through the IDK Ultraviolet proxy, so the launcher stays inside the IDK browser environment.' })
+  ]);
+  const providerGrid = el('div', { className: 'gaming-cloud-providers' });
+  const status = el('span', { className: 'count', textContent: 'Choose a cloud gaming service.' });
+  const frame = el('iframe', { className: 'gaming-cloud-frame', title: 'IDK Gaming Cloud', allow: 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write' });
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  const openProvider = async provider => {
+    status.textContent = 'Starting Ultraviolet…';
+    try {
+      if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.');
+      frame.src = await PROXY.encode(provider.url);
+      status.textContent = provider.title + ' · Running through Ultraviolet';
+    } catch (error) {
+      frame.removeAttribute('src');
+      status.textContent = error?.message || 'Could not start the cloud gaming service.';
+      window.OS?.notify?.('Gaming Cloud', status.textContent, 'danger');
+    }
+  };
+  GAMING_CLOUD_PROVIDERS.forEach(provider => {
+    const button = el('button', { className: 'gaming-cloud-provider btn', type: 'button' });
+    button.append(el('span', { className: 'gaming-cloud-provider-glyph', textContent: provider.glyph }), el('span', { textContent: provider.title }));
+    button.onclick = () => openProvider(provider);
+    providerGrid.append(button);
+  });
+  const head = el('div', { className: 'gaming-cloud-head' }, [el('strong', { textContent: 'Cloud services' }), status]);
+  root.append(intro, providerGrid, head, frame);
+  root.cleanup = () => { frame.src = 'about:blank'; };
+  return root;
+}
+
 async function gameBlobURL(name) {
   const file = gameFileName(name);
   const url = GAME_CDN + encodeURIComponent(file) + "?t=" + Date.now();
@@ -1754,7 +1798,16 @@ const APPS = {
       const count = el('span', { className: 'count' });
       const grid = el('div', { className: 'tile-grid' });
       const toolbar = el('div', { className: 'toolbar' }, [search, filter, count]);
-      root.append(toolbar, grid);
+      const cloud = gamingCloudApp();
+      const cloudToggle = el('button', { className: 'btn tab games-cloud-toggle', type: 'button', textContent: 'Gaming Cloud' });
+      const gamesToggle = el('button', { className: 'btn tab games-library-toggle', type: 'button', textContent: 'Game Library' });
+      const modeBar = el('div', { className: 'games-mode-bar' }, [gamesToggle, cloudToggle]);
+      cloud.hidden = true;
+      const showGames = () => { grid.hidden = false; toolbar.hidden = false; cloud.hidden = true; gamesToggle.classList.add('active'); cloudToggle.classList.remove('active'); };
+      const showCloud = () => { grid.hidden = true; toolbar.hidden = true; cloud.hidden = false; gamesToggle.classList.remove('active'); cloudToggle.classList.add('active'); };
+      gamesToggle.onclick = showGames; cloudToggle.onclick = showCloud;
+      root.append(modeBar, toolbar, grid, cloud);
+      gamesToggle.classList.add('active');
       const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
       const recents = () => store.get(GAME_RECENTS_KEY, []);
       const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
