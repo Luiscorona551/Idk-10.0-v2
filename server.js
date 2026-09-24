@@ -45,7 +45,9 @@ setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
 publicStoreRoutes(app);
-vmRoutes(app);
+const vmRouter = express.Router();
+vmRoutes(vmRouter);
+app.use('/api/vm', vmRouter);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
