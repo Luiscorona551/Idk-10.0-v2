@@ -1,13 +1,16 @@
 (() => {
   const VM_URL = 'https://luiscorona551.github.io/idk-Virtual-Machine/';
 
+  function hasApps() {
+    return typeof APPS !== 'undefined' && APPS;
+  }
+
   async function proxiedVMUrl() {
     if (!window.PROXY?.encode) throw new Error('Ultraviolet proxy is not available.');
     return await window.PROXY.encode(VM_URL);
   }
 
-  function registerExtras() {
-    if (!window.APPS || APPS.extras) return;
+  function renderExtras() {
     const root = document.createElement('div');
     root.className = 'idk-extras-app';
 
@@ -68,7 +71,7 @@
   }
 
   function register() {
-    if (!window.APPS || APPS.extras) return false;
+    if (!hasApps() || APPS.extras) return false;
     APPS.extras = {
       title: 'Extras',
       glyph: '✦',
@@ -76,15 +79,11 @@
       dock: false,
       width: 1040,
       height: 720,
-      render: registerExtras
+      render: renderExtras
     };
     document.dispatchEvent(new Event('idk-extras-registered'));
     return true;
   }
 
-  // This file is loaded before os.js so Extras must register immediately.
-  // The fallback event handles pages that load this module later than expected.
-  if (!register()) {
-    document.addEventListener('DOMContentLoaded', register, { once: true });
-  }
+  register();
 })();
