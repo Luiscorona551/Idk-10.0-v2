@@ -1554,6 +1554,64 @@ async function searchApp() {
 
 const APPS = {
   extras: {
+    title: 'Extras',
+    glyph: '✦',
+    desktop: true,
+    dock: false,
+    width: 1040,
+    height: 720,
+    render() {
+      const root = el('div', { className: 'app idk-extras-app' });
+      const header = el('div', { className: 'app-heading' }, [
+        el('div', {}, [
+          el('h2', { textContent: 'Extras' }),
+          el('p', { textContent: 'Extra IDK tools and companion apps.' })
+        ])
+      ]);
+
+      const card = el('section', { className: 'idk-extras-card' });
+      const icon = el('div', { className: 'idk-extras-icon', textContent: '▣' });
+      const info = el('div', { className: 'idk-extras-info' }, [
+        el('strong', { textContent: 'Virtual Machine' }),
+        el('span', { textContent: 'Open the IDK Virtual Machine manager through the Ultraviolet proxy.' })
+      ]);
+      const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
+      const status = el('span', { className: 'idk-extras-status', textContent: 'Ready · Ultraviolet' });
+
+      const frame = el('iframe', {
+        className: 'idk-extras-vm-frame',
+        title: 'IDK Virtual Machine Manager',
+        src: 'about:blank',
+        allow: 'fullscreen'
+      });
+      frame.setAttribute('allowfullscreen', '');
+      frame.setAttribute('referrerpolicy', 'no-referrer');
+
+      open.addEventListener('click', async () => {
+        open.disabled = true;
+        status.textContent = 'Connecting through Ultraviolet…';
+        try {
+          if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') {
+            throw new Error('Ultraviolet proxy is not available.');
+          }
+          frame.src = await PROXY.encode('https://luiscorona551.github.io/idk-Virtual-Machine/');
+          status.textContent = 'Virtual Machine connected · Ultraviolet';
+        } catch (error) {
+          frame.src = 'about:blank';
+          status.textContent = error?.message || 'Could not connect through Ultraviolet.';
+          window.OS?.notify?.('Virtual Machine', status.textContent, 'danger');
+        } finally {
+          open.disabled = false;
+        }
+      });
+
+      card.append(icon, info, open, status);
+      root.append(header, card, frame);
+      root.cleanup = () => { frame.src = 'about:blank'; };
+      return root;
+    }
+  },
+  extras: {
     title: 'Extras', glyph: '✦', desktop: true, dock: false, width: 1040, height: 720,
     render() {
       const root = el('div', { className: 'idk-extras-app' });
