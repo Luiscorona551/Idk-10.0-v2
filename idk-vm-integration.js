@@ -10,8 +10,7 @@
     return await window.PROXY.encode(VM_URL);
   }
 
-  function registerExtras() {
-    if (!hasApps() || APPS.extras) return false;
+  function renderExtras() {
     const root = document.createElement('div');
     root.className = 'idk-extras-app';
 
@@ -72,10 +71,19 @@
   }
 
   function register() {
-    return registerExtras();
+    if (!hasApps() || APPS.extras) return false;
+    APPS.extras = {
+      title: 'Extras',
+      glyph: '✦',
+      desktop: true,
+      dock: false,
+      width: 1040,
+      height: 720,
+      render: renderExtras
+    };
+    document.dispatchEvent(new Event('idk-extras-registered'));
+    return true;
   }
 
-  if (!register()) {
-    document.addEventListener('DOMContentLoaded', register, { once: true });
-  }
+  register();
 })();
