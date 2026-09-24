@@ -15,6 +15,7 @@ import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-se
 import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
 import { databaseStatus } from './idk-db-health.js';
 import { publicStoreRoutes } from './idk-public-store-server.js';
+import { vmBackendStatus, vmRoutes } from './idk-vm-backend.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
@@ -25,7 +26,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
-async function backendStatus() { return { ...backend, ai: aiStatus(), database: await databaseStatus() }; }
+async function backendStatus() { return { ...backend, ai: aiStatus(), database: await databaseStatus(), vm: vmBackendStatus() }; }
 app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -44,6 +45,9 @@ setupRoutes(app);
 accountRoutes(app);
 friendRoutes(app);
 publicStoreRoutes(app);
+const vmRouter = express.Router();
+vmRoutes(vmRouter);
+app.use('/api/vm', vmRouter);
 app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
