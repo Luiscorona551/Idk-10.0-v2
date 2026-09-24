@@ -464,7 +464,11 @@ const OS = (() => {
     const rank = new Map(Array.isArray(order) ? order.map((id, index) => [id, index]) : []);
     return Object.entries(APPS)
       .filter(([, app]) => app.desktop)
-      .sort(([first], [second]) => (rank.get(first) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second) ?? Number.MAX_SAFE_INTEGER));
+      .sort(([first], [second]) => {
+        if (first === 'extras' && second !== 'extras') return -1;
+        if (second === 'extras' && first !== 'extras') return 1;
+        return (rank.get(first) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second) ?? Number.MAX_SAFE_INTEGER);
+      });
   }
 
   async function launch(appId, opts = {}) {
