@@ -1,0 +1,10 @@
+.idk-extras-app{height:100%;overflow:auto;padding:22px;box-sizing:border-box}
+.idk-extras-app .app-heading{margin-bottom:16px}
+.idk-extras-app .app-heading h2{margin:0 0 5px}
+.idk-extras-app .app-heading p{margin:0;color:var(--muted)}
+.idk-extras-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:16px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:16px;background:color-mix(in srgb,var(--panel) 90%,transparent)}
+.idk-extras-icon{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 18%,transparent);font-size:25px}
+.idk-extras-info{display:grid;gap:5px;min-width:0}
+.idk-extras-info span,.idk-extras-status{color:var(--muted);font-size:13px}
+.idk-extras-vm-frame{display:block;width:100%;height:500px;margin-top:14px;border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:16px;background:#0a0f20}
+@media(max-width:700px){.idk-extras-card{grid-template-columns:auto 1fr}.idk-extras-card .btn{grid-column:1/-1;width:100%}.idk-extras-status{grid-column:1/-1}.idk-extras-vm-frame{height:520px}}
