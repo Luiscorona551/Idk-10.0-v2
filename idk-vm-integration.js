@@ -67,8 +67,8 @@
     return root;
   }
 
-  const register = () => {
-    if (!window.APPS || APPS.extras) return;
+  function register() {
+    if (!window.APPS || APPS.extras) return false;
     APPS.extras = {
       title: 'Extras',
       glyph: '✦',
@@ -79,8 +79,12 @@
       render: registerExtras
     };
     document.dispatchEvent(new Event('idk-extras-registered'));
-  };
+    return true;
+  }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', register, { once: true });
-  else register();
+  // This file is loaded before os.js so Extras must register immediately.
+  // The fallback event handles pages that load this module later than expected.
+  if (!register()) {
+    document.addEventListener('DOMContentLoaded', register, { once: true });
+  }
 })();
