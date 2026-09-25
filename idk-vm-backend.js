@@ -60,13 +60,13 @@ async function ensureDisk(vm) {
   return file;
 }
 function displayArgs(vm,args){ if(vm.display==='virtio')args.push('-vga','virtio'); else if(vm.display==='qxl')args.push('-vga','qxl'); else if(vm.display==='vmware')args.push('-vga','vmware'); else if(vm.display==='vga')args.push('-vga','std'); else args.push('-vga','std'); }
-function soundArgs(vm,args){ if(vm.soundDevice==='none')return; args.push('-audiodev','driver=none,id=audio0'); const map={hda:'hda-duplex',ac97:'AC97',sb16:'sb16',virtio:'virtio-sound-pci'}; args.push('-device',map[vm.soundDevice]||'hda-duplex'); }
+function soundArgs(vm,args){ if(vm.soundDevice==='none')return; args.push('-audiodev','driver=none,id=audio0'); if(vm.soundDevice==='hda'){args.push('-device','ich9-intel-hda,id=sound0','-device','hda-duplex,audiodev=audio0');} else {const map={ac97:'AC97',sb16:'sb16',virtio:'virtio-sound-pci'};args.push('-device',(map[vm.soundDevice]||'AC97')+',audiodev=audio0');} }
 function networkArgs(vm,args){ if(vm.network==='isolated'||vm.network==='host-only'){args.push('-nic','none');return;} const model=vm.networkAdapter||'virtio'; args.push('-nic',(vm.network==='bridged'?'bridge,br=br0,model=':'user,model=')+model); }
 async function startQemu(vm) {
   if(!ENABLE_QEMU){const error=new Error('QEMU execution is disabled. Set ENABLE_QEMU=true on a dedicated VM host.');error.code='QEMU_DISABLED';throw error;}
   if(running.has(vm.id))return running.get(vm.id);
   const disk=await ensureDisk(vm);
-  const args=['-name',vm.name,'-m',String(vm.ramMb),'-smp',String(vm.cpuCores),'-nodefaults'];
+  const args=['-name',vm.name,'-m',String(vm.ramMb),'-smp',String(vm.cpuCores),'-cpu',vm.cpuModel==='qemu64'?'qemu64':vm.cpuModel==='max'?'max':'host','-nodefaults'];
   if(vm.firmware==='uefi') args.push('-machine','q35');
   const driveBus=vm.diskBus==='nvme'?'none':vm.diskBus;
   if(vm.diskBus==='nvme'){args.push('-drive','file='+disk+',if=none,id=disk0,format=qcow2','-device','nvme,drive=disk0,serial=IDKDISK');}
