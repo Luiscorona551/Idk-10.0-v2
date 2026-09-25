@@ -40,6 +40,33 @@ const WALLPAPER_PRESETS = [
   { value: DEFAULT_WALLPAPER, label: 'IDK Blue' }
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
+const TAB_CLOAKER_KEY = 'idkTabCloaker';
+const DEFAULT_TAB_TITLE = 'IDK 10.0';
+
+function applyTabCloaker(settings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' })) {
+  const config = settings && typeof settings === 'object' ? settings : { enabled: false, url: '' };
+  const enabled = Boolean(config.enabled);
+  const rawURL = String(config.url || '').trim();
+  let target;
+  try { target = new URL(rawURL); } catch (e) { target = null; }
+  if (!enabled || !target || !/^https?:$/.test(target.protocol)) {
+    document.title = DEFAULT_TAB_TITLE;
+    const icon = document.querySelector('link[data-idk-tab-cloak]');
+    if (icon) icon.remove();
+    return false;
+  }
+  const hostname = target.hostname.replace(/^www\./i, '');
+  document.title = hostname || target.host;
+  let icon = document.querySelector('link[data-idk-tab-cloak]');
+  if (!icon) {
+    icon = document.createElement('link');
+    icon.rel = 'icon';
+    icon.dataset.idkTabCloak = 'true';
+    document.head.append(icon);
+  }
+  icon.href = target.origin + '/favicon.ico';
+  return true;
+}
 const MOVIE_HISTORY_KEY = 'idkMovieHistory';
 const GAME_FAVORITES_KEY = 'idkGameFavorites';
 const GAME_RECENTS_KEY = 'idkGameRecents';
@@ -2461,6 +2488,14 @@ const APPS = {
       const motion = el('select', { className: 'field', value: store.get('motion', 'on') });
       [['on', 'Motion on'], ['off', 'Reduce motion']].forEach(([value, label]) => motion.append(el('option', { value, textContent: label })));
       motion.value = store.get('motion', 'on');
+      const tabCloakSettings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' });
+      const tabCloakURL = el('input', {
+        className: 'field',
+        type: 'url',
+        placeholder: 'https://www.google.com/',
+        value: tabCloakSettings.url || ''
+      });
+      const tabCloakEnabled = el('input', { type: 'checkbox', checked: Boolean(tabCloakSettings.enabled) });
       const panic = el('input', {
         className: 'field',
         type: 'url',
@@ -2478,6 +2513,8 @@ const APPS = {
         store.set('dockPosition', dockPosition.value);
         store.set('motion', motion.value);
         store.set('panicURL', panic.value.trim());
+        store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
+        applyTabCloaker();
         applyWallpaper(input.value.trim());
         applyTheme(theme.value);
         applyIconSize(iconSize.value);
@@ -2522,6 +2559,15 @@ const APPS = {
          ]),
         customTheme,
         el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Tab Cloaker' }),
+          el('small', { className: 'sub', textContent: 'Changes the browser tab title and favicon to the site you choose. Browsers do not allow a web app to change the real address bar to another domain.' }),
+          el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' }, [
+            tabCloakEnabled,
+            el('span', { textContent: 'Enable cloak' }),
+            tabCloakURL
+          ])
+        ]),
+        el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Power button redirects to' }),
           panic
         ]),
@@ -2563,6 +2609,8 @@ const APPS = {
     }
   }
 };
+
+applyTabCloaker();
 
 window.IDKPermissions = {
   can(appId, permission) {
