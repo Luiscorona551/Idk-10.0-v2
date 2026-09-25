@@ -2520,8 +2520,8 @@ const APPS = {
         store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
         applyTabCloaker();
         applyWallpaper(input.value.trim());
-        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
         applyTheme(theme.value);
+        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
         applyIconSize(iconSize.value);
         applyDockPosition(dockPosition.value);
         applyMotion(motion.value);
