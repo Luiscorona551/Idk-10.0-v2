@@ -2453,6 +2453,9 @@ const APPS = {
       }
       wallpaperPreset.value = currentWallpaper;
       wallpaperPreset.addEventListener('change', () => { if (wallpaperPreset.value) input.value = wallpaperPreset.value; });
+      const uiColor = el('select', { className: 'field' });
+      [['auto', 'Auto — match wallpaper'], ['blue', 'Blue / Classic'], ['grape', 'Purple / Grape'], ['green', 'Green'], ['red', 'Red / Cherry'], ['yellow', 'Yellow / Lemon']].forEach(([value, label]) => uiColor.append(el('option', { value, textContent: label })));
+      uiColor.value = store.get('idkUIColorTheme', 'auto');
       const clock24 = el('input', { type: 'checkbox', checked: store.get('clock24', false) });
       const theme = el('select', { className: 'field', value: store.get('theme', 'midnight') });
       [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy'], ['custom', 'Custom']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
@@ -2507,6 +2510,7 @@ const APPS = {
       save.addEventListener('click', () => {
         store.set('wallpaper', input.value.trim());
         store.set('clock24', clock24.checked);
+        store.set('idkUIColorTheme', uiColor.value);
         store.set('theme', theme.value);
         store.set(CUSTOM_THEME_KEY, readCustomTheme());
         store.set('iconSize', iconSize.value);
@@ -2516,6 +2520,7 @@ const APPS = {
         store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
         applyTabCloaker();
         applyWallpaper(input.value.trim());
+        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
         applyTheme(theme.value);
         applyIconSize(iconSize.value);
         applyDockPosition(dockPosition.value);
@@ -2550,6 +2555,11 @@ const APPS = {
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: '24-hour clock' }),
           clock24
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'UI color' }),
+          uiColor,
+          el('small', { className: 'sub', textContent: 'Choose the accent, panels, text, and related interface colors. Auto follows the selected wallpaper.' })
         ]),
         el('div', { className: 'settings-row settings-grid' }, [
            el('label', { textContent: 'Theme' }), theme,
