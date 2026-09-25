@@ -18,7 +18,7 @@ const store = {
 };
 
 const PANIC_URL = 'https://classroom.google.com/';
-const DEFAULT_WALLPAPER = 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png';
+const DEFAULT_WALLPAPER = 'https://cdn.phototourl.com/member/2026-09-25-8f19f079-9694-4973-af98-5f3add5f3868.png';
 const FALLBACK_WALLPAPER = 'linear-gradient(135deg, #16224a, #2b1748)';
 const THEMES = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
 const CUSTOM_THEME_KEY = 'idkCustomTheme';
