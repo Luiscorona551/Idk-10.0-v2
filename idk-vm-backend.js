@@ -88,7 +88,7 @@ export function vmBackendStatus() {
 export function vmRoutes(router) {
   const setCors = (req, res, next) => {
     const origin = req.get('origin');
-    if (origin && /^https:\/\/([a-z0-9-]+\.)*github\.io$/i.test(origin)) {
+    if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
