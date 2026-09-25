@@ -7,10 +7,10 @@
   const HISTORY_KEY = 'idkBrowserHistory-v1';
 
   const packs = [
-    { id: 'blue', name: 'IDK Blue', wallpaper: 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png', accent: '#5b9cff', glow: '#4b8dff', panel: 'rgba(10, 28, 68, .82)', solid: '#0d1d43' },
     { id: 'grape', name: 'Grape', wallpaper: 'https://kommodo.ai/i/SSsUaAWZPviBJ7HWcyLM', accent: '#c17bdc', glow: '#9b5de5', panel: 'rgba(40, 18, 67, .84)', solid: '#24123f' },
     { id: 'green', name: 'Green', wallpaper: 'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun', accent: '#62e6a0', glow: '#42d392', panel: 'rgba(8, 43, 33, .84)', solid: '#0b2f24' },
-    { id: 'red', name: 'Red', wallpaper: 'https://kommodo.ai/i/hdSl', accent: '#ff667d', glow: '#e94f64', panel: 'rgba(61, 13, 25, .84)', solid: '#3a0d18' }
+    { id: 'red', name: 'Red', wallpaper: 'https://kommodo.ai/i/hdSlLTe6uuxgLc9LaurW', accent: '#ff667d', glow: '#e94f64', panel: 'rgba(61, 13, 25, .84)', solid: '#3a0d18' },
+    { id: 'blue', name: 'Blue', wallpaper: 'https://kommodo.ai/i/NgrJyYk2J4PoV0hjkopI', accent: '#5b9cff', glow: '#4b8dff', panel: 'rgba(10, 28, 68, .82)', solid: '#0d1d43' }
   ];
 
   const addStyle = () => {
@@ -92,7 +92,7 @@
       button.className = 'idk-theme-pack-button';
       button.dataset.themePack = pack.id;
       button.innerHTML = `<span class="idk-theme-swatch"></span><strong></strong>`;
-      button.querySelector('.idk-theme-swatch').style.background = pack.id === 'blue' ? 'linear-gradient(135deg,#1553a4,#5b9cff)' : pack.id === 'grape' ? 'linear-gradient(135deg,#24123f,#9b5de5)' : pack.id === 'green' ? 'linear-gradient(135deg,#0b2f24,#42d392)' : 'linear-gradient(135deg,#3a0d18,#e94f64)';
+      button.querySelector('.idk-theme-swatch').style.background = `linear-gradient(135deg, ${pack.solid}, ${pack.glow})`;
       button.querySelector('strong').textContent = pack.name;
       button.addEventListener('click', () => applyPack(pack));
       grid.append(button);
@@ -231,7 +231,10 @@
   }
 
   const initialPack = packs.find(pack => pack.id === localStorage.getItem(KEY));
-  if (initialPack) setBackgroundTheme(initialPack);
+  if (initialPack) {
+    setWallpaper(initialPack.wallpaper);
+    setBackgroundTheme(initialPack);
+  }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan, {once:true}); else scan();
   new MutationObserver(scan).observe(document.body, {childList:true,subtree:true});
