@@ -396,7 +396,7 @@ window.SYSTEM_APPS = (() => {
         if (!blob) throw new Error('This file is no longer available. Import it again.');
         if (/\\.url$/i.test(entry.name)) {
           const shortcutText = await blob.text();
-          const target = shortcutText.match(/^URL=(https?:\\/\\/[^\\r\\n]+)/im)?.[1]?.trim();
+          const target = shortcutText.match(/^URL=(https?:\/\/[^\r\n]+)/im)?.[1]?.trim();
           if (!target) throw new Error('This web shortcut does not contain a valid URL.');
           window.OS?.open?.('proxy', { title: entry.name.replace(/\\.url$/i, '') + ' — Browser', url: target });
           return;
