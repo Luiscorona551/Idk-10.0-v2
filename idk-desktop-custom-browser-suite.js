@@ -27,6 +27,7 @@
       .idk-desktop-tools button { flex:1 1 140px; }
       .idk-browser-tools { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
       .idk-browser-tools button { white-space:nowrap; }
+      .idk-browser-fullscreen { width:100%; min-height:70vh; }
       .idk-browser-library { margin-top:8px; padding:9px; border-radius:10px; background:rgba(0,0,0,.16); }
       .idk-browser-library[hidden] { display:none; }
       .idk-browser-library-list { display:grid; gap:5px; max-height:180px; overflow:auto; margin-top:7px; }
@@ -145,10 +146,12 @@
     history.className = 'btn tab'; history.type = 'button'; history.textContent = 'History';
     const saveFile = document.createElement('button');
     saveFile.className = 'btn tab'; saveFile.type = 'button'; saveFile.textContent = 'Save URL to Files';
+    const fullscreen = document.createElement('button');
+    fullscreen.className = 'btn tab'; fullscreen.type = 'button'; fullscreen.textContent = 'Fullscreen';
     const panel = document.createElement('div');
     panel.className = 'idk-browser-library';
     panel.hidden = true;
-    tools.append(bookmark, library, history, saveFile);
+    tools.append(bookmark, library, history, saveFile, fullscreen);
     root.prepend(tools);
     root.prepend(panel);
 
@@ -179,14 +182,30 @@
     };
     library.onclick = () => renderList('bookmarks');
     history.onclick = () => renderList('history');
-    saveFile.onclick = () => {
+    saveFile.onclick = async () => {
       const url = browserURL(root);
       if (!/^https?:/i.test(url)) return window.OS?.notify?.('Browser','No web URL is open.','warning');
-      const blob = new Blob([`[InternetShortcut]\\nURL=${url}\\n`], {type:'text/plain'});
-      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'IDK Web Shortcut.url'; link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      saveHistory(url, document.title);
-      window.OS?.notify?.('Browser','Web shortcut saved.','success');
+      const title = (root.querySelector('input[type="url"],input[type="search"]')?.value || document.title || 'Web Shortcut').trim();
+      const safeTitle = title.replace(/^https?:\/\//i, '').replace(/[^a-z0-9 _.-]+/gi, '-').slice(0, 80).trim() || 'Web Shortcut';
+      const shortcut = '[InternetShortcut]\nURL=' + url + '\n';
+      if (window.IDKFiles?.writeTextFile) {
+        window.IDKFiles.writeTextFile(safeTitle.endsWith('.url') ? safeTitle : safeTitle + '.url', shortcut, '', 'application/internet-shortcut');
+        saveHistory(url, document.title);
+        window.OS?.notify?.('Browser','Web shortcut saved to C:\\IDK Files.','success');
+      } else {
+        const blob = new Blob([shortcut], {type:'text/plain'});
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = safeTitle.endsWith('.url') ? safeTitle : safeTitle + '.url'; link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        window.OS?.notify?.('Browser','IDK Files was unavailable, so the shortcut was downloaded.','warning');
+      }
+    };
+    fullscreen.onclick = async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await (root.requestFullscreen?.() || root.querySelector('iframe')?.requestFullscreen?.());
+      } catch {
+        window.OS?.notify?.('Browser','Fullscreen is unavailable in this browser.','warning');
+      }
     };
     const observer = new MutationObserver(() => {
       const url = browserURL(root);
