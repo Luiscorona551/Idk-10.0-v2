@@ -34,10 +34,11 @@ const PERMISSION_TYPES = [
 ];
 const PERMISSION_DEFAULTS = { open: true, storage: true, notifications: true, network: true, microphone: false, camera: false };
 const WALLPAPER_PRESETS = [
-  { value: 'https://kommodo.ai/i/SSsUaAWZPviBJ7HWcyLM', label: 'Grape' },
-  { value: 'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun', label: 'Green' },
-  { value: 'https://kommodo.ai/i/hdSl', label: 'Red' },
-  { value: DEFAULT_WALLPAPER, label: 'IDK Blue' }
+  { value: DEFAULT_WALLPAPER, label: 'Blue / Classic' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg', label: 'Purple / Grape' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg', label: 'Green' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg', label: 'Red / Cherry' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c.jpg', label: 'Yellow / Lemon' }
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
 const TAB_CLOAKER_KEY = 'idkTabCloaker';
