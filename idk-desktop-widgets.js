@@ -7,7 +7,11 @@
     news: { label: 'News', icon: '▤', width: 285, height: 205 },
     calendar: { label: 'Calendar events', icon: '□', width: 245, height: 180 },
     stocks: { label: 'Stock prices', icon: '↗', width: 245, height: 180 },
-    sports: { label: 'Sports scores', icon: '★', width: 285, height: 205 }
+    sports: { label: 'Sports scores', icon: '★', width: 285, height: 205 },
+    clock: { label: 'Clock', icon: '◷', width: 245, height: 150 },
+    notes: { label: 'Quick notes', icon: '✎', width: 285, height: 205 },
+    system: { label: 'System status', icon: '▣', width: 245, height: 180 },
+    shortcuts: { label: 'Quick actions', icon: '⚡', width: 285, height: 190 }
   };
 
   const read = (key, fallback) => {
@@ -68,6 +72,31 @@
           return `${symbol}: ${row.split(',')[6] || '—'}`;
         }));
         body.innerHTML = prices.map(item => `<span class="idk-widget-line">${esc(item)}</span>`).join('');
+      } else if (type === 'clock') {
+        const now = new Date();
+        body.innerHTML = `<strong class="idk-widget-clock">${esc(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}</strong><span>${esc(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }))}</span>`;
+      } else if (type === 'notes') {
+        const notes = read('idkQuickNotes', []);
+        const items = Array.isArray(notes) ? notes.filter(Boolean).slice(0, 4) : [];
+        body.innerHTML = `${items.length ? items.map(item => `<span class="idk-widget-line">${esc(typeof item === 'string' ? item : item.text || item.title || '')}</span>`).join('') : '<span>No quick notes yet.</span>'}<button type="button" class="idk-widget-inline-action" data-note-action>Add note</button>`;
+        body.querySelector('[data-note-action]').onclick = () => {
+          const value = window.prompt('New quick note');
+          if (!value?.trim()) return;
+          const next = Array.isArray(read('idkQuickNotes', [])) ? read('idkQuickNotes', []) : [];
+          next.unshift({ text: value.trim(), at: Date.now() });
+          write('idkQuickNotes', next.slice(0, 20));
+          refresh(card, type);
+        };
+      } else if (type === 'system') {
+        const memory = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Not reported';
+        const online = navigator.onLine ? 'Online' : 'Offline';
+        body.innerHTML = `<span class="idk-widget-line">Network: <b>${esc(online)}</b></span><span class="idk-widget-line">Screen: <b>${innerWidth}×${innerHeight}</b></span><span class="idk-widget-line">Memory: <b>${esc(memory)}</b></span><span class="idk-widget-line">Browser: <b>${esc(navigator.userAgent.includes('CriOS') ? 'Chrome iOS' : navigator.userAgent.includes('Safari') ? 'Safari' : 'Web browser')}</b></span>`;
+      } else if (type === 'shortcuts') {
+        body.innerHTML = '<div class="idk-widget-shortcuts"><button type="button" data-shortcut="settings">Settings</button><button type="button" data-shortcut="files">Files</button><button type="button" data-shortcut="lock">Lock</button><button type="button" data-shortcut="notifications">Notifications</button></div>';
+        body.querySelector('[data-shortcut="settings"]').onclick = () => window.OS?.open?.('settings');
+        body.querySelector('[data-shortcut="files"]').onclick = () => window.OS?.open?.('files');
+        body.querySelector('[data-shortcut="lock"]').onclick = () => window.IDKFeaturePack?.lockScreen?.();
+        body.querySelector('[data-shortcut="notifications"]').onclick = () => document.getElementById('notification-toggle')?.click();
       } else if (type === 'sports') {
         const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard');
         const data = await response.json();
