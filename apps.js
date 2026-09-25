@@ -34,10 +34,11 @@ const PERMISSION_TYPES = [
 ];
 const PERMISSION_DEFAULTS = { open: true, storage: true, notifications: true, network: true, microphone: false, camera: false };
 const WALLPAPER_PRESETS = [
-  { value: 'https://kommodo.ai/i/SSsUaAWZPviBJ7HWcyLM', label: 'Grape' },
-  { value: 'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun', label: 'Green' },
-  { value: 'https://kommodo.ai/i/hdSl', label: 'Red' },
-  { value: DEFAULT_WALLPAPER, label: 'IDK Blue' }
+  { value: DEFAULT_WALLPAPER, label: 'Blue / Classic' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg', label: 'Purple / Grape' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg', label: 'Green' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg', label: 'Red / Cherry' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c.jpg', label: 'Yellow / Lemon' }
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
 const TAB_CLOAKER_KEY = 'idkTabCloaker';
@@ -2453,6 +2454,9 @@ const APPS = {
       }
       wallpaperPreset.value = currentWallpaper;
       wallpaperPreset.addEventListener('change', () => { if (wallpaperPreset.value) input.value = wallpaperPreset.value; });
+      const uiColor = el('select', { className: 'field' });
+      [['auto', 'Auto — match wallpaper'], ['blue', 'Blue / Classic'], ['grape', 'Purple / Grape'], ['green', 'Green'], ['red', 'Red / Cherry'], ['yellow', 'Yellow / Lemon']].forEach(([value, label]) => uiColor.append(el('option', { value, textContent: label })));
+      uiColor.value = store.get('idkUIColorTheme', 'auto');
       const clock24 = el('input', { type: 'checkbox', checked: store.get('clock24', false) });
       const theme = el('select', { className: 'field', value: store.get('theme', 'midnight') });
       [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy'], ['custom', 'Custom']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
@@ -2507,6 +2511,7 @@ const APPS = {
       save.addEventListener('click', () => {
         store.set('wallpaper', input.value.trim());
         store.set('clock24', clock24.checked);
+        store.set('idkUIColorTheme', uiColor.value);
         store.set('theme', theme.value);
         store.set(CUSTOM_THEME_KEY, readCustomTheme());
         store.set('iconSize', iconSize.value);
@@ -2517,6 +2522,7 @@ const APPS = {
         applyTabCloaker();
         applyWallpaper(input.value.trim());
         applyTheme(theme.value);
+        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
         applyIconSize(iconSize.value);
         applyDockPosition(dockPosition.value);
         applyMotion(motion.value);
@@ -2550,6 +2556,11 @@ const APPS = {
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: '24-hour clock' }),
           clock24
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'UI color' }),
+          uiColor,
+          el('small', { className: 'sub', textContent: 'Choose the accent, panels, text, and related interface colors. Auto follows the selected wallpaper.' })
         ]),
         el('div', { className: 'settings-row settings-grid' }, [
            el('label', { textContent: 'Theme' }), theme,

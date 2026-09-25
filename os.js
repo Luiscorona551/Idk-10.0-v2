@@ -719,8 +719,10 @@ const OS = (() => {
     });
     buildDockMedia();
 
-    applyWallpaper(store.get('wallpaper', DEFAULT_WALLPAPER));
+    const savedWallpaper = store.get('wallpaper', DEFAULT_WALLPAPER);
+    applyWallpaper(savedWallpaper);
     applyTheme(store.get('theme', 'midnight'));
+    if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(store.get('idkUIColorTheme', 'auto'), savedWallpaper);
     applyIconSize(store.get('iconSize', 'normal'));
     applyDockPosition(store.get('dockPosition', 'bottom'));
     applyMotion(store.get('motion', 'on'));

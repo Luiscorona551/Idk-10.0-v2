@@ -12,10 +12,13 @@
     return themes.find(theme => theme.match(url)) || themes[0];
   }
 
-  function apply(url) {
-    const theme = choose(url);
+  function chooseByName(name) {
+    return themes.find(theme => theme.name === name) || null;
+  }
+
+  function applyThemeObject(theme) {
     const desktop = document.getElementById('desktop');
-    if (!desktop) return;
+    if (!desktop || !theme) return false;
     desktop.setAttribute('data-background-theme', theme.name);
     desktop.style.setProperty('--bg-accent', theme.accent);
     desktop.style.setProperty('--bg-glow', theme.glow);
@@ -28,6 +31,16 @@
     desktop.style.setProperty('--muted', `color-mix(in srgb, ${theme.text} 62%, transparent)`);
     desktop.setAttribute('data-theme', 'custom-background');
     localStorage.setItem(KEY, theme.name);
+    return true;
+  }
+
+  function apply(url) {
+    return applyThemeObject(choose(url));
+  }
+
+  function applyChoice(choice, wallpaperURL) {
+    if (choice === 'auto' || !choice) return apply(wallpaperURL);
+    return applyThemeObject(chooseByName(choice) || choose(wallpaperURL));
   }
 
   const original = window.applyWallpaper;
@@ -40,5 +53,5 @@
     wrapped.__idkBackgroundThemeWrapped = true;
     window.applyWallpaper = wrapped;
   }
-  window.IDKBackgroundTheme = { apply, themes };
+  window.IDKBackgroundTheme = { apply, applyChoice, themes };
 })();
