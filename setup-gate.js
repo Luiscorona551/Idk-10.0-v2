@@ -1,9 +1,7 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 const DEFAULT_KEYS = [
-  'PZ4B-PRWS-2WCX',
-  '4GNN-H4NE-7CSR',
-  'UFJV-ZBBY-TWVY'
+  'PZ4B-PRWS-2WCX'
 ];
 
 function normalizeKey(value) {
@@ -14,11 +12,13 @@ const configuredKeys = (process.env.SETUP_KEYS || process.env.SETUP_KEY || '')
   .split(',')
   .map(key => key.trim())
   .filter(Boolean);
-const KEYS = configuredKeys.length ? configuredKeys : DEFAULT_KEYS;
+// Built-in keys always remain valid; deployment environment keys are additional.
+const KEYS = [...new Set([...DEFAULT_KEYS, ...configuredKeys])];
 // A fresh secret per boot means restarting the server re-locks every browser.
-const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
+const SECRET = process.env.SESSION_SECRET || createHash('sha256').update(`idk-session:${KEYS.join('|')}`).digest('hex');
 const COOKIE = 'ugs_setup';
-const MAX_AGE = 60 * 60 * 24 * 30;
+// Keep the setup gate persistent for 10 years so reopening the site does not restart setup.
+const MAX_AGE = 60 * 60 * 24 * 3650;
 
 // Paths the setup flow itself needs before a session exists.
 const PUBLIC = [
@@ -74,6 +74,10 @@ export function setupRoutes(app) {
   });
 
   app.use((req, res, next) => {
+    if (req.path === '/' || req.path === '/index.html') {
+      if (hasSession(req)) return res.redirect('/desktop.html');
+      return next();
+    }
     if (PUBLIC.some(pattern => pattern.test(req.path)) || hasSession(req)) return next();
     if (req.method === 'GET' && req.accepts('html')) return res.redirect('/');
     res.sendStatus(403);
