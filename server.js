@@ -15,7 +15,7 @@ import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-se
 import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
 import { databaseStatus } from './idk-db-health.js';
 import { publicStoreRoutes } from './idk-public-store-server.js';
-import { vmBackendStatus, vmRoutes } from './idk-vm-backend.js';
+import { vmBackendStatus, vmRoutes, handleVmUpgrade } from './idk-vm-backend.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
@@ -178,6 +178,7 @@ server.on('upgrade', (req, socket, head) => {
     }
   }
   else if (/^\/chat(?:\?|$)/.test(u)) chat.handleUpgrade(req, socket, head, ws => chat.emit('connection', ws, req));
+  else if (/^\/api\/vm\/vms\/[^/]+\/vnc(?:\?|$)/.test(u)) handleVmUpgrade(req, socket, head);
   else socket.destroy();
 });
 const port = Number(process.env.PORT) || 8080, host = process.env.HOST || '0.0.0.0', protocol = httpsKey && httpsCert ? 'https' : 'http';
