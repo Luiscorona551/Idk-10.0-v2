@@ -2681,6 +2681,94 @@ const APPS = {
         openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
         openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
       );
+      // Legacy Control Center abilities now live directly in Settings.
+      const featureState = () => window.IDKFeaturePack?.getState?.() || {};
+      const feature = window.IDKFeaturePack;
+      const systemTools = el('section', { className: 'idk-settings-panel-section' });
+      systemTools.innerHTML = '<h3>Desktop & device</h3><p class="sub">Controls formerly scattered across the old Control Center are managed here.</p>';
+      const healthRow = el('div', { className: 'settings-row' }, [
+        el('label', { textContent: 'System status' }),
+        el('span', { className: 'sub', textContent: 'Checking…' }),
+        el('button', { className: 'btn', type: 'button', textContent: 'Refresh' })
+      ]);
+      feature?.systemStatus?.(healthRow.children[1]);
+      healthRow.children[2].onclick = () => feature?.systemStatus?.(healthRow.children[1]);
+      const brightness = el('input', { type: 'range', min: '20', max: '100', value: String(featureState().brightness ?? 100) });
+      const volume = el('input', { type: 'range', min: '0', max: '100', value: String(featureState().volume ?? 70) });
+      brightness.oninput = () => feature?.setBrightness?.(brightness.value);
+      volume.oninput = () => feature?.setVolume?.(volume.value);
+      systemTools.append(
+        healthRow,
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Brightness' }), brightness]),
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Volume' }), volume]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Virtual desktops' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [1,2,3].map(space => {
+            const b=el('button',{className:'btn tab',type:'button',textContent:'Desktop '+space});
+            b.onclick=()=>feature?.switchSpace?.(space); return b;
+          }))
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Desktop tools' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Toggle widgets'});b.onclick=()=>feature?.toggleWidgets?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Save screenshot'});b.onclick=()=>feature?.saveScreenshot?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Move focused window'});b.onclick=()=>feature?.moveFocusedWindow?.((featureState().space||1)===3?1:(featureState().space||1)+1);return b;})()
+          ])
+        ])
+      );
+      system.append(systemTools);
+
+      const backupSection = el('section', { className: 'idk-settings-panel-section' });
+      backupSection.innerHTML = '<h3>Backup & portability</h3><p class="sub">Export or restore your local IDK settings and app data.</p>';
+      const backupStatus = el('p', { className: 'idk-settings-status', textContent: '' });
+      const exportBackup = el('button', { className: 'btn', type: 'button', textContent: 'Export local backup' });
+      const importLabel = el('label', { className: 'btn', textContent: 'Import local backup' });
+      const importInput = el('input', { type: 'file', accept: 'application/json', hidden: true });
+      importLabel.append(importInput);
+      exportBackup.onclick = () => {
+        const values = Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]));
+        const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([JSON.stringify(values,null,2)],{type:'application/json'})); link.download='idk-10-backup.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+        backupStatus.textContent='Backup exported.';
+      };
+      importInput.onchange = async () => {
+        const file=importInput.files?.[0]; if(!file) return;
+        try { const values=JSON.parse(await file.text()); if(!values || typeof values!=='object') throw new Error('Invalid backup'); Object.entries(values).forEach(([key,value])=>localStorage.setItem(key,String(value))); backupStatus.textContent='Backup imported. Reloading…'; setTimeout(()=>location.reload(),500); }
+        catch { backupStatus.textContent='That backup file could not be read.'; }
+      };
+      backupSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[exportBackup,importLabel]),backupStatus);
+      system.append(backupSection);
+
+      const privacyTools = el('section', { className: 'idk-settings-panel-section' });
+      privacyTools.innerHTML = '<h3>Local privacy & lock</h3><p class="sub">Guest mode and the optional local lock stay on this device.</p>';
+      const guest = el('input', { type:'checkbox', checked:Boolean(featureState().guest) });
+      guest.onchange=()=>feature?.setGuest?.(guest.checked);
+      const pin = el('input',{className:'field',type:'password',inputMode:'numeric',maxlength:'12',placeholder:'New PIN'});
+      const savePin=el('button',{className:'btn',type:'button',textContent:'Save PIN'});
+      const clearPin=el('button',{className:'btn',type:'button',textContent:'Clear PIN'});
+      const lock=el('button',{className:'btn',type:'button',textContent:'Lock now'});
+      const privacyStatus=el('p',{className:'idk-settings-status'});
+      savePin.onclick=async()=>{await feature?.setPIN?.(pin.value.trim());pin.value='';privacyStatus.textContent='Lock PIN saved.';};
+      clearPin.onclick=()=>{feature?.clearPIN?.();pin.value='';privacyStatus.textContent='Lock PIN cleared.';};
+      lock.onclick=()=>feature?.lockScreen?.();
+      privacyTools.append(el('div',{className:'settings-row'},[el('label',{textContent:'Guest mode'}),guest]),el('div',{className:'settings-row'},[el('label',{textContent:'Lock PIN'}),pin,savePin,clearPin,lock]),privacyStatus);
+      privacy.append(privacyTools);
+
+      const bookmarkSection = el('section',{className:'idk-settings-panel-section'});
+      bookmarkSection.innerHTML='<h3>Bookmarks</h3><p class="sub">Manage saved browser bookmarks without opening the old Control Center.</p>';
+      const bookmarkTitle=el('input',{className:'field',placeholder:'Bookmark name'});
+      const bookmarkURL=el('input',{className:'field',type:'url',placeholder:'https://example.com'});
+      const bookmarkList=el('div',{className:'settings-row'});
+      const refreshBookmarks=()=>{bookmarkList.replaceChildren();(feature?.getBookmarks?.()||[]).forEach((item,index)=>{const row=el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;'},[el('span',{textContent:item.title}),el('small',{className:'sub',textContent:item.url})]);const open=el('button',{className:'btn tab',type:'button',textContent:'Open'});open.onclick=()=>window.open(item.url,'_blank','noopener,noreferrer');const del=el('button',{className:'btn tab',type:'button',textContent:'Remove'});del.onclick=()=>{feature?.removeBookmark?.(index);refreshBookmarks();};row.append(open,del);bookmarkList.append(row);});if(!bookmarkList.children.length)bookmarkList.append(el('small',{className:'sub',textContent:'No bookmarks saved.'}));};
+      const addBookmark=el('button',{className:'btn',type:'button',textContent:'Save bookmark'});addBookmark.onclick=()=>{if(feature?.addBookmark?.(bookmarkTitle.value.trim(),bookmarkURL.value.trim())){bookmarkTitle.value='';bookmarkURL.value='';refreshBookmarks();}};
+      bookmarkSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[bookmarkTitle,bookmarkURL,addBookmark]),bookmarkList);refreshBookmarks();system.append(bookmarkSection);
+
+      const generalTools = el('section',{className:'idk-settings-panel-section'});
+      generalTools.innerHTML='<h3>Workspace</h3><p class="sub">Quick access to saved desktop layout controls.</p>';
+      const resetLayout=el('button',{className:'btn',type:'button',textContent:'Reset saved layout'});
+      resetLayout.onclick=()=>{localStorage.removeItem('desktopOrder');localStorage.removeItem('idkDesktopIconPositions');notify('Workspace','The desktop layout will reset after reload.');};
+      generalTools.append(resetLayout); general.append(generalTools);
+
       body.append(system, privacy);
       [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
       const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
