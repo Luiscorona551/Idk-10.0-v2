@@ -1760,15 +1760,6 @@ const APPS = {
     render: () => window.IDKBatchSix?.contacts?.() || document.createElement('div')
   },
 
-  'control-center': {
-    title: 'Control Center',
-    glyph: '◉',
-    desktop: false,
-    dock: false,
-    width: 680,
-    height: 580,
-    render: () => window.IDKBatchSix?.controlCenter?.() || document.createElement('div')
-  },
 
   permissions: {
     title: 'App Permissions',
@@ -2686,7 +2677,7 @@ const APPS = {
       const openPrivacy = (title, detail, action) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = action; return button; };
       privacyGrid.append(
         openPrivacy('App Permissions', 'Review microphone, camera, storage, and network access.', () => window.OS?.open?.('permissions')),
-        openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => window.IDKFeaturePack?.openCenter?.('privacy')),
+        openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => root._showSettingsTab?.('privacy')),
         openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
         openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
       );
