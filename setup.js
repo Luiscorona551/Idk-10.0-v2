@@ -387,8 +387,30 @@ $('region-select').addEventListener('change', () => {
   $('region-btn').textContent = copy.next;
 });
 
-function enterDesktop() {
-  window.location.replace(new URL('desktop.html', document.baseURI).href);
+async function verifySession() {
+  const response = await fetch(new URL('api/status', document.baseURI), {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    headers: { 'Cache-Control': 'no-cache' }
+  });
+  if (!response.ok) throw new Error('IDK session verification failed.');
+  const result = await response.json();
+  if (!result.ok) throw new Error('IDK session verification failed.');
+  return result;
+}
+
+async function enterDesktop() {
+  try {
+    await verifySession();
+    // Bypass any stale document/service-worker cache when transitioning from setup.
+    const desktopURL = new URL('desktop.html', document.baseURI);
+    desktopURL.searchParams.set('idk_build', String(Date.now()));
+    window.location.replace(desktopURL.href);
+  } catch (error) {
+    profileLoginError.textContent = 'Your IDK session could not be verified. Please finish setup again.';
+    profileLoginError.hidden = false;
+    show('profile-setup-screen');
+  }
 }
 
 profileLoginButton.addEventListener('click', () => {
@@ -432,7 +454,7 @@ profileLoginForm.addEventListener('submit', async event => {
         hint: ''
       });
     }
-    enterDesktop();
+    await enterDesktop();
   } catch (error) {
     profileLoginError.textContent = 'The IDK account service could not be reached.';
   } finally {
