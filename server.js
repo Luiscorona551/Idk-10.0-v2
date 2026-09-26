@@ -48,7 +48,7 @@ publicStoreRoutes(app);
 const vmRouter = express.Router();
 vmRoutes(vmRouter);
 app.use('/api/vm', vmRouter);
-app.get('/api/status', async (req, res) => res.json({ ok: true, ...(await backendStatus()) }));
+app.get('/api/status', async (req, res) => res.json({ ok: true, vmApi: process.env.IDK_VM_API || '/api/vm', ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
   version: process.env.IDK_VERSION || '10.30.0',
