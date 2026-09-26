@@ -2442,7 +2442,7 @@ const APPS = {
       const root = el('div', { className: 'app idk-unified-settings' });
       const tabs = el('div', { className: 'idk-settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
       const body = el('div', { className: 'idk-settings-body' });
-      const requestedTab = ['general','appearance','system','privacy'].includes(opts.tab) ? opts.tab : 'general';
+      const requestedTab = ['general','appearance','system','privacy'].includes(opts.tab) ? opts.tab : (store.get('idkSettingsSection','general') || 'general');
       const input = el('input', {
         className: 'field',
         type: 'text',
@@ -2635,7 +2635,7 @@ const APPS = {
       );
       body.append(system, privacy);
       [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
-      const showTab = id => { tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===id; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==id); };
+      const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
       tabs.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.onclick=()=>showTab(tab.dataset.settingsTab));
       root.append(tabs, body);
       showTab(requestedTab);
