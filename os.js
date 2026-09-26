@@ -260,6 +260,40 @@ const OS = (() => {
   }
 
   function drag(win, handle) {
+    let snapPreview = null;
+    let snapTarget = null;
+
+    const ensureSnapPreview = () => {
+      if (snapPreview) return snapPreview;
+      snapPreview = document.createElement('div');
+      snapPreview.className = 'idk-snap-preview';
+      snapPreview.setAttribute('aria-hidden', 'true');
+      desktop.append(snapPreview);
+      return snapPreview;
+    };
+
+    const clearSnapPreview = () => {
+      snapPreview?.classList.remove('show', 'left', 'right', 'max');
+      snapTarget = null;
+    };
+
+    const updateSnapPreview = (clientX, clientY) => {
+      const rect = desktop.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const edge = Math.min(96, Math.max(64, desktop.clientWidth * 0.08));
+      let target = null;
+      if (y <= edge) target = 'max';
+      else if (x <= edge) target = 'left';
+      else if (x >= desktop.clientWidth - edge) target = 'right';
+
+      snapTarget = target;
+      const preview = ensureSnapPreview();
+      preview.classList.remove('show', 'left', 'right', 'max');
+      if (!target) return;
+      preview.classList.add('show', target);
+    };
+
     handle.addEventListener('pointerdown', event => {
       if (event.target.closest('.ctrl')) return;
       focus(win);
@@ -273,23 +307,24 @@ const OS = (() => {
       const move = e => {
         lastX = e.clientX;
         lastY = e.clientY;
-        win.classList.remove('maximized');
-        win.classList.remove('snapped-left', 'snapped-right');
+        win.classList.remove('maximized', 'snapped-left', 'snapped-right');
+        updateSnapPreview(e.clientX, e.clientY);
         const nextLeft = e.clientX - desktopRect.left - offsetX;
         const nextTop = e.clientY - desktopRect.top - offsetY;
         win.style.left = `${Math.min(Math.max(0, nextLeft), Math.max(0, desktop.clientWidth - rect.width))}px`;
         win.style.top = `${Math.min(Math.max(0, nextTop), Math.max(0, desktop.clientHeight - rect.height))}px`;
       };
-      const up = () => {
+      const finish = () => {
         window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        if (lastY <= 18) snap(win, 'max');
-        else if (lastX <= 18) snap(win, 'left');
-        else if (lastX >= desktop.clientWidth - 18) snap(win, 'right');
+        window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', finish);
+        clearSnapPreview();
+        if (snapTarget) snap(win, snapTarget);
         scheduleWorkspaceSave();
       };
       window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
+      window.addEventListener('pointerup', finish);
+      window.addEventListener('pointercancel', finish);
     });
   }
 
