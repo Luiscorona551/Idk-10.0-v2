@@ -20,7 +20,6 @@ vncWsServer.on('connection', (ws, socket) => {
   if (!target) return ws.close();
   const tcp = net.connect(target.port, '127.0.0.1');
   vncSockets.set(ws, tcp);
-  tcp.on('connect', () => { try { ws.send(Buffer.from([0])); } catch {} });
   tcp.on('data', data => { if (ws.readyState === 1) ws.send(data); });
   tcp.on('error', () => { try { ws.close(); } catch {} });
   tcp.on('close', () => { try { ws.close(); } catch {} });
@@ -90,6 +89,7 @@ async function startQemu(vm) {
   if(vm.diskBus==='nvme'){args.push('-drive','file='+disk+',if=none,id=disk0,format=qcow2','-device','nvme,drive=disk0,serial=IDKDISK');}
   else args.push('-drive','file='+disk+',if='+(driveBus==='sata'?'ide':driveBus)+',format=qcow2');
   displayArgs(vm,args); soundArgs(vm,args); networkArgs(vm,args); const vncPort=allocateVncPort(vm.id); args.push('-vnc','127.0.0.1:'+(vncPort-5900),'-display','none');
+  if(vm.isoId){ const isoName=String(vm.isoName||vm.iso||'iso').replace(/[^a-zA-Z0-9._-]/g,'').slice(0,160)||'iso'; const isoFile=path.join(DISK_DIR,String(vm.isoId).replace(/[^a-zA-Z0-9_-]/g,'')+'-'+isoName); try{await fs.access(isoFile);args.push('-cdrom',isoFile);}catch{} }
   const child=spawn(QEMU_BINARY,args,{stdio:'ignore'});
   const processInfo={pid:child.pid,startedAt:new Date().toISOString(),diskPath:disk};
   running.set(vm.id,processInfo); child.once('exit',()=>running.delete(vm.id)); child.once('error',()=>running.delete(vm.id)); return processInfo;
