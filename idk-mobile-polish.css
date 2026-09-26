@@ -1,0 +1,29 @@
+/* Mobile polish: keep the unified shell usable on narrow touch screens. */
+@media (max-width: 700px) {
+  #desktop { min-width: 0; overflow: hidden; }
+  .window {
+    left: 8px !important;
+    right: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: min(78vh, 720px) !important;
+    max-height: calc(100vh - 92px) !important;
+  }
+  .window .content { min-width: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .titlebar .controls .ctrl { min-width: 40px; min-height: 40px; }
+  #start-menu { width: calc(100vw - 20px); max-width: none; max-height: calc(100vh - 120px); overflow: auto; }
+  #dock { max-width: calc(100vw - 20px); overflow-x: auto; scrollbar-width: none; }
+  #dock::-webkit-scrollbar { display: none; }
+  .idk-settings-tabs { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; padding-bottom: 4px; scrollbar-width: none; }
+  .idk-settings-tabs::-webkit-scrollbar { display: none; }
+  .idk-settings-tab { flex: 0 0 auto; min-height: 44px; }
+  .idk-settings-panel, .settings-row, .settings-grid { min-width: 0; }
+  .settings-row { flex-wrap: wrap; }
+  .settings-row .field, .settings-row select, .settings-row input:not([type="checkbox"]):not([type="range"]) { max-width: 100%; box-sizing: border-box; }
+  .idk-call-actions, .idk-rooms-actions { flex-wrap: wrap; }
+  .idk-call-actions .btn, .idk-rooms-actions .btn { min-height: 44px; }
+}
+@media (pointer: coarse) and (max-width: 700px) {
+  button, .btn, input, select, textarea { touch-action: manipulation; }
+  .desktop-icon { min-height: 44px; }
+}
