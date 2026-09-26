@@ -117,7 +117,7 @@
     state.space = Math.max(1, Math.min(3, Number(space) || 1));
     save();
     syncWindows();
-    renderPane('desktop');
+    renderTaskbar();
   }
 
   function moveFocusedWindow(space) {
@@ -221,76 +221,6 @@
     });
   }
 
-  function renderPane(name) {
-    const pane = one('#idk-pack-pane');
-    if (!pane) return;
-    document.querySelectorAll('.idk-pack-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.pane === name));
-    if (name === 'desktop') {
-       pane.innerHTML = `<section class="idk-pack-card"><h3>Virtual desktops</h3><p>Keep school, games, and personal windows separate.</p><div class="idk-pack-space-list">${[1, 2, 3].map(space => `<button class="idk-pack-space${state.space === space ? ' active' : ''}" data-space="${space}">Desktop ${space}</button>`).join('')}</div><div class="idk-pack-actions"><button class="idk-pack-btn" data-action="move">Move active window</button><button class="idk-pack-btn" data-action="widgets">Show widgets</button><button class="idk-pack-btn" data-action="screenshot">Save screenshot</button></div></section>
-         <section class="idk-pack-card"><h3>Appearance</h3><label class="idk-pack-label"><strong>Theme</strong><select class="idk-pack-select" id="idk-pack-theme">${['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy', 'custom'].map(theme => `<option value="${theme}">${theme[0].toUpperCase() + theme.slice(1)}</option>`).join('')}</select></label><div class="idk-pack-custom-theme" id="idk-pack-custom-theme"><label class="idk-pack-label"><strong>Accent</strong><input class="idk-pack-color" data-color="accent" type="color" value="${state.customTheme.accent}"></label><label class="idk-pack-label"><strong>Panel</strong><input class="idk-pack-color" data-color="panel" type="color" value="${state.customTheme.panel}"></label><label class="idk-pack-label"><strong>Window panel</strong><input class="idk-pack-color" data-color="panelSolid" type="color" value="${state.customTheme.panelSolid}"></label><label class="idk-pack-label"><strong>Text</strong><input class="idk-pack-color" data-color="text" type="color" value="${state.customTheme.text}"></label></div></section>`;
-       one('#idk-pack-theme').value = state.theme;
-       const customTheme = one('#idk-pack-custom-theme');
-       const syncCustomTheme = () => {
-         customTheme.hidden = one('#idk-pack-theme').value !== 'custom';
-         if (!customTheme.hidden) applyTheme();
-       };
-       customTheme.querySelectorAll('[data-color]').forEach(input => input.oninput = () => {
-         state.customTheme[input.dataset.color] = input.value;
-         store.set('idkCustomTheme', state.customTheme);
-         save();
-         syncCustomTheme();
-       });
-       pane.querySelectorAll('[data-space]').forEach(button => { button.onclick = () => switchSpace(button.dataset.space); });
-      pane.querySelector('[data-action="move"]').onclick = () => moveFocusedWindow(state.space === 3 ? 1 : state.space + 1);
-      pane.querySelector('[data-action="widgets"]').onclick = toggleWidgets;
-      pane.querySelector('[data-action="screenshot"]').onclick = saveScreenshot;
-       one('#idk-pack-theme').onchange = event => { state.theme = event.target.value; store.set('theme', state.theme); save(); syncCustomTheme(); applyTheme(); };
-       syncCustomTheme();
-       return;
-    }
-    if (name === 'system') {
-      pane.innerHTML = `<section class="idk-pack-card"><h3>System health</h3><p class="idk-pack-status" id="idk-pack-health">Checking system status…</p><button class="idk-pack-btn" id="idk-pack-refresh-health">Refresh status</button></section><section class="idk-pack-card"><h3>Device controls</h3><label class="idk-pack-label"><strong>Brightness</strong><input class="idk-pack-range" id="idk-pack-brightness-range" type="range" min="20" max="100" value="${state.brightness}"></label><label class="idk-pack-label"><strong>Volume</strong><input class="idk-pack-range" id="idk-pack-volume-range" type="range" min="0" max="100" value="${state.volume}"></label></section><section class="idk-pack-card"><h3>Open a built-in app</h3><div class="idk-pack-actions"><button class="idk-pack-btn" data-app="files">Files</button><button class="idk-pack-btn" data-app="proxy">Browser</button><button class="idk-pack-btn" data-app="chat">Messenger</button><button class="idk-pack-btn" data-app="games">Games</button><button class="idk-pack-btn" data-app="music">Music</button></div></section>`;
-      const health = one('#idk-pack-health');
-      systemStatus(health);
-      one('#idk-pack-refresh-health').onclick = () => systemStatus(health);
-      one('#idk-pack-brightness-range').oninput = event => { state.brightness = Number(event.target.value); save(); applyDeviceSettings(); };
-      one('#idk-pack-volume-range').oninput = event => { state.volume = Number(event.target.value); save(); applyDeviceSettings(); };
-      pane.querySelectorAll('[data-app]').forEach(button => { button.onclick = () => openApp(button.dataset.app); });
-      return;
-    }
-    if (name === 'apps') {
-      pane.innerHTML = `<section class="idk-pack-card"><h3>App launcher</h3><p>Files, proxy browsing, games, music, Messenger, and the existing App Store are available here.</p><div class="idk-pack-actions"><button class="idk-pack-btn" data-app="apps">Open Apps</button><button class="idk-pack-btn" data-app="search">Search everything</button></div></section><section class="idk-pack-card"><h3>Bookmarks</h3><label class="idk-pack-label"><strong>Name</strong><input class="idk-pack-input" id="idk-bookmark-title" placeholder="My favorite site"></label><label class="idk-pack-label"><strong>Web address</strong><input class="idk-pack-input" id="idk-bookmark-url" type="url" placeholder="https://example.com"></label><div class="idk-pack-actions"><button class="idk-pack-btn" id="idk-bookmark-add">Save bookmark</button></div><div class="idk-pack-bookmarks"></div></section>`;
-      renderBookmarks(pane);
-      pane.querySelectorAll('[data-app]').forEach(button => { button.onclick = () => openApp(button.dataset.app); });
-      one('#idk-bookmark-add').onclick = () => { const title = one('#idk-bookmark-title').value.trim(); const url = one('#idk-bookmark-url').value.trim(); if (!title || !/^https?:\/\//i.test(url)) return notify('Bookmarks', 'Enter a name and a full web address.'); state.bookmarks.push({ title, url }); save(); renderBookmarks(pane); };
-      return;
-    }
-    if (name === 'privacy') {
-      pane.innerHTML = `<section class="idk-pack-card"><h3>Privacy</h3><p>Guest mode keeps this browser session separate from your saved profile.</p><div class="idk-pack-row"><span>Guest mode</span><input id="idk-pack-guest" type="checkbox" ${state.guest ? 'checked' : ''}></div><div class="idk-pack-actions"><button class="idk-pack-btn" data-action="lock">Lock screen</button></div></section><section class="idk-pack-card"><h3>Optional lock PIN</h3><p>Set a PIN for this browser profile. It is stored locally and is not a replacement for your account password.</p><input class="idk-pack-input" id="idk-pack-pin" type="password" inputmode="numeric" maxlength="12" placeholder="New PIN"><div class="idk-pack-actions"><button class="idk-pack-btn" id="idk-pack-save-pin">Save PIN</button><button class="idk-pack-btn danger" id="idk-pack-clear-pin">Clear PIN</button></div></section>`;
-      one('#idk-pack-guest').onchange = event => { state.guest = event.target.checked; save(); document.body.classList.toggle('idk-guest-mode', state.guest); };
-      pane.querySelector('[data-action="lock"]').onclick = lockScreen;
-      one('#idk-pack-save-pin').onclick = async () => { const pin = one('#idk-pack-pin').value.trim(); state.pinHash = pin ? await hash(pin) : ''; save(); notify('Privacy', pin ? 'Lock PIN saved.' : 'Lock PIN cleared.'); };
-      one('#idk-pack-clear-pin').onclick = () => { state.pinHash = ''; save(); notify('Privacy', 'Lock PIN cleared.'); };
-      return;
-    }
-    pane.innerHTML = `<section class="idk-pack-card"><h3>Backup and restore</h3><p>Save your browser OS settings, notes, bookmarks, and local app data in one file.</p><div class="idk-pack-actions"><button class="idk-pack-btn" id="idk-pack-export">Export backup</button><label class="idk-pack-btn">Import backup<input id="idk-pack-import" type="file" accept="application/json" hidden></label></div><p class="idk-pack-status" id="idk-pack-backup-status"></p></section><section class="idk-pack-card"><h3>Built-in tools</h3><div class="idk-pack-actions"><button class="idk-pack-btn" data-app="settings">Desktop settings</button><button class="idk-pack-btn" data-action="clear-note">Clear quick note</button></div></section>`;
-    one('#idk-pack-export').onclick = () => download('idk-10-backup.json', JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)])), null, 2));
-    one('#idk-pack-import').onchange = async event => { const file = event.target.files?.[0]; if (!file) return; try { const values = JSON.parse(await file.text()); Object.entries(values).forEach(([key, value]) => localStorage.setItem(key, value)); one('#idk-pack-backup-status').textContent = 'Backup imported. Reloading…'; setTimeout(() => location.reload(), 700); } catch { one('#idk-pack-backup-status').textContent = 'That backup file could not be read.'; } };
-    pane.querySelector('[data-action="clear-note"]').onclick = () => { state.note = ''; save(); notify('Quick note', 'Note cleared.'); };
-    pane.querySelectorAll('[data-app]').forEach(button => { button.onclick = () => openApp(button.dataset.app); });
-  }
-
-  function openCenter(tab = 'desktop') {
-    const existing = document.getElementById('idk-pack-center');
-    if (existing) { existing.hidden = !existing.hidden; if (!existing.hidden) renderPane(tab); return; }
-    const center = document.createElement('section');
-    center.id = 'idk-pack-center';
-    center.innerHTML = `<div class="idk-pack-head"><h2>IDK Control Center</h2><button class="idk-pack-close" type="button" aria-label="Close">×</button></div><div class="idk-pack-tabs">${[['desktop', 'Desktop'], ['system', 'System'], ['apps', 'Apps'], ['privacy', 'Privacy'], ['backup', 'Backup']].map(([id, label]) => `<button class="idk-pack-tab" type="button" data-pane="${id}">${label}</button>`).join('')}</div><div id="idk-pack-pane" class="idk-pack-pane"></div>`;
-    document.body.append(center);
-    center.querySelector('.idk-pack-close').onclick = () => { center.hidden = true; };
-    center.querySelectorAll('.idk-pack-tab').forEach(button => { button.onclick = () => renderPane(button.dataset.pane); });
-    renderPane(tab);
-  }
 
   function lockScreen() {
     if (document.getElementById('idk-pack-lock')) return;
@@ -310,24 +240,28 @@
     applyTheme();
     applyDeviceSettings();
     document.body.classList.toggle('idk-guest-mode', state.guest);
-    const control = document.createElement('button');
-    control.id = 'idk-pack-control';
-    control.type = 'button';
-    control.title = 'Open IDK Control Center';
-    control.setAttribute('aria-label', 'Open IDK Control Center');
-    control.textContent = '☷';
-    control.onclick = () => openCenter();
-    document.body.append(control);
     renderTaskbar();
     const windows = document.getElementById('windows');
     if (windows) new MutationObserver(syncWindows).observe(windows, { childList: true });
     document.addEventListener('keydown', event => {
       if (event.ctrlKey && event.altKey && /^[123]$/.test(event.key)) { event.preventDefault(); switchSpace(event.key); }
       if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'l') { event.preventDefault(); lockScreen(); }
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'p') { event.preventDefault(); openCenter(); }
     });
     if (state.locked) lockScreen();
-    window.IDKFeaturePack = { openCenter, switchSpace, toggleWidgets, lockScreen };
+    window.IDKFeaturePack = {
+      switchSpace, toggleWidgets, lockScreen, saveScreenshot, systemStatus,
+      getState: () => ({ ...state, bookmarks: state.bookmarks.map(item => ({ ...item })), customTheme: { ...state.customTheme } }),
+      setBrightness(value) { state.brightness = Math.max(20, Math.min(100, Number(value) || 100)); save(); applyDeviceSettings(); },
+      setVolume(value) { state.volume = Math.max(0, Math.min(100, Number(value) || 0)); save(); applyDeviceSettings(); },
+      setGuest(enabled) { state.guest = Boolean(enabled); save(); document.body.classList.toggle('idk-guest-mode', state.guest); },
+      async setPIN(value) { state.pinHash = value ? await hash(String(value)) : ''; save(); return Boolean(value); },
+      clearPIN() { state.pinHash = ''; save(); },
+      clearNote() { state.note = ''; save(); },
+      getBookmarks: () => state.bookmarks.map(item => ({ ...item })),
+      addBookmark(title, url) { if (!title || !/^https?:\/\//i.test(url)) return false; state.bookmarks.push({ title, url }); save(); return true; },
+      removeBookmark(index) { if (index < 0 || index >= state.bookmarks.length) return false; state.bookmarks.splice(index, 1); save(); return true; },
+      moveFocusedWindow
+    };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
