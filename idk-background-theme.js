@@ -1,5 +1,7 @@
 (() => {
   const KEY = 'idkBackgroundTheme-v2';
+  // Clear legacy appearance state; the unified Settings/background system is authoritative.
+  try { localStorage.removeItem('idkThemePack-v1'); localStorage.removeItem('idkBackgroundTheme-v1'); localStorage.removeItem('idkWallpaper'); } catch {}
   const themes = [
     { name: 'blue', match: url => String(url || '').includes('8f19f079-9694-4973-af98-5f3add5f3868') || String(url || '').includes('plain-wnam-prod-public'), accent: '#5b9cff', glow: '#2d8cff', panel: 'rgba(10, 28, 68, .84)', solid: '#0d1d43', text: '#eaf3ff' },
     { name: 'grape', match: url => String(url || '').includes('e806c32c-31fd-4f54-a378-8eba729b9eda'), accent: '#c17bdc', glow: '#9b5de5', panel: 'rgba(40, 18, 67, .86)', solid: '#24123f', text: '#f7eaff' },
