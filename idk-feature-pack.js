@@ -74,24 +74,6 @@
     return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
-  function applyTheme() {
-    const themes = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
-    const theme = store.get('theme', state.theme);
-    const desktop = document.getElementById('desktop');
-    if (!desktop) return;
-    if (theme === 'custom') {
-      desktop.setAttribute('data-theme', 'custom');
-      desktop.style.setProperty('--accent', state.customTheme.accent);
-      desktop.style.setProperty('--panel', state.customTheme.panel);
-      desktop.style.setProperty('--panel-solid', state.customTheme.panelSolid);
-      desktop.style.setProperty('--text', state.customTheme.text);
-      desktop.style.setProperty('--muted', `color-mix(in srgb, ${state.customTheme.text} 62%, transparent)`);
-      return;
-    }
-    ['--accent', '--panel', '--panel-solid', '--text', '--muted'].forEach(property => desktop.style.removeProperty(property));
-    desktop.setAttribute('data-theme', themes.includes(theme) ? theme : 'midnight');
-  }
-
   function applyDeviceSettings() {
     const brightness = Math.max(20, Math.min(100, Number(state.brightness) || 100));
     let shade = document.getElementById('idk-pack-brightness');
@@ -237,7 +219,6 @@
   }
 
   function init() {
-    applyTheme();
     applyDeviceSettings();
     document.body.classList.toggle('idk-guest-mode', state.guest);
     renderTaskbar();
