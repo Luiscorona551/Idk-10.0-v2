@@ -2,111 +2,8 @@
   'use strict';
   if (window.IDKDesktopCustomizationBrowser) return;
 
-  const KEY = 'idkThemePack-v1';
   const BOOKMARKS_KEY = 'idkBrowserBookmarks-v1';
   const HISTORY_KEY = 'idkBrowserHistory-v1';
-
-  const packs = [
-    { id: 'grape', name: 'Grape', wallpaper: 'https://kommodo.ai/i/SSsUaAWZPviBJ7HWcyLM', accent: '#c17bdc', glow: '#9b5de5', panel: 'rgba(40, 18, 67, .84)', solid: '#24123f' },
-    { id: 'green', name: 'Green', wallpaper: 'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun', accent: '#62e6a0', glow: '#42d392', panel: 'rgba(8, 43, 33, .84)', solid: '#0b2f24' },
-    { id: 'red', name: 'Red', wallpaper: 'https://kommodo.ai/i/hdSlLTe6uuxgLc9LaurW', accent: '#ff667d', glow: '#e94f64', panel: 'rgba(61, 13, 25, .84)', solid: '#3a0d18' },
-    { id: 'blue', name: 'Blue', wallpaper: 'https://kommodo.ai/i/NgrJyYk2J4PoV0hjkopI', accent: '#5b9cff', glow: '#4b8dff', panel: 'rgba(10, 28, 68, .82)', solid: '#0d1d43' }
-  ];
-
-  const addStyle = () => {
-    if (document.getElementById('idk-desktop-custom-browser-style')) return;
-    const style = document.createElement('style');
-    style.id = 'idk-desktop-custom-browser-style';
-    style.textContent = `
-      .idk-theme-pack { margin-top:12px; padding:12px; border:1px solid color-mix(in srgb,var(--bg-accent,#5b9cff) 35%,transparent); border-radius:14px; background:var(--bg-panel,rgba(10,28,68,.5)); }
-      .idk-theme-pack-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; margin-top:9px; }
-      .idk-theme-pack-button { border:1px solid rgba(255,255,255,.15); border-radius:11px; padding:9px; background:rgba(0,0,0,.18); color:var(--text,#eaf0ff); cursor:pointer; text-align:left; }
-      .idk-theme-pack-button:hover,.idk-theme-pack-button.active { border-color:var(--bg-accent,#5b9cff); box-shadow:0 0 0 2px color-mix(in srgb,var(--bg-accent,#5b9cff) 18%,transparent); }
-      .idk-theme-swatch { display:block; height:28px; border-radius:7px; margin-bottom:7px; }
-      .idk-desktop-tools { display:flex; flex-wrap:wrap; gap:7px; margin:10px 0; }
-      .idk-desktop-tools button { flex:1 1 140px; }
-      .idk-browser-tools { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
-      .idk-browser-tools button { white-space:nowrap; }
-      .idk-browser-fullscreen { width:100%; min-height:70vh; }
-      .idk-browser-library { margin-top:8px; padding:9px; border-radius:10px; background:rgba(0,0,0,.16); }
-      .idk-browser-library[hidden] { display:none; }
-      .idk-browser-library-list { display:grid; gap:5px; max-height:180px; overflow:auto; margin-top:7px; }
-      .idk-browser-library-item { display:flex; gap:7px; align-items:center; justify-content:space-between; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.05); }
-      .idk-browser-library-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    `;
-    document.head.append(style);
-  };
-
-  function setBackgroundTheme(pack) {
-    const desktop = document.getElementById('desktop');
-    if (!desktop || !pack) return;
-    desktop.dataset.backgroundTheme = pack.id;
-    desktop.style.setProperty('--bg-accent', pack.accent);
-    desktop.style.setProperty('--bg-glow', pack.glow);
-    desktop.style.setProperty('--bg-panel', pack.panel);
-    desktop.style.setProperty('--bg-panel-solid', pack.solid);
-    desktop.style.setProperty('--accent', pack.accent);
-    desktop.style.setProperty('--panel', pack.panel);
-    desktop.style.setProperty('--panel-solid', pack.solid);
-    localStorage.setItem('idkBackgroundTheme-v1', pack.id);
-  }
-
-  function setWallpaper(value) {
-    const safe = String(value || '').trim().replace(/["\\\\\\r\\n]/g, '');
-    const gradient = /^(linear|radial|conic)-gradient\(/.test(safe);
-    document.documentElement.style.setProperty('--wallpaper', safe ? (gradient ? safe : 'url("' + safe + '"), linear-gradient(135deg,#16224a,#2b1748)') : 'linear-gradient(135deg,#16224a,#2b1748)');
-    localStorage.setItem('idkWallpaper', JSON.stringify(safe));
-    localStorage.setItem('wallpaper', JSON.stringify(safe));
-  }
-
-  function applyPack(pack) {
-    setWallpaper(pack.wallpaper);
-    setBackgroundTheme(pack);
-    localStorage.setItem(KEY, pack.id);
-    localStorage.setItem('theme', JSON.stringify(pack.id === 'blue' ? 'midnight' : 'custom'));
-    if (pack.id !== 'blue') {
-      const custom = { accent: pack.accent, panel: pack.panel, panelSolid: pack.solid, text: '#eaf0ff' };
-      localStorage.setItem('idkCustomTheme', JSON.stringify(custom));
-    }
-    window.dispatchEvent(new CustomEvent('idk-background-theme-refresh'));
-    window.OS?.notify?.('Appearance', `${pack.name} theme applied.`, 'success');
-    refreshThemePackButtons();
-  }
-
-  function addThemePacks() {
-    const settings = [...document.querySelectorAll('.app')].find(root => root.querySelector('h2')?.textContent?.trim() === 'Settings');
-    if (!settings || settings.dataset.idkThemePacks) return;
-    settings.dataset.idkThemePacks = '1';
-    const section = document.createElement('section');
-    section.className = 'idk-theme-pack';
-    const title = document.createElement('strong');
-    title.textContent = 'Theme packs';
-    const sub = document.createElement('small');
-    sub.textContent = 'Background + UI colors stay synchronized.';
-    sub.style.display = 'block';
-    sub.style.marginTop = '3px';
-    const grid = document.createElement('div');
-    grid.className = 'idk-theme-pack-grid';
-    packs.forEach(pack => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'idk-theme-pack-button';
-      button.dataset.themePack = pack.id;
-      button.innerHTML = `<span class="idk-theme-swatch"></span><strong></strong>`;
-      button.querySelector('.idk-theme-swatch').style.background = `linear-gradient(135deg, ${pack.solid}, ${pack.glow})`;
-      button.querySelector('strong').textContent = pack.name;
-      button.addEventListener('click', () => applyPack(pack));
-      grid.append(button);
-    });
-    section.append(title, sub, grid);
-    settings.querySelector('h2')?.after(section);
-    refreshThemePackButtons();
-  }
-
-  function refreshThemePackButtons() {
-    const active = localStorage.getItem(KEY);
-    document.querySelectorAll('[data-theme-pack]').forEach(button => button.classList.toggle('active', button.dataset.themePack === active));
-  }
 
   function bookmarkList() {
     const value = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '[]');
@@ -242,20 +139,11 @@
   }
 
   function scan() {
-    addStyle();
-    addThemePacks();
     desktopTools();
     document.querySelectorAll('.browser-app,.proxy-app,.site-frame').forEach(enhanceBrowser);
-    refreshThemePackButtons();
-  }
-
-  const initialPack = packs.find(pack => pack.id === localStorage.getItem(KEY));
-  if (initialPack) {
-    setWallpaper(initialPack.wallpaper);
-    setBackgroundTheme(initialPack);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan, {once:true}); else scan();
   new MutationObserver(scan).observe(document.body, {childList:true,subtree:true});
-  window.IDKDesktopCustomizationBrowser = { packs, applyPack, scan };
+  window.IDKDesktopCustomizationBrowser = { scan };
 })();
