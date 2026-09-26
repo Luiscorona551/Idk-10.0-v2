@@ -2645,7 +2645,7 @@ const APPS = {
       body.replaceChildren(general, appearance);
 
       const system = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'system', hidden: true });
-      system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and controls from the old Control Center.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
+      system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and desktop controls.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
       const systemGrid = system.querySelector('.idk-settings-action-grid');
       const status = system.querySelector('[data-settings-status]');
       const settingAction = (title, detail, run) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = async () => { button.disabled = true; try { await run(); status.textContent = title + ' completed.'; } catch (error) { status.textContent = title + ' failed: ' + (error?.message || 'Try again.'); } finally { button.disabled = false; } }; return button; };
@@ -2685,7 +2685,7 @@ const APPS = {
       const featureState = () => window.IDKFeaturePack?.getState?.() || {};
       const feature = window.IDKFeaturePack;
       const systemTools = el('section', { className: 'idk-settings-panel-section' });
-      systemTools.innerHTML = '<h3>Desktop & device</h3><p class="sub">Controls formerly scattered across the old Control Center are managed here.</p>';
+      systemTools.innerHTML = '<h3>Desktop & device</h3><p class="sub">Desktop, device, and recovery controls are managed here.</p>';
       const healthRow = el('div', { className: 'settings-row' }, [
         el('label', { textContent: 'System status' }),
         el('span', { className: 'sub', textContent: 'Checking…' }),
@@ -2717,7 +2717,15 @@ const APPS = {
           ])
         ])
       );
-      system.append(systemTools);
+      const launcherSection = el('section', { className: 'idk-settings-panel-section' });
+      launcherSection.innerHTML = '<h3>Built-in apps</h3><p class="sub">Open common IDK apps directly from Settings.</p>';
+      const launcherGrid = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;' });
+      [['files','Files'],['proxy','Browser'],['chat','Messenger'],['games','Games'],['music','Music'],['apps','App Store'],['search','Search']].forEach(([id,label]) => {
+        const b=el('button',{className:'btn tab',type:'button',textContent:label});
+        b.onclick=()=>window.OS?.open?.(id); launcherGrid.append(b);
+      });
+      launcherSection.append(launcherGrid);
+      system.append(launcherSection);
 
       const backupSection = el('section', { className: 'idk-settings-panel-section' });
       backupSection.innerHTML = '<h3>Backup & portability</h3><p class="sub">Export or restore your local IDK settings and app data.</p>';
@@ -2755,7 +2763,7 @@ const APPS = {
       privacy.append(privacyTools);
 
       const bookmarkSection = el('section',{className:'idk-settings-panel-section'});
-      bookmarkSection.innerHTML='<h3>Bookmarks</h3><p class="sub">Manage saved browser bookmarks without opening the old Control Center.</p>';
+      bookmarkSection.innerHTML='<h3>Bookmarks</h3><p class="sub">Manage saved browser bookmarks from Settings.</p>';
       const bookmarkTitle=el('input',{className:'field',placeholder:'Bookmark name'});
       const bookmarkURL=el('input',{className:'field',type:'url',placeholder:'https://example.com'});
       const bookmarkList=el('div',{className:'settings-row'});
