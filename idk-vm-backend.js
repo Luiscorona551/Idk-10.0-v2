@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import net from 'node:net';
+import { WebSocketServer } from 'ws';
 
 const DATA_DIR = process.env.IDK_VM_DATA_DIR || path.resolve(process.cwd(), 'data');
 const VM_DATA_FILE = path.join(DATA_DIR, 'idk-vms.json');
@@ -10,6 +12,21 @@ const QEMU_BINARY = process.env.QEMU_BINARY || 'qemu-system-x86_64';
 const QEMU_IMG_BINARY = process.env.QEMU_IMG_BINARY || 'qemu-img';
 const ENABLE_QEMU = process.env.ENABLE_QEMU === 'true';
 const running = new Map();
+const vncSockets = new Map();
+const vmVnc = new Map();
+const vncWsServer = new WebSocketServer({ noServer: true });
+vncWsServer.on('connection', (ws, socket) => {
+  const target = socket.__idkVncTarget;
+  if (!target) return ws.close();
+  const tcp = net.connect(target.port, '127.0.0.1');
+  vncSockets.set(ws, tcp);
+  tcp.on('connect', () => { try { ws.send(Buffer.from([0])); } catch {} });
+  tcp.on('data', data => { if (ws.readyState === 1) ws.send(data); });
+  tcp.on('error', () => { try { ws.close(); } catch {} });
+  tcp.on('close', () => { try { ws.close(); } catch {} });
+  ws.on('message', data => { if (!tcp.destroyed) tcp.write(Buffer.from(data)); });
+  ws.on('close', () => { vncSockets.delete(ws); tcp.destroy(); });
+});
 
 const allowedNetworks = new Set(['nat', 'bridged', 'isolated', 'host-only']);
 const allowedDisplays = new Set(['default', 'virtio', 'vga', 'qxl', 'vmware']);
@@ -48,7 +65,8 @@ function validateVM(input) {
   if(partitionTotal>diskGb)return 'Partition sizes exceed the virtual disk size';
   return null;
 }
-function qemuStatus(){return{enabled:ENABLE_QEMU,binary:QEMU_BINARY,running:[...running.keys()]};}
+function qemuStatus(){return{enabled:ENABLE_QEMU,binary:QEMU_BINARY,running:[...running.keys()].map(id=>({id,vncPort:vmVnc.get(id)||null}))};}
+function allocateVncPort(id) { if (vmVnc.has(id)) return vmVnc.get(id); const used=new Set(vmVnc.values()); for(let port=5901;port<6000;port++){if(!used.has(port)){vmVnc.set(id,port);return port;}} throw new Error('No VNC ports available'); }
 function diskPath(vm){return path.join(DISK_DIR,vm.id+'.qcow2');}
 function spawnAsync(binary,args) {
   return new Promise((resolve,reject)=>{const child=spawn(binary,args,{stdio:'ignore'});let settled=false;child.once('error',e=>{if(!settled){settled=true;reject(e);}});child.once('exit',(code,signal)=>{if(!settled){settled=true;code===0?resolve():reject(new Error(binary+' exited with code '+code+(signal?' ('+signal+')':'')));}});});
@@ -71,12 +89,12 @@ async function startQemu(vm) {
   const driveBus=vm.diskBus==='nvme'?'none':vm.diskBus;
   if(vm.diskBus==='nvme'){args.push('-drive','file='+disk+',if=none,id=disk0,format=qcow2','-device','nvme,drive=disk0,serial=IDKDISK');}
   else args.push('-drive','file='+disk+',if='+(driveBus==='sata'?'ide':driveBus)+',format=qcow2');
-  displayArgs(vm,args); soundArgs(vm,args); networkArgs(vm,args); args.push('-display','none');
+  displayArgs(vm,args); soundArgs(vm,args); networkArgs(vm,args); const vncPort=allocateVncPort(vm.id); args.push('-vnc','127.0.0.1:'+(vncPort-5900),'-display','none');
   const child=spawn(QEMU_BINARY,args,{stdio:'ignore'});
   const processInfo={pid:child.pid,startedAt:new Date().toISOString(),diskPath:disk};
   running.set(vm.id,processInfo); child.once('exit',()=>running.delete(vm.id)); child.once('error',()=>running.delete(vm.id)); return processInfo;
 }
-function stopQemu(id){const info=running.get(id);if(!info)return false;try{process.kill(info.pid,'SIGTERM');}catch{}running.delete(id);return true;}
+function stopQemu(id){const info=running.get(id);if(!info)return false;try{process.kill(info.pid,'SIGTERM');}catch{}running.delete(id);vmVnc.delete(id);return true;}
 async function restartQemu(vm){stopQemu(vm.id);return startQemu(vm);}
 
 export function vmBackendStatus(){return{enabled:true,qemu:qemuStatus(),dataFile:VM_DATA_FILE,diskDirectory:DISK_DIR};}
@@ -87,11 +105,22 @@ export function vmRoutes(router) {
   router.get('/health',(req,res)=>res.json({ok:true,service:'idk-vm-backend',version:'0.3.0',hostedBy:'Idk 10.0 server',time:new Date().toISOString()}));
   router.get('/host',(req,res)=>res.json({ok:true,virtualization:qemuStatus()}));
   router.get('/vms',async(req,res)=>res.json({ok:true,vms:await listVMs()}));
+  router.put('/isos/:id', async (req,res)=>{ const id=String(req.params.id||'').replace(/[^a-zA-Z0-9_-]/g,''); const name=String(req.get('x-iso-name')||'iso').replace(/[^a-zA-Z0-9._-]/g,'').slice(0,160)||'iso'; if(!id)return res.status(400).json({ok:false,error:'ISO id is required'}); const file=path.join(DISK_DIR,id+'-'+name); try{await fs.mkdir(DISK_DIR,{recursive:true}); const chunks=[]; let bytes=0; req.on('data',chunk=>{bytes+=chunk.length;if(bytes>20*1024*1024*1024) req.destroy(new Error('ISO is too large')); else chunks.push(chunk);}); req.on('end',async()=>{try{await fs.writeFile(file,Buffer.concat(chunks));res.json({ok:true,id,name,bytes,path:file});}catch(error){res.status(500).json({ok:false,error:error.message});}}); req.on('error',error=>res.status(400).json({ok:false,error:error.message}));}catch(error){res.status(500).json({ok:false,error:error.message});} });
   router.post('/vms',async(req,res)=>{const error=validateVM(req.body||{});if(error)return res.status(400).json({ok:false,error});const now=new Date().toISOString();const vm={id:crypto.randomUUID(),name:String(req.body.name).trim(),cpuCores:Number(req.body.cpuCores),ramMb:Number(req.body.ramMb),diskGb:Number(req.body.diskGb),cpuModel:req.body.cpuModel||'host',cpuTopology:req.body.cpuTopology||'simple',diskBus:req.body.diskBus||'sata',network:req.body.network||'nat',networkAdapter:req.body.networkAdapter||'virtio',mac:String(req.body.mac||''),display:req.body.display||'default',videoMemoryMb:Number(req.body.videoMemoryMb)||32,resolution:String(req.body.resolution||'1280x720'),soundDevice:req.body.soundDevice||'hda',accel3d:Boolean(req.body.accel3d),firmware:req.body.firmware||'bios',bootDevice:req.body.bootDevice||'disk',bootOrder:Array.isArray(req.body.bootOrder)?req.body.bootOrder:['disk','iso','network'],iso:String(req.body.iso||'').trim(),isoId:String(req.body.isoId||''),isoName:String(req.body.isoName||req.body.iso||'').trim(),partitions:Array.isArray(req.body.partitions)?req.body.partitions:[],status:'stopped',createdAt:now,updatedAt:now};res.status(201).json({ok:true,vm:await createVM(vm)});});
   router.get('/vms/:id',async(req,res)=>{const vm=await getVM(req.params.id);if(!vm)return res.status(404).json({ok:false,error:'VM not found'});res.json({ok:true,vm});});
   router.patch('/vms/:id',async(req,res)=>{const current=await getVM(req.params.id);if(!current)return res.status(404).json({ok:false,error:'VM not found'});const candidate={...current,...(req.body||{})};const error=validateVM(candidate);if(error)return res.status(400).json({ok:false,error});res.json({ok:true,vm:await updateVM(req.params.id,{...candidate,updatedAt:new Date().toISOString()})});});
   router.delete('/vms/:id',async(req,res)=>{if(await getVM(req.params.id))stopQemu(req.params.id);if(!await deleteVM(req.params.id))return res.status(404).json({ok:false,error:'VM not found'});try{await fs.unlink(diskPath({id:req.params.id}));}catch{}res.json({ok:true});});
+  router.get('/vms/:id/console',async(req,res)=>{ const vm=await getVM(req.params.id); const port=vmVnc.get(req.params.id); if(!vm||!port||!running.has(req.params.id)) return res.status(409).json({ok:false,error:'VM is not running'}); res.json({ok:true,host:req.get('host'),path:'/api/vm/vms/'+encodeURIComponent(req.params.id)+'/vnc',port}); });
   router.post('/vms/:id/start',async(req,res)=>{const vm=await getVM(req.params.id);if(!vm)return res.status(404).json({ok:false,error:'VM not found'});try{const processInfo=await startQemu(vm);await updateVM(vm.id,{status:'running',updatedAt:new Date().toISOString()});res.json({ok:true,status:'running',process:processInfo});}catch(error){res.status(503).json({ok:false,error:error.message,code:error.code||'QEMU_ERROR'});}});
   router.post('/vms/:id/stop',async(req,res)=>{const vm=await getVM(req.params.id);if(!vm)return res.status(404).json({ok:false,error:'VM not found'});stopQemu(vm.id);await updateVM(vm.id,{status:'stopped',updatedAt:new Date().toISOString()});res.json({ok:true,status:'stopped'});});
   router.post('/vms/:id/restart',async(req,res)=>{const vm=await getVM(req.params.id);if(!vm)return res.status(404).json({ok:false,error:'VM not found'});try{const processInfo=await restartQemu(vm);await updateVM(vm.id,{status:'running',updatedAt:new Date().toISOString()});res.json({ok:true,status:'running',process:processInfo});}catch(error){res.status(503).json({ok:false,error:error.message,code:error.code||'QEMU_ERROR'});}});
+}
+export async function handleVmUpgrade(req, socket, head) {
+  const match = String(req.url||'').match(/^\/api\/vm\/vms\/([^/]+)\/vnc(?:\?|$)/);
+  if (!match) return false;
+  const id=decodeURIComponent(match[1]); const port=vmVnc.get(id);
+  if(!port || !running.has(id)){ socket.destroy(); return true; }
+  socket.__idkVncTarget={port};
+  vncWsServer.handleUpgrade(req,socket,head,ws=>vncWsServer.emit('connection',ws,socket));
+  return true;
 }
