@@ -75,8 +75,48 @@ const GAME_RECENTS_KEY = 'idkGameRecents';
 function applyWallpaper(url) {
   const safeURL = String(url || '').trim().replace(/["\\\r\n]/g, '');
   const isGradient = /^(linear|radial|conic)-gradient\(/.test(safeURL);
-  const value = safeURL ? (isGradient ? safeURL : `url("${safeURL}"), ${FALLBACK_WALLPAPER}`) : FALLBACK_WALLPAPER;
-  document.documentElement.style.setProperty('--wallpaper', value);
+  const root = document.documentElement;
+
+  if (!safeURL) {
+    root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+    return;
+  }
+
+  if (isGradient) {
+    root.style.setProperty('--wallpaper', safeURL);
+    return;
+  }
+
+  // Older Chromebooks can fail to load newer CDN/TLS endpoints. Try the
+  // original image first, then a lightweight image proxy before falling back
+  // to the built-in gradient.
+  const sources = [
+    safeURL,
+    `https://wsrv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`
+  ];
+
+  let index = 0;
+  const applySource = source => {
+    root.style.setProperty('--wallpaper', `url("${source}"), ${FALLBACK_WALLPAPER}`);
+  };
+
+  const test = new Image();
+  test.onload = () => applySource(sources[index]);
+  test.onerror = () => {
+    index += 1;
+    if (index < sources.length) {
+      applySource(sources[index]);
+      const retry = new Image();
+      retry.onload = () => applySource(sources[index]);
+      retry.onerror = () => root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+      retry.src = sources[index];
+    } else {
+      root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+    }
+  };
+
+  applySource(sources[index]);
+  test.src = sources[index];
 }
 
 function applyTheme(name) {
