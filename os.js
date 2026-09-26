@@ -318,8 +318,9 @@ const OS = (() => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', finish);
         window.removeEventListener('pointercancel', finish);
+        const target = snapTarget;
         clearSnapPreview();
-        if (snapTarget) snap(win, snapTarget);
+        if (target) snap(win, target);
         scheduleWorkspaceSave();
       };
       window.addEventListener('pointermove', move);
