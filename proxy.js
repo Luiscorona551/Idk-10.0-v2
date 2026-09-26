@@ -3,6 +3,16 @@
 const PROXY = (() => {
   let ready = null;
   let connection = null;
+  let diagnostics = { stage: 'idle', secureContext: null, serviceWorkerSupported: null, serviceWorkerController: null, registrationState: null, backend: null, scope: null, transport: null, error: null, updatedAt: null };
+  function record(patch) {
+    diagnostics = { ...diagnostics, ...patch, updatedAt: new Date().toISOString() };
+    window.IDKProxyDiagnostics = { ...diagnostics };
+    window.dispatchEvent(new CustomEvent('idk-proxy-diagnostics', { detail: { ...diagnostics } }));
+  }
+  function describeError(error) {
+    if (!error) return null;
+    return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack ? String(error.stack).split('\n').slice(0, 3).join('\n') : null };
+  }
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const existing = [...document.scripts].find(tag => tag.src && new URL(tag.src, location.href).pathname === src);
@@ -48,7 +58,8 @@ const PROXY = (() => {
       }
     }
   }
-  return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
+  window.IDKProxyDiagnostics = { ...diagnostics };
+  return { encode, backendAvailable, chatAvailable, serverScope, status, diagnose, reset };
 })();
 (async () => {
   if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
