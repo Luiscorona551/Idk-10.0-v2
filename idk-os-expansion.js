@@ -82,11 +82,11 @@
     const access = card('10. Accessibility', 'Apply high contrast, reduced motion, and larger text without leaving the desktop.', 'Preferences stay on this device');
     const accessActions = access.querySelector('.idk-expansion-actions');
     [['highContrast', 'Contrast'], ['reduceMotion', 'Motion'], ['largeText', 'Text']].forEach(([key, label]) => { const item = document.createElement('label'); item.className = 'idk-expansion-check'; const input = document.createElement('input'); input.type = 'checkbox'; input.checked = Boolean(accessibility[key]); input.onchange = () => { accessibility[key] = input.checked; applyAccessibility(accessibility); }; item.append(input, document.createTextNode(label)); accessActions.append(item); });
-    accessActions.append(button('Settings', () => open('settings', { tab: 'desktop' }))); grid.append(access);
+    accessActions.append(button('Settings', () => open('settings', { tab: 'general' }))); grid.append(access);
     const mobile = settings();
     const mobileCard = card('11. Mobile Companion Layout', 'Use touch-sized controls and a focused single-column desktop on narrow screens.', mobile.mobileMode ? 'Companion mode on' : `Responsive mode · ${window.innerWidth}px wide`);
     const mobileActions = mobileCard.querySelector('.idk-expansion-actions');
-    mobileActions.append(button(mobile.mobileMode ? 'Turn off companion' : 'Turn on companion', () => { setMobileMode(!settings().mobileMode); root.remove(); open('osExpansion'); }, 'btn'), button('Open appearance', () => open('settings', { tab: 'desktop' })));
+    mobileActions.append(button(mobile.mobileMode ? 'Turn off companion' : 'Turn on companion', () => { setMobileMode(!settings().mobileMode); root.remove(); open('osExpansion'); }, 'btn'), button('Open appearance', () => open('settings', { tab: 'appearance' })));
     grid.append(mobileCard);
     return root;
   }
