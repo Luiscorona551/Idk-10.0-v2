@@ -305,38 +305,12 @@
     return root;
   }
 
-  function applyThemeChoice(theme) {
-    write('theme', theme);
-    window.applyTheme?.(theme);
-    notify('Appearance', `${theme} theme applied.`);
-  }
-
-  function renderAppearance() {
-    const root = el('section', { class: 'idk-next-panel' });
-    const themes = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
-    const wallpapers = [
-      ['IDK Blue', 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png'],
-      ['Violet Horizon', 'linear-gradient(135deg, #101a3d 0%, #16224a 48%, #4b1f57 100%)'],
-      ['Neon Tide', 'radial-gradient(circle at 18% 20%, rgba(126, 246, 168, .24), transparent 26%), linear-gradient(135deg, #062a35, #071020 58%, #123f4c)'],
-      ['Sunset Bloom', 'linear-gradient(135deg, #27182d 0%, #6b2d50 52%, #f08a65 100%)'],
-      ['Graphite', 'linear-gradient(135deg, #080b13 0%, #202938 48%, #596273 100%)']
-    ];
-    const heading = el('div', { class: 'idk-next-section-heading' });
-    heading.append(el('div', {}, [el('h2', { text: 'Appearance studio' }), el('p', { text: 'Make IDK feel like your own desktop.' })]));
-    root.append(heading);
-    const themeGrid = el('div', { class: 'idk-next-theme-grid' });
-    themes.forEach(theme => { const item = button(theme, () => applyThemeChoice(theme), 'idk-next-theme'); item.dataset.themeChoice = theme; themeGrid.append(item); });
-    const wallpaperGrid = el('div', { class: 'idk-next-wallpaper-grid' });
-    wallpapers.forEach(([label, value]) => { const item = button(label, () => { write('wallpaper', value); window.applyWallpaper?.(value); notify('Appearance', `${label} wallpaper applied.`); }, 'idk-next-wallpaper'); item.style.setProperty('--swatch', value); wallpaperGrid.append(item); });
-    root.append(el('h3', { class: 'idk-next-subheading', text: 'Themes' }), themeGrid, el('h3', { class: 'idk-next-subheading', text: 'Wallpapers' }), wallpaperGrid);
-    return root;
-  }
 
   function renderHubTab(tab) {
     if (!currentHub) return;
     const panel = currentHub.querySelector('[data-next-panel]');
     const nav = currentHub.querySelectorAll('[data-next-tab]');
-    const views = { overview: renderOverview, focus: renderFocus, automations: renderAutomations, privacy: renderPrivacy, performance: renderPerformance, recovery: renderRecovery, appearance: renderAppearance };
+    const views = { overview: renderOverview, focus: renderFocus, automations: renderAutomations, privacy: renderPrivacy, performance: renderPerformance, recovery: renderRecovery };
     const render = views[tab] || views.overview;
     nav.forEach(item => item.classList.toggle('active', item.dataset.nextTab === tab));
     panel.replaceChildren(render());
@@ -347,7 +321,7 @@
     const root = el('div', { class: 'app idk-next-hub' });
     const header = el('header', { class: 'idk-next-header' }, [el('div', {}, [el('span', { class: 'idk-next-kicker', text: 'IDK 10.0' }), el('h2', { text: 'IDK Hub' }), el('p', { text: 'One control center for your desktop.' })]), button('Command palette', () => openPalette(), 'idk-next-button small')]);
     const nav = el('nav', { class: 'idk-next-nav', 'aria-label': 'IDK Hub sections' });
-    [['overview', 'Overview'], ['focus', 'Focus'], ['automations', 'Routines'], ['privacy', 'Privacy'], ['performance', 'Health'], ['recovery', 'Recovery'], ['appearance', 'Appearance']].forEach(([id, label]) => { const item = button(label, () => renderHubTab(id), 'idk-next-tab'); item.dataset.nextTab = id; nav.append(item); });
+    [['overview', 'Overview'], ['focus', 'Focus'], ['automations', 'Routines'], ['privacy', 'Privacy'], ['performance', 'Health'], ['recovery', 'Recovery']].forEach(([id, label]) => { const item = button(label, () => renderHubTab(id), 'idk-next-tab'); item.dataset.nextTab = id; nav.append(item); });
     root.append(header, nav, el('div', { class: 'idk-next-body', 'data-next-panel': '' }));
     currentHub = root;
     const onState = () => renderHubTab(root.dataset.nextActiveTab || 'overview');
@@ -400,13 +374,10 @@
     const desktop = document.getElementById('desktop');
     if (!desktop) return;
     const bar = el('div', { id: 'idk-next-bar', 'aria-label': 'IDK Hub shortcuts' });
-    const control = button('◉ Control', () => openApp('control-center'), 'idk-next-launcher');
-    control.setAttribute('aria-label', 'Open Control Center');
-    bar.append(button('✦ Hub', () => openHub(), 'idk-next-launcher'), button('◉ Focus', () => openHub('focus'), 'idk-next-launcher'), button('⌕ Search', () => openPalette(), 'idk-next-launcher'), control);
+    bar.append(button('✦ Hub', () => openHub(), 'idk-next-launcher'), button('◉ Focus', () => openHub('focus'), 'idk-next-launcher'), button('⌕ Search', () => openPalette(), 'idk-next-launcher'), button('⚙ Settings', () => openApp('settings'), 'idk-next-launcher'));
     desktop.append(bar);
     window.addEventListener('keydown', event => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'KeyP') { event.preventDefault(); openHub('focus'); }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'KeyC') { event.preventDefault(); openApp('control-center'); }
       if (event.key === 'Escape') document.getElementById('idk-next-palette')?.remove();
     });
   }
