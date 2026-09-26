@@ -1765,9 +1765,13 @@ const APPS = {
     glyph: '◉',
     desktop: false,
     dock: false,
-    width: 680,
-    height: 580,
-    render: () => window.IDKBatchSix?.controlCenter?.() || document.createElement('div')
+    width: 760,
+    height: 700,
+    render: () => {
+      const root = document.createElement('div');
+      setTimeout(() => window.OS?.open?.('settings', { tab: 'system' }), 0);
+      return root;
+    }
   },
 
   permissions: {
@@ -2541,6 +2545,9 @@ const APPS = {
       const dockPosition = el('select', { className: 'field', value: store.get('dockPosition', 'bottom') });
       [['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']].forEach(([value, label]) => dockPosition.append(el('option', { value, textContent: label })));
       dockPosition.value = store.get('dockPosition', 'bottom');
+      const brightness = el('input', { className: 'field', type: 'range', min: 20, max: 100, value: store.get('idkFeaturePackState', {}).brightness || 100 });
+      const volume = el('input', { className: 'field', type: 'range', min: 0, max: 100, value: store.get('idkFeaturePackState', {}).volume ?? 70 });
+      const guestMode = el('input', { type: 'checkbox', checked: Boolean(store.get('idkFeaturePackState', {}).guest) });
       const motion = el('select', { className: 'field', value: store.get('motion', 'on') });
       [['on', 'Motion on'], ['off', 'Reduce motion']].forEach(([value, label]) => motion.append(el('option', { value, textContent: label })));
       motion.value = store.get('motion', 'on');
@@ -2569,6 +2576,8 @@ const APPS = {
         store.set('iconSize', iconSize.value);
         store.set('dockPosition', dockPosition.value);
         store.set('motion', motion.value);
+        window.IDKFeaturePack?.setDeviceSettings?.(brightness.value, volume.value);
+        window.IDKFeaturePack?.setGuestMode?.(guestMode.checked);
         store.set('panicURL', panic.value.trim());
         store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
         applyTabCloaker();
@@ -2620,6 +2629,11 @@ const APPS = {
            el('label', { textContent: 'Dock position' }), dockPosition,
            el('label', { textContent: 'Animations' }), motion
          ]),
+        el('div', { className: 'settings-row settings-grid' }, [
+           el('label', { textContent: 'Brightness' }), brightness,
+           el('label', { textContent: 'Media volume' }), volume,
+           el('label', { textContent: 'Guest mode' }), guestMode
+         ]),
         customTheme,
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Tab Cloaker' }),
@@ -2659,6 +2673,12 @@ const APPS = {
       const status = system.querySelector('[data-settings-status]');
       const settingAction = (title, detail, run) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = async () => { button.disabled = true; try { await run(); status.textContent = title + ' completed.'; } catch (error) { status.textContent = title + ' failed: ' + (error?.message || 'Try again.'); } finally { button.disabled = false; } }; return button; };
       systemGrid.append(
+        settingAction('Virtual desktops', 'Switch between the three desktop workspaces.', () => {
+          const next = (Number(store.get('idkFeaturePackState', {}).space || 1) % 3) + 1;
+          window.IDKFeaturePack?.switchSpace?.(next);
+        }),
+        settingAction('Desktop widgets', 'Show or hide the desktop widget panel.', () => window.IDKFeaturePack?.toggleWidgets?.()),
+        settingAction('Save desktop screenshot', 'Capture the current IDK desktop as an image.', () => window.IDKFeaturePack?.saveScreenshot?.()),
         settingAction('Sync now', 'Push changes and retry queued work.', async () => { await window.IDKOffline?.flush?.(); await window.IDKDataLayer?.syncNow?.(); window.OS?.notify?.('Settings', 'Sync requested.'); }),
         settingAction('Backup & Recovery', 'Protect local settings and files.', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
         settingAction('Security & Privacy', 'Account safety and local data.', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('privacy')),
@@ -2684,12 +2704,25 @@ const APPS = {
       privacy.innerHTML = '<h2>Privacy & Security</h2><p class="sub">Security and privacy controls now live in the main Settings app.</p><div class="idk-settings-action-grid"></div>';
       const privacyGrid = privacy.querySelector('.idk-settings-action-grid');
       const openPrivacy = (title, detail, action) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = action; return button; };
+      const lockPin = el('input', { className: 'field', type: 'password', inputMode: 'numeric', maxLength: 12, placeholder: 'New lock PIN' });
+      const pinRow = el('div', { className: 'settings-row' }, [
+        el('label', { textContent: 'Lock screen PIN' }),
+        lockPin,
+        el('button', { className: 'btn', type: 'button', textContent: 'Save PIN' })
+      ]);
+      pinRow.querySelector('button').onclick = async () => {
+        await window.IDKFeaturePack?.setPin?.(lockPin.value.trim());
+        lockPin.value = '';
+        OS.notify('Privacy', 'Lock PIN updated.');
+      };
       privacyGrid.append(
         openPrivacy('App Permissions', 'Review microphone, camera, storage, and network access.', () => window.OS?.open?.('permissions')),
         openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => window.IDKFeaturePack?.openCenter?.('privacy')),
         openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
-        openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
+        openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.()),
+        openPrivacy('Lock screen now', 'Lock this desktop immediately.', () => window.IDKFeaturePack?.lockScreen?.())
       );
+      privacy.append(pinRow);
       body.append(system, privacy);
       [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
       const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
