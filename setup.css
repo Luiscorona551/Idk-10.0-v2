@@ -106,6 +106,15 @@ body.setup, html {
 .profile-primary:disabled { opacity: .55; cursor: wait; }
 .profile-skip { border: 1px solid rgba(255,255,255,.3); color: rgba(255,255,255,.86); background: rgba(5,17,51,.2); }
 .profile-skip:hover, .profile-skip:focus-visible { border-color: #9ed5ff; background: rgba(5,17,51,.42); }
+.profile-account-login { margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.16); }
+.profile-login-button { width: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,.3); border-radius: 7px; color: #fff; background: rgba(5,17,51,.2); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.profile-login-button:hover, .profile-login-button:focus-visible { border-color: #9ed5ff; background: rgba(5,17,51,.42); outline: none; }
+.profile-login-panel { margin-top: 14px; padding: 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; background: rgba(5,17,51,.2); }
+.profile-login-panel[hidden] { display: none; }
+.profile-login-panel .login-subtitle { margin-bottom: 14px; }
+.profile-login-panel .profile-field { margin-bottom: 10px; }
+.profile-login-panel .profile-field input { box-sizing: border-box; }
+.profile-login-panel .profile-actions { margin-top: 12px; }
 
 .login-bg { align-items: center; justify-content: center; padding: 24px; background: radial-gradient(circle at 50% 25%, rgba(82,146,255,.2), transparent 35%), linear-gradient(145deg, #101e4d, #160d3a 55%, #071020); }
 .login-card { width: min(390px, 100%); padding: 32px 34px 28px; border: 1px solid rgba(255,255,255,.26); border-radius: 18px; background: rgba(7,14,36,.62); box-shadow: 0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.1); text-align: center; backdrop-filter: blur(18px); }
