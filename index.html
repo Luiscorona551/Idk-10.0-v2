@@ -115,6 +115,28 @@
           <button class="profile-primary" id="profile-save-btn" type="submit">Save profile</button>
           <button class="profile-skip" id="profile-skip-btn" type="button">Skip password setup</button>
         </div>
+        <div class="profile-account-login">
+          <button class="profile-login-button" id="profile-login-button" type="button">Already have an IDK account? Log in</button>
+          <div id="profile-login-panel" class="profile-login-panel" hidden>
+            <div class="login-kicker">IDK 10.0 account</div>
+            <p class="login-subtitle">Sign in with the account stored in the IDK database.</p>
+            <form id="profile-login-form" class="login-form">
+              <label class="profile-field" for="profile-login-username">
+                <span>Account name</span>
+                <input id="profile-login-username" type="text" autocomplete="username" placeholder="Enter your account name" required>
+              </label>
+              <label class="profile-field" for="profile-login-password">
+                <span>Password</span>
+                <input id="profile-login-password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+              </label>
+              <div class="profile-actions">
+                <button class="profile-primary" id="profile-login-submit" type="submit">Log in</button>
+                <button class="profile-skip" id="profile-login-cancel" type="button">Cancel</button>
+              </div>
+              <p id="profile-login-error" class="profile-error" role="alert"></p>
+            </form>
+          </div>
+        </div>
       </form>
     </div>
   </div>

@@ -21,13 +21,14 @@ const profileHintField = $('profile-password-hint');
 const profileError = $('profile-error');
 const profileSaveButton = $('profile-save-btn');
 const profileSkipButton = $('profile-skip-btn');
-const loginForm = $('login-form');
-const loginAvatar = $('login-avatar');
-const loginName = $('login-name');
-const loginPassword = $('login-password');
-const loginHint = $('login-hint');
-const loginError = $('login-error');
-const loginNoPassword = $('login-no-password');
+const profileLoginButton = $('profile-login-button');
+const profileLoginPanel = $('profile-login-panel');
+const profileLoginForm = $('profile-login-form');
+const profileLoginUsername = $('profile-login-username');
+const profileLoginPassword = $('profile-login-password');
+const profileLoginSubmit = $('profile-login-submit');
+const profileLoginCancel = $('profile-login-cancel');
+const profileLoginError = $('profile-login-error');
 const PANIC_URL = 'https://classroom.google.com/';
 const TIMEZONE_KEY = 'timezone';
 const TIMEZONE_OFFSET_KEY = 'timezoneOffset';
@@ -126,16 +127,6 @@ function prepareProfileSetup() {
   profileError.textContent = '';
   setSelectedAvatar(profile?.avatar || DEFAULT_PROFILE_IMAGE);
   profileSkipButton.textContent = profile?.passwordHash ? 'Keep existing password' : 'Skip password setup';
-}
-
-function profileForLogin() {
-  const profile = readProfile();
-  return profile || {
-    displayName: savedAccountName() || 'Guest',
-    avatar: DEFAULT_PROFILE_IMAGE,
-    passwordHash: '',
-    hint: ''
-  };
 }
 
 function normalizeKey(value) {
@@ -396,69 +387,65 @@ $('region-select').addEventListener('change', () => {
   $('region-btn').textContent = copy.next;
 });
 
-function prepareLogin() {
-  const profile = profileForLogin();
-  loginAvatar.onerror = () => {
-    loginAvatar.onerror = null;
-    loginAvatar.src = 'ugs-icon.jpeg';
-  };
-  loginAvatar.src = profile.avatar;
-  loginName.textContent = profile.displayName;
-  loginPassword.value = '';
-  loginPassword.placeholder = profile.passwordHash ? 'Password' : 'No password set';
-  loginError.textContent = '';
-  loginHint.dataset.revealed = 'false';
-  loginHint.hidden = !profile.hint;
-  loginHint.textContent = 'Show password hint';
-  loginNoPassword.hidden = Boolean(profile.passwordHash);
-}
-
 function enterDesktop() {
   window.location.replace(new URL('desktop.html', document.baseURI).href);
 }
 
-loginHint.addEventListener('click', () => {
-  const profile = profileForLogin();
-  if (!profile.hint) return;
-  const revealed = loginHint.dataset.revealed === 'true';
-  loginHint.dataset.revealed = String(!revealed);
-  loginHint.textContent = revealed ? 'Show password hint' : `Hint: ${profile.hint}`;
+profileLoginButton.addEventListener('click', () => {
+  profileLoginPanel.hidden = false;
+  profileLoginButton.hidden = true;
+  profileLoginError.textContent = '';
+  profileLoginUsername.focus();
 });
 
-loginForm.addEventListener('submit', async event => {
+profileLoginCancel.addEventListener('click', () => {
+  profileLoginPanel.hidden = true;
+  profileLoginButton.hidden = false;
+  profileLoginForm.reset();
+  profileLoginError.textContent = '';
+});
+
+profileLoginForm.addEventListener('submit', async event => {
   event.preventDefault();
-  const profile = profileForLogin();
-  if (!profile.passwordHash) {
-    enterDesktop();
-    return;
-  }
-
-  const submit = $('login-submit');
-  submit.disabled = true;
-  const matches = await sha256(loginPassword.value) === profile.passwordHash;
-  submit.disabled = false;
-  if (!matches) {
-    loginError.textContent = 'Incorrect password.';
-    if (profile.hint) {
-      loginHint.hidden = false;
-      loginHint.dataset.revealed = 'true';
-      loginHint.textContent = `Hint: ${profile.hint}`;
+  profileLoginError.textContent = '';
+  profileLoginSubmit.disabled = true;
+  try {
+    const response = await fetch(new URL('api/account/login', document.baseURI), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        username: profileLoginUsername.value.trim(),
+        password: profileLoginPassword.value
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) {
+      profileLoginError.textContent = result.error || 'Could not sign in to the IDK account.';
+      return;
     }
-    loginPassword.select();
-    return;
+    if (result.user) {
+      writeProfile({
+        displayName: String(result.user.username || '').slice(0, 32),
+        avatar: PROFILE_IMAGES.includes(result.user.avatar) ? result.user.avatar : DEFAULT_PROFILE_IMAGE,
+        passwordHash: '',
+        hint: ''
+      });
+    }
+    enterDesktop();
+  } catch (error) {
+    profileLoginError.textContent = 'The IDK account service could not be reached.';
+  } finally {
+    profileLoginSubmit.disabled = false;
   }
-  enterDesktop();
 });
-
-loginNoPassword.addEventListener('click', enterDesktop);
 
 $('region-btn').addEventListener('click', () => {
   $('help-ui').classList.add('hide');
   show('welcome-screen');
   $('welcome-audio').play().catch(() => {});
   setTimeout(() => {
-    prepareLogin();
-    show('login-screen');
+    enterDesktop();
   }, 4500);
 });
 
@@ -474,8 +461,7 @@ $('help-ui').addEventListener('click', () => {
     'profile-setup-screen': 'Choose your account name and profile picture. A password is recommended but optional.',
     setup4: "Your time zone is saved. Click 'Continue' to proceed to region settings.",
     'timezone-screen': 'Choose a global time zone and decide whether the clock should follow daylight saving changes.',
-    'region-screen': 'Select your region and state to set your preferred language.',
-    'login-screen': 'Enter your account password. If you skip password setup, choose Continue without a password.'
+    'region-screen': 'Select your region and state to set your preferred language.'
   };
   const current = [...screens].find(screen => screen.classList.contains('show'));
     alert(`IDK 10.0 ASSISTANCE:\n\n${help[current?.id] ?? "Click 'start now' to begin."}`);

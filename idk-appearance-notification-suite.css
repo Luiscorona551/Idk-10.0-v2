@@ -30,3 +30,25 @@
 .idk-widget-inline-action,.idk-widget-shortcuts button{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.06);color:inherit;padding:6px 8px;cursor:pointer}
 .idk-widget-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 @media(max-width:600px){.idk-appearance-grid{grid-template-columns:1fr}.idk-appearance-section.full{grid-column:auto}.idk-appearance-card{padding:16px}}
+
+
+/* Unified Settings */
+.idk-unified-settings { min-height: 100%; }
+.idk-settings-tabs { display:flex; gap:7px; flex-wrap:wrap; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.1); }
+.idk-settings-tab { border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04); color:inherit; border-radius:9px; padding:8px 11px; cursor:pointer; }
+.idk-settings-tab.active { background:var(--accent,rgba(91,156,255,.25)); border-color:var(--accent,rgba(91,156,255,.45)); }
+.idk-settings-panel { display:block; }
+.idk-settings-action-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:9px; margin-top:12px; }
+.idk-settings-action { display:grid; gap:4px; text-align:left; border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:12px; background:rgba(255,255,255,.04); color:inherit; cursor:pointer; }
+.idk-settings-action:hover { background:rgba(255,255,255,.08); }
+.idk-settings-action small { opacity:.68; line-height:1.35; }
+.idk-settings-status { margin:12px 0 0; opacity:.72; }
+@media (max-width:700px) { .idk-settings-tabs { overflow:auto; flex-wrap:nowrap; } .idk-settings-tab { flex:0 0 auto; } .idk-settings-action-grid { grid-template-columns:1fr; } }
+
+/* Unified Settings responsive polish */
+.idk-unified-settings { overflow:auto; box-sizing:border-box; }
+.idk-settings-body { min-width:0; }
+.idk-settings-panel { min-width:0; }
+.idk-settings-panel .settings-row { min-width:0; }
+.idk-settings-panel .field { max-width:100%; box-sizing:border-box; }
+@media (max-width:560px) { .idk-unified-settings { padding:10px; } .idk-settings-tabs { gap:5px; } .idk-settings-tab { padding:7px 9px; font-size:12px; } .idk-settings-action { padding:10px; } }

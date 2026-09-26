@@ -2436,10 +2436,13 @@ const APPS = {
     title: 'Settings',
     glyph: '⚙️',
     desktop: true,
-    width: 600,
-    height: 560,
-    render() {
-      const root = el('div', { className: 'app' });
+    width: 760,
+    height: 700,
+    render(opts = {}) {
+      const root = el('div', { className: 'app idk-unified-settings' });
+      const tabs = el('div', { className: 'idk-settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
+      const body = el('div', { className: 'idk-settings-body' });
+      const requestedTab = ['general','appearance','system','privacy'].includes(opts.tab) ? opts.tab : (store.get('idkSettingsSection','general') || 'general');
       const input = el('input', {
         className: 'field',
         type: 'text',
@@ -2543,7 +2546,7 @@ const APPS = {
       const clearWorkspace = el('button', { className: 'btn tab', type: 'button', textContent: 'Forget saved workspace' });
       clearWorkspace.addEventListener('click', () => OS.clearWorkspace());
 
-      root.append(
+      body.append(
         el('h2', { textContent: 'Settings' }),
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Wallpaper preset' }),
@@ -2589,6 +2592,54 @@ const APPS = {
         ]),
         el('div', { style: 'display:flex; gap:8px;' }, [save, reset])
       );
+      const existingSettings = [...body.children];
+      const general = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'general' });
+      const appearance = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'appearance', hidden: true });
+      appearance.append(el('h2', { textContent: 'Appearance' }));
+      const appearanceKeywords = ['Wallpaper', 'UI color', 'Theme', 'Custom theme', 'Tab Cloaker'];
+      existingSettings.forEach((node, index) => {
+        const text = node.textContent || '';
+        if (index === 0 || !appearanceKeywords.some(keyword => text.includes(keyword))) general.append(node);
+        else appearance.append(node);
+      });
+      body.replaceChildren(general, appearance);
+
+      const system = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'system', hidden: true });
+      system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and controls from the old Control Center.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
+      const systemGrid = system.querySelector('.idk-settings-action-grid');
+      const status = system.querySelector('[data-settings-status]');
+      const settingAction = (title, detail, run) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = async () => { button.disabled = true; try { await run(); status.textContent = title + ' completed.'; } catch (error) { status.textContent = title + ' failed: ' + (error?.message || 'Try again.'); } finally { button.disabled = false; } }; return button; };
+      systemGrid.append(
+        settingAction('Sync now', 'Push changes and retry queued work.', async () => { await window.IDKOffline?.flush?.(); await window.IDKDataLayer?.syncNow?.(); window.OS?.notify?.('Settings', 'Sync requested.'); }),
+        settingAction('Backup & Recovery', 'Protect local settings and files.', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
+        settingAction('Security & Privacy', 'Account safety and local data.', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('privacy')),
+        settingAction('Account & Devices', 'Profiles, sessions, and handoff.', () => window.IDKAccountsDevices?.open?.('security') || window.IDKAccountsDevices?.open?.('profiles')),
+        settingAction('Check for updates', 'Check the installed IDK shell for updates.', async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) throw new Error('Update checks are unavailable in this browser.'); await registration.update().catch(() => {}); if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' }); }),
+        settingAction('System Health', 'Storage, performance, and diagnostics.', () => window.OS?.open?.('system-monitor') || window.OS?.open?.('reliability')),
+        settingAction('AI Setup', 'Choose local, cloud, or offline AI.', () => window.OS?.open?.('aiModes') || window.OS?.open?.('ai')),
+        settingAction('Profiles', 'Switch local workspaces and profiles.', () => window.IDKAccountsDevices?.open?.('profiles') || window.IDKConnectivitySuite?.openProfiles?.()),
+        settingAction('Smart Workspaces', 'Save or activate desktop setups.', () => window.IDKOSNext?.workspaceView?.()),
+        settingAction('Activity Center', 'Notifications and recent activity.', () => window.OS?.open?.('activity')),
+        settingAction('Share Sheet', 'Send text to IDK apps.', () => window.IDKOSNext?.openShareSheet?.()),
+        settingAction('Reset icon size', 'Return desktop icon size to Normal.', () => { store.set('iconSize','normal'); applyIconSize('normal'); })
+      );
+      const privacy = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'privacy', hidden: true });
+      privacy.innerHTML = '<h2>Privacy & Security</h2><p class="sub">Security and privacy controls now live in the main Settings app.</p><div class="idk-settings-action-grid"></div>';
+      const privacyGrid = privacy.querySelector('.idk-settings-action-grid');
+      const openPrivacy = (title, detail, action) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = action; return button; };
+      privacyGrid.append(
+        openPrivacy('App Permissions', 'Review microphone, camera, storage, and network access.', () => window.OS?.open?.('permissions')),
+        openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => window.IDKFeaturePack?.openCenter?.('privacy')),
+        openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
+        openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
+      );
+      body.append(system, privacy);
+      [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
+      const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
+      tabs.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.onclick=()=>showTab(tab.dataset.settingsTab));
+      root.append(tabs, body);
+      showTab(requestedTab);
+      root._showSettingsTab = showTab;
       return root;
     }
   },
