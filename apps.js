@@ -20,6 +20,12 @@ const store = {
 const PANIC_URL = 'https://classroom.google.com/';
 const DEFAULT_WALLPAPER = 'https://cdn.phototourl.com/member/2026-09-25-8f19f079-9694-4973-af98-5f3add5f3868.png';
 const FALLBACK_WALLPAPER = 'linear-gradient(135deg, #16224a, #2b1748)';
+const LEGACY_WALLPAPER_MAP = {
+  'https://kommodo.ai/i/SSsUaAWZPviBJHWcyLM': 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg',
+  'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun': 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg',
+  'https://kommodo.ai/i/hdSlLTe6uuxgLc9LaurW': 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg',
+  'https://kommodo.ai/i/NgrJyYk2J4PoV0hjkopI': DEFAULT_WALLPAPER
+};
 const THEMES = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
 const CUSTOM_THEME_KEY = 'idkCustomTheme';
 const CUSTOM_THEME_DEFAULTS = { accent: '#5986da', panel: '#0c1226', panelSolid: '#0d1226', text: '#eaf0ff' };
@@ -73,7 +79,8 @@ const GAME_FAVORITES_KEY = 'idkGameFavorites';
 const GAME_RECENTS_KEY = 'idkGameRecents';
 
 function applyWallpaper(url) {
-  const safeURL = String(url || '').trim().replace(/[\"\\\r\n]/g, '');
+  let safeURL = String(url || '').trim().replace(/[\"\\\r\n]/g, '');
+  safeURL = LEGACY_WALLPAPER_MAP[safeURL] || safeURL;
   const isGradient = /^(linear|radial|conic)-gradient\(/.test(safeURL);
   const root = document.documentElement;
 
