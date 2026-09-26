@@ -2656,6 +2656,14 @@ const APPS = {
         settingAction('Backup & Recovery', 'Protect local settings and files.', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
         settingAction('Security & Privacy', 'Account safety and local data.', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('privacy')),
         settingAction('Account & Devices', 'Profiles, sessions, and handoff.', () => window.IDKAccountsDevices?.open?.('security') || window.IDKAccountsDevices?.open?.('profiles')),
+        settingAction('Delete account & restart setup', 'Permanently delete your IDK account and return to the original setup.', async () => {
+          if (!window.confirm('Delete your IDK account and all account data? This cannot be undone. You will be returned to the original setup.')) throw new Error('Account deletion cancelled.');
+          const response = await fetch('/api/account', { method: 'DELETE', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || 'Could not delete the account.');
+          try { localStorage.clear(); sessionStorage.clear(); } catch {}
+          window.location.replace('/');
+        }),
         settingAction('Check for updates', 'Check the installed IDK shell for updates.', async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) throw new Error('Update checks are unavailable in this browser.'); await registration.update().catch(() => {}); if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' }); }),
         settingAction('System Health', 'Storage, performance, and diagnostics.', () => window.OS?.open?.('system-monitor') || window.OS?.open?.('reliability')),
         settingAction('AI Setup', 'Choose local, cloud, or offline AI.', () => window.OS?.open?.('aiModes') || window.OS?.open?.('ai')),
