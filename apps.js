@@ -2592,6 +2592,18 @@ const APPS = {
         ]),
         el('div', { style: 'display:flex; gap:8px;' }, [save, reset])
       );
+      const existingSettings = [...body.children];
+      const general = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'general' });
+      const appearance = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'appearance', hidden: true });
+      appearance.append(el('h2', { textContent: 'Appearance' }));
+      const appearanceKeywords = ['Wallpaper', 'UI color', 'Theme', 'Custom theme', 'Tab Cloaker'];
+      existingSettings.forEach((node, index) => {
+        const text = node.textContent || '';
+        if (index === 0 || !appearanceKeywords.some(keyword => text.includes(keyword))) general.append(node);
+        else appearance.append(node);
+      });
+      body.replaceChildren(general, appearance);
+
       const system = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'system', hidden: true });
       system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and controls from the old Control Center.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
       const systemGrid = system.querySelector('.idk-settings-action-grid');
