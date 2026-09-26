@@ -44,3 +44,11 @@
 .idk-settings-action small { opacity:.68; line-height:1.35; }
 .idk-settings-status { margin:12px 0 0; opacity:.72; }
 @media (max-width:700px) { .idk-settings-tabs { overflow:auto; flex-wrap:nowrap; } .idk-settings-tab { flex:0 0 auto; } .idk-settings-action-grid { grid-template-columns:1fr; } }
+
+/* Unified Settings responsive polish */
+.idk-unified-settings { overflow:auto; box-sizing:border-box; }
+.idk-settings-body { min-width:0; }
+.idk-settings-panel { min-width:0; }
+.idk-settings-panel .settings-row { min-width:0; }
+.idk-settings-panel .field { max-width:100%; box-sizing:border-box; }
+@media (max-width:560px) { .idk-unified-settings { padding:10px; } .idk-settings-tabs { gap:5px; } .idk-settings-tab { padding:7px 9px; font-size:12px; } .idk-settings-action { padding:10px; } }
