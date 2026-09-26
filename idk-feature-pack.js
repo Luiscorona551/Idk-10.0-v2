@@ -216,6 +216,25 @@
     one('#idk-pack-unlock-pin').focus();
   }
 
+  function setDeviceSettings(brightness, volume) {
+    state.brightness = Math.max(20, Math.min(100, Number(brightness) || 100));
+    state.volume = Math.max(0, Math.min(100, Number(volume) || 0));
+    save();
+    applyDeviceSettings();
+  }
+
+  function setGuestMode(enabled) {
+    state.guest = Boolean(enabled);
+    save();
+    document.body.classList.toggle('idk-guest-mode', state.guest);
+  }
+
+  async function setPin(pin) {
+    state.pinHash = pin ? await hash(String(pin)) : '';
+    save();
+    return Boolean(state.pinHash);
+  }
+
   function init() {
     applyDeviceSettings();
     document.body.classList.toggle('idk-guest-mode', state.guest);
@@ -227,7 +246,7 @@
       if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'l') { event.preventDefault(); lockScreen(); }
     });
     if (state.locked) lockScreen();
-    window.IDKFeaturePack = { switchSpace, toggleWidgets, lockScreen, saveScreenshot };
+    window.IDKFeaturePack = { switchSpace, toggleWidgets, lockScreen, saveScreenshot, setDeviceSettings, setGuestMode, setPin };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
