@@ -305,11 +305,6 @@
     return root;
   }
 
-  function applyThemeChoice(theme) {
-    write('theme', theme);
-    window.applyTheme?.(theme);
-    notify('Appearance', `${theme} theme applied.`);
-  }
 
   function renderHubTab(tab) {
     if (!currentHub) return;
