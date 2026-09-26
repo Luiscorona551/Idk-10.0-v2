@@ -28,7 +28,7 @@
     desktop.style.setProperty('--panel', theme.panel);
     desktop.style.setProperty('--panel-solid', theme.solid);
     desktop.style.setProperty('--text', theme.text);
-    desktop.style.setProperty('--muted', `color-mix(in srgb, ${theme.text} 62%, transparent)`);
+    desktop.style.setProperty('--muted', theme.text === '#f7eaff' ? 'rgba(247,234,255,.62)' : theme.text === '#eafff2' ? 'rgba(234,255,242,.62)' : theme.text === '#ffecef' ? 'rgba(255,236,239,.62)' : theme.text === '#fff9df' ? 'rgba(255,249,223,.62)' : 'rgba(234,243,255,.62)');
     desktop.setAttribute('data-theme', 'custom-background');
     localStorage.setItem(KEY, theme.name);
     return true;
