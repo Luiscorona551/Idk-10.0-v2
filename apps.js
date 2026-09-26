@@ -2436,8 +2436,8 @@ const APPS = {
     title: 'Settings',
     glyph: '⚙️',
     desktop: true,
-    width: 600,
-    height: 560,
+    width: 760,
+    height: 700,
     render(opts = {}) {
       const root = el('div', { className: 'app idk-unified-settings' });
       const tabs = el('div', { className: 'idk-settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
