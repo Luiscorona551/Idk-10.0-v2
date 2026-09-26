@@ -18,8 +18,14 @@ const store = {
 };
 
 const PANIC_URL = 'https://classroom.google.com/';
-const DEFAULT_WALLPAPER = 'https://plain-wnam-prod-public.komododecks.com/202608/09/2mq0HYHmjO3qexTDZY9G/image.png';
+const DEFAULT_WALLPAPER = 'https://cdn.phototourl.com/member/2026-09-25-8f19f079-9694-4973-af98-5f3add5f3868.png';
 const FALLBACK_WALLPAPER = 'linear-gradient(135deg, #16224a, #2b1748)';
+const LEGACY_WALLPAPER_MAP = {
+  'https://kommodo.ai/i/SSsUaAWZPviBJHWcyLM': 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg',
+  'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun': 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg',
+  'https://kommodo.ai/i/hdSlLTe6uuxgLc9LaurW': 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg',
+  'https://kommodo.ai/i/NgrJyYk2J4PoV0hjkopI': DEFAULT_WALLPAPER
+};
 const THEMES = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
 const CUSTOM_THEME_KEY = 'idkCustomTheme';
 const CUSTOM_THEME_DEFAULTS = { accent: '#5986da', panel: '#0c1226', panelSolid: '#0d1226', text: '#eaf0ff' };
@@ -34,29 +40,94 @@ const PERMISSION_TYPES = [
 ];
 const PERMISSION_DEFAULTS = { open: true, storage: true, notifications: true, network: true, microphone: false, camera: false };
 const WALLPAPER_PRESETS = [
-  { value: DEFAULT_WALLPAPER, label: 'IDK Blue' },
-  { value: 'linear-gradient(135deg, #101a3d 0%, #16224a 48%, #4b1f57 100%)', label: 'Violet Horizon' },
-  { value: 'radial-gradient(circle at 18% 20%, rgba(126, 246, 168, .24), transparent 26%), linear-gradient(135deg, #062a35, #071020 58%, #123f4c)', label: 'Neon Tide' },
-  { value: 'linear-gradient(135deg, #27182d 0%, #6b2d50 52%, #f08a65 100%)', label: 'Sunset Bloom' },
-  { value: 'linear-gradient(135deg, #080b13 0%, #202938 48%, #596273 100%)', label: 'Graphite' },
-  { value: 'linear-gradient(135deg, #24123f 0%, #5b2a86 52%, #9b5de5 100%)', label: 'Grape' },
-  { value: 'linear-gradient(135deg, #3a0d18 0%, #8f1d35 52%, #e94f64 100%)', label: 'Red' },
-  { value: 'linear-gradient(135deg, #0b2f24 0%, #087f5b 52%, #42d392 100%)', label: 'Emerald' },
-  { value: 'linear-gradient(135deg, #121a35 0%, #263b73 52%, #526db0 100%)', label: 'Midnight' },
-  { value: 'linear-gradient(135deg, #2b163f 0%, #713f8c 50%, #c17bdc 100%)', label: 'Purple Glow' }
+  { value: DEFAULT_WALLPAPER, label: 'Blue / Classic' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg', label: 'Purple / Grape' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg', label: 'Green' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg', label: 'Red / Cherry' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c.jpg', label: 'Yellow / Lemon' }
 ];
 const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
+const TAB_CLOAKER_KEY = 'idkTabCloaker';
+const DEFAULT_TAB_TITLE = 'IDK 10.0';
+
+function applyTabCloaker(settings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' })) {
+  const config = settings && typeof settings === 'object' ? settings : { enabled: false, url: '' };
+  const enabled = Boolean(config.enabled);
+  const rawURL = String(config.url || '').trim();
+  let target;
+  try { target = new URL(rawURL); } catch (e) { target = null; }
+  if (!enabled || !target || !/^https?:$/.test(target.protocol)) {
+    document.title = DEFAULT_TAB_TITLE;
+    const icon = document.querySelector('link[data-idk-tab-cloak]');
+    if (icon) icon.remove();
+    return false;
+  }
+  const hostname = target.hostname.replace(/^www\./i, '');
+  document.title = hostname || target.host;
+  let icon = document.querySelector('link[data-idk-tab-cloak]');
+  if (!icon) {
+    icon = document.createElement('link');
+    icon.rel = 'icon';
+    icon.dataset.idkTabCloak = 'true';
+    document.head.append(icon);
+  }
+  icon.href = target.origin + '/favicon.ico';
+  return true;
+}
 const MOVIE_HISTORY_KEY = 'idkMovieHistory';
 const GAME_FAVORITES_KEY = 'idkGameFavorites';
 const GAME_RECENTS_KEY = 'idkGameRecents';
 
 function applyWallpaper(url) {
-  const safeURL = String(url || '').trim().replace(/["\\\r\n]/g, '');
+  let safeURL = String(url || '').trim().replace(/[\"\\\r\n]/g, '');
+  safeURL = LEGACY_WALLPAPER_MAP[safeURL] || safeURL;
   const isGradient = /^(linear|radial|conic)-gradient\(/.test(safeURL);
-  const value = safeURL ? (isGradient ? safeURL : `url("${safeURL}"), ${FALLBACK_WALLPAPER}`) : FALLBACK_WALLPAPER;
-  document.documentElement.style.setProperty('--wallpaper', value);
-}
+  const root = document.documentElement;
 
+  if (!safeURL) {
+    root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+    return;
+  }
+
+  if (isGradient) {
+    root.style.setProperty('--wallpaper', safeURL);
+    return;
+  }
+
+  // Prefer a compatibility proxy, then the original CDN, then a second
+  // compatibility proxy. Older Chromebooks can have trouble negotiating
+  // some modern image/CDN endpoints even when the same page loads.
+  const localFallback = (() => {
+    const id = safeURL;
+    if (id.includes('e806c32c-31fd-4f54-a378-8eba729b9eda')) return 'backgrounds/grape.svg';
+    if (id.includes('b9324e05-93bd-445b-b799-c75b6ff7b455')) return 'backgrounds/green.svg';
+    if (id.includes('99dc02ce-44e6-4b64-965a-6674dcca4695')) return 'backgrounds/red.svg';
+    if (id.includes('8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c')) return 'backgrounds/yellow.svg';
+    return 'backgrounds/blue.svg';
+  })();
+  const sources = [
+    `https://wsrv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
+    safeURL,
+    `https://images.weserv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
+    localFallback
+  ];
+
+  const applySource = source => {
+    root.style.setProperty('--wallpaper', `url("${source}")`);
+  };
+  const trySource = index => {
+    if (index >= sources.length) {
+      root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+      return;
+    }
+    const test = new Image();
+    test.onload = () => applySource(sources[index]);
+    test.onerror = () => trySource(index + 1);
+    test.src = sources[index] + (sources[index].includes('?') ? '&' : '?') + 'idkbg=' + Date.now();
+  };
+  root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+  trySource(0);
+}
 function applyTheme(name) {
   const desktop = document.getElementById('desktop');
   if (!desktop) return;
@@ -108,6 +179,50 @@ function gameIconURL(path) {
 
 function gameTabURL(name) {
   return `game.html?game=${encodeURIComponent(name)}`;
+}
+
+const GAMING_CLOUD_PROVIDERS = [
+  { id: 'xbox', title: 'Xbox Cloud Gaming', url: 'https://www.xbox.com/play', glyph: 'X' },
+  { id: 'geforce', title: 'GeForce NOW', url: 'https://play.geforcenow.com/', glyph: 'N' },
+  { id: 'luna', title: 'Amazon Luna', url: 'https://luna.amazon.com/', glyph: 'L' },
+  { id: 'boosteroid', title: 'Boosteroid', url: 'https://cloud.boosteroid.com/', glyph: 'B' },
+  { id: 'blacknut', title: 'Blacknut', url: 'https://www.blacknut.com/', glyph: 'B' }
+];
+
+function gamingCloudApp() {
+  const root = el('section', { className: 'gaming-cloud-panel' });
+  const intro = el('div', { className: 'gaming-cloud-intro' }, [
+    el('div', { className: 'gaming-cloud-badge', textContent: 'ULTRAVIOLET' }),
+    el('h3', { textContent: 'Gaming Cloud' }),
+    el('p', { textContent: 'Cloud gaming services open through the IDK Ultraviolet proxy, so the launcher stays inside the IDK browser environment.' })
+  ]);
+  const providerGrid = el('div', { className: 'gaming-cloud-providers' });
+  const status = el('span', { className: 'count', textContent: 'Choose a cloud gaming service.' });
+  const frame = el('iframe', { className: 'gaming-cloud-frame', title: 'IDK Gaming Cloud', allow: 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write' });
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  const openProvider = async provider => {
+    status.textContent = 'Starting Ultraviolet…';
+    try {
+      if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.');
+      frame.src = await PROXY.encode(provider.url);
+      status.textContent = provider.title + ' · Running through Ultraviolet';
+    } catch (error) {
+      frame.removeAttribute('src');
+      status.textContent = error?.message || 'Could not start the cloud gaming service.';
+      window.OS?.notify?.('Gaming Cloud', status.textContent, 'danger');
+    }
+  };
+  GAMING_CLOUD_PROVIDERS.forEach(provider => {
+    const button = el('button', { className: 'gaming-cloud-provider btn', type: 'button' });
+    button.append(el('span', { className: 'gaming-cloud-provider-glyph', textContent: provider.glyph }), el('span', { textContent: provider.title }));
+    button.onclick = () => openProvider(provider);
+    providerGrid.append(button);
+  });
+  const head = el('div', { className: 'gaming-cloud-head' }, [el('strong', { textContent: 'Cloud services' }), status]);
+  root.append(intro, providerGrid, head, frame);
+  root.cleanup = () => { frame.src = 'about:blank'; };
+  return root;
 }
 
 async function gameBlobURL(name) {
@@ -1515,6 +1630,79 @@ async function searchApp() {
 }
 
 const APPS = {
+  extras: {
+    title: 'Extras',
+    glyph: '✦',
+    desktop: true,
+    dock: false,
+    width: 1040,
+    height: 720,
+    render() {
+      const root = el('div', { className: 'app idk-extras-app' });
+      const header = el('div', { className: 'app-heading' }, [
+        el('div', {}, [
+          el('h2', { textContent: 'Extras' }),
+          el('p', { textContent: 'Extra IDK tools and companion apps.' })
+        ])
+      ]);
+
+      const card = el('section', { className: 'idk-extras-card' });
+      const icon = el('div', { className: 'idk-extras-icon', textContent: '▣' });
+      const info = el('div', { className: 'idk-extras-info' }, [
+        el('strong', { textContent: 'Virtual Machine' }),
+        el('span', { textContent: 'Open the IDK Virtual Machine manager through the Ultraviolet proxy.' })
+      ]);
+      const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
+      const status = el('span', { className: 'idk-extras-status', textContent: 'Ready · Ultraviolet' });
+
+      const frame = el('iframe', {
+        className: 'idk-extras-vm-frame',
+        title: 'IDK Virtual Machine Manager',
+        src: 'about:blank',
+        allow: 'fullscreen'
+      });
+      frame.setAttribute('allowfullscreen', '');
+      frame.setAttribute('referrerpolicy', 'no-referrer');
+
+      open.addEventListener('click', async () => {
+        open.disabled = true;
+        status.textContent = 'Connecting through Ultraviolet…';
+        try {
+          if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') {
+            throw new Error('Ultraviolet proxy is not available.');
+          }
+          frame.src = await PROXY.encode('https://luiscorona551.github.io/idk-Virtual-Machine/');
+          status.textContent = 'Virtual Machine connected · Ultraviolet';
+        } catch (error) {
+          frame.src = 'about:blank';
+          status.textContent = error?.message || 'Could not connect through Ultraviolet.';
+          window.OS?.notify?.('Virtual Machine', status.textContent, 'danger');
+        } finally {
+          open.disabled = false;
+        }
+      });
+
+      card.append(icon, info, open, status);
+      root.append(header, card, frame);
+      root.cleanup = () => { frame.src = 'about:blank'; };
+      return root;
+    }
+  },
+  extras: {
+    title: 'Extras', glyph: '✦', desktop: true, dock: false, width: 1040, height: 720,
+    render() {
+      const root = el('div', { className: 'idk-extras-app' });
+      root.append(el('section', { className: 'idk-extras-hero' }, [el('div', { className: 'idk-extras-badge', textContent: 'IDK EXTRAS' }), el('h2', { textContent: 'Extras' }), el('p', { textContent: 'Additional IDK tools and companion apps.' })]));
+      const card = el('article', { className: 'idk-extra-card' });
+      card.append(el('div', { className: 'idk-extra-icon', textContent: '▣' }), el('div', { className: 'idk-extra-copy' }, [el('strong', { textContent: 'Virtual Machine' }), el('span', { textContent: 'Virt-Manager-style VM configuration and management through Ultraviolet.' })]));
+      const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
+      const status = el('span', { className: 'idk-extra-status', textContent: 'Ready · Ultraviolet' });
+      const frame = el('iframe', { className: 'idk-vm-frame', title: 'IDK Virtual Machine Manager', src: 'about:blank', allow: 'fullscreen' });
+      frame.setAttribute('allowfullscreen', ''); frame.setAttribute('referrerpolicy', 'no-referrer');
+      open.onclick = async () => { open.disabled = true; status.textContent = 'Connecting through Ultraviolet…'; try { if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.'); const vmUrl = new URL('https://luiscorona551.github.io/idk-Virtual-Machine/'); vmUrl.searchParams.set('idkApi', `${window.location.origin}/api/vm`); frame.src = await PROXY.encode(vmUrl.toString()); status.textContent = 'Virtual Machine Manager connected through Ultraviolet · IDK backend'; } catch (error) { frame.src = 'about:blank'; status.textContent = error?.message || 'Could not connect through Ultraviolet'; window.OS?.notify?.('Virtual Machine', status.textContent, 'error'); } finally { open.disabled = false; } };
+      card.append(open, status); root.append(card, frame, el('p', { className: 'idk-extras-note', textContent: 'The VM manager UI is hosted on GitHub Pages, while its API is served by the existing IDK 10.0 backend through /api/vm.' })); root.cleanup = () => { frame.src = 'about:blank'; }; return root;
+    }
+  },
   search: {
     title: 'Search',
     glyph: '🔎',
@@ -1572,15 +1760,6 @@ const APPS = {
     render: () => window.IDKBatchSix?.contacts?.() || document.createElement('div')
   },
 
-  'control-center': {
-    title: 'Control Center',
-    glyph: '◉',
-    desktop: false,
-    dock: false,
-    width: 680,
-    height: 580,
-    render: () => window.IDKBatchSix?.controlCenter?.() || document.createElement('div')
-  },
 
   permissions: {
     title: 'App Permissions',
@@ -1760,7 +1939,16 @@ const APPS = {
       const count = el('span', { className: 'count' });
       const grid = el('div', { className: 'tile-grid' });
       const toolbar = el('div', { className: 'toolbar' }, [search, filter, count]);
-      root.append(toolbar, grid);
+      const cloud = gamingCloudApp();
+      const cloudToggle = el('button', { className: 'btn tab games-cloud-toggle', type: 'button', textContent: 'Gaming Cloud' });
+      const gamesToggle = el('button', { className: 'btn tab games-library-toggle', type: 'button', textContent: 'Game Library' });
+      const modeBar = el('div', { className: 'games-mode-bar' }, [gamesToggle, cloudToggle]);
+      cloud.hidden = true;
+      const showGames = () => { grid.hidden = false; toolbar.hidden = false; cloud.hidden = true; gamesToggle.classList.add('active'); cloudToggle.classList.remove('active'); };
+      const showCloud = () => { grid.hidden = true; toolbar.hidden = true; cloud.hidden = false; gamesToggle.classList.remove('active'); cloudToggle.classList.add('active'); };
+      gamesToggle.onclick = showGames; cloudToggle.onclick = showCloud;
+      root.append(modeBar, toolbar, grid, cloud);
+      gamesToggle.classList.add('active');
       const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
       const recents = () => store.get(GAME_RECENTS_KEY, []);
       const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
@@ -2288,10 +2476,13 @@ const APPS = {
     title: 'Settings',
     glyph: '⚙️',
     desktop: true,
-    width: 600,
-    height: 560,
-    render() {
-      const root = el('div', { className: 'app' });
+    width: 760,
+    height: 700,
+    render(opts = {}) {
+      const root = el('div', { className: 'app idk-unified-settings' });
+      const tabs = el('div', { className: 'idk-settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
+      const body = el('div', { className: 'idk-settings-body' });
+      const requestedTab = ['general','appearance','system','privacy'].includes(opts.tab) ? opts.tab : (store.get('idkSettingsSection','general') || 'general');
       const input = el('input', {
         className: 'field',
         type: 'text',
@@ -2306,6 +2497,9 @@ const APPS = {
       }
       wallpaperPreset.value = currentWallpaper;
       wallpaperPreset.addEventListener('change', () => { if (wallpaperPreset.value) input.value = wallpaperPreset.value; });
+      const uiColor = el('select', { className: 'field' });
+      [['auto', 'Auto — match wallpaper'], ['blue', 'Blue / Classic'], ['grape', 'Purple / Grape'], ['green', 'Green'], ['red', 'Red / Cherry'], ['yellow', 'Yellow / Lemon']].forEach(([value, label]) => uiColor.append(el('option', { value, textContent: label })));
+      uiColor.value = store.get('idkUIColorTheme', 'auto');
       const clock24 = el('input', { type: 'checkbox', checked: store.get('clock24', false) });
       const theme = el('select', { className: 'field', value: store.get('theme', 'midnight') });
       [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy'], ['custom', 'Custom']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
@@ -2341,6 +2535,14 @@ const APPS = {
       const motion = el('select', { className: 'field', value: store.get('motion', 'on') });
       [['on', 'Motion on'], ['off', 'Reduce motion']].forEach(([value, label]) => motion.append(el('option', { value, textContent: label })));
       motion.value = store.get('motion', 'on');
+      const tabCloakSettings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' });
+      const tabCloakURL = el('input', {
+        className: 'field',
+        type: 'url',
+        placeholder: 'https://www.google.com/',
+        value: tabCloakSettings.url || ''
+      });
+      const tabCloakEnabled = el('input', { type: 'checkbox', checked: Boolean(tabCloakSettings.enabled) });
       const panic = el('input', {
         className: 'field',
         type: 'url',
@@ -2352,14 +2554,18 @@ const APPS = {
       save.addEventListener('click', () => {
         store.set('wallpaper', input.value.trim());
         store.set('clock24', clock24.checked);
+        store.set('idkUIColorTheme', uiColor.value);
         store.set('theme', theme.value);
         store.set(CUSTOM_THEME_KEY, readCustomTheme());
         store.set('iconSize', iconSize.value);
         store.set('dockPosition', dockPosition.value);
         store.set('motion', motion.value);
         store.set('panicURL', panic.value.trim());
+        store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
+        applyTabCloaker();
         applyWallpaper(input.value.trim());
         applyTheme(theme.value);
+        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
         applyIconSize(iconSize.value);
         applyDockPosition(dockPosition.value);
         applyMotion(motion.value);
@@ -2380,7 +2586,7 @@ const APPS = {
       const clearWorkspace = el('button', { className: 'btn tab', type: 'button', textContent: 'Forget saved workspace' });
       clearWorkspace.addEventListener('click', () => OS.clearWorkspace());
 
-      root.append(
+      body.append(
         el('h2', { textContent: 'Settings' }),
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Wallpaper preset' }),
@@ -2394,6 +2600,11 @@ const APPS = {
           el('label', { textContent: '24-hour clock' }),
           clock24
         ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'UI color' }),
+          uiColor,
+          el('small', { className: 'sub', textContent: 'Choose the accent, panels, text, and related interface colors. Auto follows the selected wallpaper.' })
+        ]),
         el('div', { className: 'settings-row settings-grid' }, [
            el('label', { textContent: 'Theme' }), theme,
            el('label', { textContent: 'Desktop icon size' }), iconSize,
@@ -2401,6 +2612,15 @@ const APPS = {
            el('label', { textContent: 'Animations' }), motion
          ]),
         customTheme,
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Tab Cloaker' }),
+          el('small', { className: 'sub', textContent: 'Changes the browser tab title and favicon to the site you choose. Browsers do not allow a web app to change the real address bar to another domain.' }),
+          el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' }, [
+            tabCloakEnabled,
+            el('span', { textContent: 'Enable cloak' }),
+            tabCloakURL
+          ])
+        ]),
         el('div', { className: 'settings-row' }, [
           el('label', { textContent: 'Power button redirects to' }),
           panic
@@ -2412,6 +2632,158 @@ const APPS = {
         ]),
         el('div', { style: 'display:flex; gap:8px;' }, [save, reset])
       );
+      const existingSettings = [...body.children];
+      const general = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'general' });
+      const appearance = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'appearance', hidden: true });
+      appearance.append(el('h2', { textContent: 'Appearance' }));
+      const appearanceKeywords = ['Wallpaper', 'UI color', 'Theme', 'Custom theme', 'Tab Cloaker'];
+      existingSettings.forEach((node, index) => {
+        const text = node.textContent || '';
+        if (index === 0 || !appearanceKeywords.some(keyword => text.includes(keyword))) general.append(node);
+        else appearance.append(node);
+      });
+      body.replaceChildren(general, appearance);
+
+      const system = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'system', hidden: true });
+      system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and desktop controls.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
+      const systemGrid = system.querySelector('.idk-settings-action-grid');
+      const status = system.querySelector('[data-settings-status]');
+      const settingAction = (title, detail, run) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = async () => { button.disabled = true; try { await run(); status.textContent = title + ' completed.'; } catch (error) { status.textContent = title + ' failed: ' + (error?.message || 'Try again.'); } finally { button.disabled = false; } }; return button; };
+      systemGrid.append(
+        settingAction('Sync now', 'Push changes and retry queued work.', async () => { await window.IDKOffline?.flush?.(); await window.IDKDataLayer?.syncNow?.(); window.OS?.notify?.('Settings', 'Sync requested.'); }),
+        settingAction('Backup & Recovery', 'Protect local settings and files.', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
+        settingAction('Security & Privacy', 'Account safety and local data.', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('privacy')),
+        settingAction('Account & Devices', 'Profiles, sessions, and handoff.', () => window.IDKAccountsDevices?.open?.('security') || window.IDKAccountsDevices?.open?.('profiles')),
+        settingAction('Delete account & restart setup', 'Permanently delete your IDK account and return to the original setup.', async () => {
+          if (!window.confirm('Delete your IDK account and all account data? This cannot be undone. You will be returned to the original setup.')) throw new Error('Account deletion cancelled.');
+          const response = await fetch('/api/account', { method: 'DELETE', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || 'Could not delete the account.');
+          try { localStorage.clear(); sessionStorage.clear(); } catch {}
+          window.location.replace('/');
+        }),
+        settingAction('Check for updates', 'Check the installed IDK shell for updates.', async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) throw new Error('Update checks are unavailable in this browser.'); await registration.update().catch(() => {}); if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' }); }),
+        settingAction('System Health', 'Storage, performance, and diagnostics.', () => window.OS?.open?.('system-monitor') || window.OS?.open?.('reliability')),
+        settingAction('AI Setup', 'Choose local, cloud, or offline AI.', () => window.OS?.open?.('aiModes') || window.OS?.open?.('ai')),
+        settingAction('Profiles', 'Switch local workspaces and profiles.', () => window.IDKAccountsDevices?.open?.('profiles') || window.IDKConnectivitySuite?.openProfiles?.()),
+        settingAction('Smart Workspaces', 'Save or activate desktop setups.', () => window.IDKOSNext?.workspaceView?.()),
+        settingAction('Activity Center', 'Notifications and recent activity.', () => window.OS?.open?.('activity')),
+        settingAction('Share Sheet', 'Send text to IDK apps.', () => window.IDKOSNext?.openShareSheet?.()),
+        settingAction('Reset icon size', 'Return desktop icon size to Normal.', () => { store.set('iconSize','normal'); applyIconSize('normal'); })
+      );
+      const privacy = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'privacy', hidden: true });
+      privacy.innerHTML = '<h2>Privacy & Security</h2><p class="sub">Security and privacy controls now live in the main Settings app.</p><div class="idk-settings-action-grid"></div>';
+      const privacyGrid = privacy.querySelector('.idk-settings-action-grid');
+      const openPrivacy = (title, detail, action) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = action; return button; };
+      privacyGrid.append(
+        openPrivacy('App Permissions', 'Review microphone, camera, storage, and network access.', () => window.OS?.open?.('permissions')),
+        openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => root._showSettingsTab?.('privacy')),
+        openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
+        openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
+      );
+      // Legacy Control Center abilities now live directly in Settings.
+      const featureState = () => window.IDKFeaturePack?.getState?.() || {};
+      const feature = window.IDKFeaturePack;
+      const systemTools = el('section', { className: 'idk-settings-panel-section' });
+      systemTools.innerHTML = '<h3>Desktop & device</h3><p class="sub">Desktop, device, and recovery controls are managed here.</p>';
+      const healthRow = el('div', { className: 'settings-row' }, [
+        el('label', { textContent: 'System status' }),
+        el('span', { className: 'sub', textContent: 'Checking…' }),
+        el('button', { className: 'btn', type: 'button', textContent: 'Refresh' })
+      ]);
+      feature?.systemStatus?.(healthRow.children[1]);
+      healthRow.children[2].onclick = () => feature?.systemStatus?.(healthRow.children[1]);
+      const brightness = el('input', { type: 'range', min: '20', max: '100', value: String(featureState().brightness ?? 100) });
+      const volume = el('input', { type: 'range', min: '0', max: '100', value: String(featureState().volume ?? 70) });
+      brightness.oninput = () => feature?.setBrightness?.(brightness.value);
+      volume.oninput = () => feature?.setVolume?.(volume.value);
+      systemTools.append(
+        healthRow,
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Brightness' }), brightness]),
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Volume' }), volume]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Virtual desktops' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [1,2,3].map(space => {
+            const b=el('button',{className:'btn tab',type:'button',textContent:'Desktop '+space});
+            b.onclick=()=>feature?.switchSpace?.(space); return b;
+          }))
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Desktop tools' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Toggle widgets'});b.onclick=()=>feature?.toggleWidgets?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Save screenshot'});b.onclick=()=>feature?.saveScreenshot?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Move focused window'});b.onclick=()=>feature?.moveFocusedWindow?.((featureState().space||1)===3?1:(featureState().space||1)+1);return b;})()
+          ])
+        ])
+      );
+      const launcherSection = el('section', { className: 'idk-settings-panel-section' });
+      launcherSection.innerHTML = '<h3>Built-in apps</h3><p class="sub">Open common IDK apps directly from Settings.</p>';
+      const launcherGrid = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;' });
+      [['files','Files'],['proxy','Browser'],['chat','Messenger'],['games','Games'],['music','Music'],['apps','App Store'],['search','Search']].forEach(([id,label]) => {
+        const b=el('button',{className:'btn tab',type:'button',textContent:label});
+        b.onclick=()=>window.OS?.open?.(id); launcherGrid.append(b);
+      });
+      launcherSection.append(launcherGrid);
+      system.append(launcherSection);
+
+      const backupSection = el('section', { className: 'idk-settings-panel-section' });
+      backupSection.innerHTML = '<h3>Backup & portability</h3><p class="sub">Export or restore your local IDK settings and app data.</p>';
+      const backupStatus = el('p', { className: 'idk-settings-status', textContent: '' });
+      const exportBackup = el('button', { className: 'btn', type: 'button', textContent: 'Export local backup' });
+      const importLabel = el('label', { className: 'btn', textContent: 'Import local backup' });
+      const importInput = el('input', { type: 'file', accept: 'application/json', hidden: true });
+      importLabel.append(importInput);
+      exportBackup.onclick = () => {
+        const values = Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]));
+        const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([JSON.stringify(values,null,2)],{type:'application/json'})); link.download='idk-10-backup.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+        backupStatus.textContent='Backup exported.';
+      };
+      importInput.onchange = async () => {
+        const file=importInput.files?.[0]; if(!file) return;
+        try { const values=JSON.parse(await file.text()); if(!values || typeof values!=='object') throw new Error('Invalid backup'); Object.entries(values).forEach(([key,value])=>localStorage.setItem(key,String(value))); backupStatus.textContent='Backup imported. Reloading…'; setTimeout(()=>location.reload(),500); }
+        catch { backupStatus.textContent='That backup file could not be read.'; }
+      };
+      backupSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[exportBackup,importLabel]),backupStatus);
+      system.append(backupSection);
+
+      const privacyTools = el('section', { className: 'idk-settings-panel-section' });
+      privacyTools.innerHTML = '<h3>Local privacy & lock</h3><p class="sub">Guest mode and the optional local lock stay on this device.</p>';
+      const guest = el('input', { type:'checkbox', checked:Boolean(featureState().guest) });
+      guest.onchange=()=>feature?.setGuest?.(guest.checked);
+      const pin = el('input',{className:'field',type:'password',inputMode:'numeric',maxlength:'12',placeholder:'New PIN'});
+      const savePin=el('button',{className:'btn',type:'button',textContent:'Save PIN'});
+      const clearPin=el('button',{className:'btn',type:'button',textContent:'Clear PIN'});
+      const lock=el('button',{className:'btn',type:'button',textContent:'Lock now'});
+      const privacyStatus=el('p',{className:'idk-settings-status'});
+      savePin.onclick=async()=>{await feature?.setPIN?.(pin.value.trim());pin.value='';privacyStatus.textContent='Lock PIN saved.';};
+      clearPin.onclick=()=>{feature?.clearPIN?.();pin.value='';privacyStatus.textContent='Lock PIN cleared.';};
+      lock.onclick=()=>feature?.lockScreen?.();
+      privacyTools.append(el('div',{className:'settings-row'},[el('label',{textContent:'Guest mode'}),guest]),el('div',{className:'settings-row'},[el('label',{textContent:'Lock PIN'}),pin,savePin,clearPin,lock]),privacyStatus);
+      privacy.append(privacyTools);
+
+      const bookmarkSection = el('section',{className:'idk-settings-panel-section'});
+      bookmarkSection.innerHTML='<h3>Bookmarks</h3><p class="sub">Manage saved browser bookmarks from Settings.</p>';
+      const bookmarkTitle=el('input',{className:'field',placeholder:'Bookmark name'});
+      const bookmarkURL=el('input',{className:'field',type:'url',placeholder:'https://example.com'});
+      const bookmarkList=el('div',{className:'settings-row'});
+      const refreshBookmarks=()=>{bookmarkList.replaceChildren();(feature?.getBookmarks?.()||[]).forEach((item,index)=>{const row=el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;'},[el('span',{textContent:item.title}),el('small',{className:'sub',textContent:item.url})]);const open=el('button',{className:'btn tab',type:'button',textContent:'Open'});open.onclick=()=>window.open(item.url,'_blank','noopener,noreferrer');const del=el('button',{className:'btn tab',type:'button',textContent:'Remove'});del.onclick=()=>{feature?.removeBookmark?.(index);refreshBookmarks();};row.append(open,del);bookmarkList.append(row);});if(!bookmarkList.children.length)bookmarkList.append(el('small',{className:'sub',textContent:'No bookmarks saved.'}));};
+      const addBookmark=el('button',{className:'btn',type:'button',textContent:'Save bookmark'});addBookmark.onclick=()=>{if(feature?.addBookmark?.(bookmarkTitle.value.trim(),bookmarkURL.value.trim())){bookmarkTitle.value='';bookmarkURL.value='';refreshBookmarks();}};
+      bookmarkSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[bookmarkTitle,bookmarkURL,addBookmark]),bookmarkList);refreshBookmarks();system.append(bookmarkSection);
+
+      const generalTools = el('section',{className:'idk-settings-panel-section'});
+      generalTools.innerHTML='<h3>Workspace</h3><p class="sub">Quick access to saved desktop layout controls.</p>';
+      const resetLayout=el('button',{className:'btn',type:'button',textContent:'Reset saved layout'});
+      resetLayout.onclick=()=>{localStorage.removeItem('desktopOrder');localStorage.removeItem('idkDesktopIconPositions');notify('Workspace','The desktop layout will reset after reload.');};
+      generalTools.append(resetLayout); general.append(generalTools);
+
+      body.append(system, privacy);
+      [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
+      const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
+      tabs.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.onclick=()=>showTab(tab.dataset.settingsTab));
+      root.append(tabs, body);
+      showTab(requestedTab);
+      root._showSettingsTab = showTab;
       return root;
     }
   },
@@ -2443,6 +2815,8 @@ const APPS = {
     }
   }
 };
+
+applyTabCloaker();
 
 window.IDKPermissions = {
   can(appId, permission) {
