@@ -73,7 +73,7 @@ const GAME_FAVORITES_KEY = 'idkGameFavorites';
 const GAME_RECENTS_KEY = 'idkGameRecents';
 
 function applyWallpaper(url) {
-  const safeURL = String(url || '').trim().replace(/["\\\r\n]/g, '');
+  const safeURL = String(url || '').trim().replace(/[\"\\\r\n]/g, '');
   const isGradient = /^(linear|radial|conic)-gradient\(/.test(safeURL);
   const root = document.documentElement;
 
@@ -87,38 +87,40 @@ function applyWallpaper(url) {
     return;
   }
 
-  // Older Chromebooks can fail to load newer CDN/TLS endpoints. Try the
-  // original image first, then a lightweight image proxy before falling back
-  // to the built-in gradient.
+  // Prefer a compatibility proxy, then the original CDN, then a second
+  // compatibility proxy. Older Chromebooks can have trouble negotiating
+  // some modern image/CDN endpoints even when the same page loads.
+  const localFallback = (() => {
+    const id = safeURL;
+    if (id.includes('e806c32c-31fd-4f54-a378-8eba729b9eda')) return 'backgrounds/grape.svg';
+    if (id.includes('b9324e05-93bd-445b-b799-c75b6ff7b455')) return 'backgrounds/green.svg';
+    if (id.includes('99dc02ce-44e6-4b64-965a-6674dcca4695')) return 'backgrounds/red.svg';
+    if (id.includes('8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c')) return 'backgrounds/yellow.svg';
+    return 'backgrounds/blue.svg';
+  })();
   const sources = [
+    `https://wsrv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
     safeURL,
-    `https://wsrv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`
+    `https://images.weserv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
+    localFallback
   ];
 
-  let index = 0;
   const applySource = source => {
-    root.style.setProperty('--wallpaper', `url("${source}"), ${FALLBACK_WALLPAPER}`);
+    root.style.setProperty('--wallpaper', `url("${source}")`);
   };
-
-  const test = new Image();
-  test.onload = () => applySource(sources[index]);
-  test.onerror = () => {
-    index += 1;
-    if (index < sources.length) {
-      applySource(sources[index]);
-      const retry = new Image();
-      retry.onload = () => applySource(sources[index]);
-      retry.onerror = () => root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
-      retry.src = sources[index];
-    } else {
+  const trySource = index => {
+    if (index >= sources.length) {
       root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+      return;
     }
+    const test = new Image();
+    test.onload = () => applySource(sources[index]);
+    test.onerror = () => trySource(index + 1);
+    test.src = sources[index] + (sources[index].includes('?') ? '&' : '?') + 'idkbg=' + Date.now();
   };
-
-  applySource(sources[index]);
-  test.src = sources[index];
+  root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+  trySource(0);
 }
-
 function applyTheme(name) {
   const desktop = document.getElementById('desktop');
   if (!desktop) return;
