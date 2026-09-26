@@ -14,7 +14,7 @@
     const tray = document.createElement('nav');
     tray.id = 'idk-system-tray';
     tray.setAttribute('aria-label', 'System tray');
-    tray.innerHTML = '<button type="button" data-network title="Network status">Online</button><button type="button" data-battery title="Battery status">Battery: —</button><button type="button" data-theme title="Toggle theme">Theme</button><button type="button" data-notify title="Open notifications">Alerts</button>';
+    tray.innerHTML = '<button type="button" data-network title="Network status">Online</button><button type="button" data-battery title="Battery status">Battery: —</button><button type="button" data-notify title="Open notifications">Alerts</button>';
     const network = tray.querySelector('[data-network]');
     const battery = tray.querySelector('[data-battery]');
     const updateNetwork = () => { network.textContent = navigator.onLine ? 'Online' : 'Offline'; network.dataset.state = navigator.onLine ? 'online' : 'offline'; };
@@ -23,11 +23,6 @@
     window.addEventListener('online', updateNetwork);
     window.addEventListener('offline', updateNetwork);
     if (navigator.getBattery) navigator.getBattery().then(value => { updateBattery(value); value.addEventListener('levelchange', () => updateBattery(value)); value.addEventListener('chargingchange', () => updateBattery(value)); }).catch(() => {});
-    tray.querySelector('[data-theme]').onclick = () => {
-      const next = localStorage.getItem('theme') === 'neon' ? 'midnight' : 'neon';
-      localStorage.setItem('theme', JSON.stringify(next));
-      location.reload();
-    };
     tray.querySelector('[data-notify]').onclick = () => document.getElementById('notification-toggle')?.click();
     clock.append(tray);
   }
