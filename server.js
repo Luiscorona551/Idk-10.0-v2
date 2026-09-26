@@ -26,6 +26,8 @@ const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 const backend = { proxy: Boolean(wisp && typeof wisp.routeRequest === 'function'), chat: Boolean(chat && typeof chat.handleUpgrade === 'function') };
+// Prefer IPv4 for outbound proxy connections on hosts where IPv6 routes can terminate TLS early.
+if (wisp?.options) wisp.options.dns_result_order = 'ipv4first';
 async function backendStatus() { return { ...backend, ai: aiStatus(), database: await databaseStatus(), vm: vmBackendStatus() }; }
 app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
