@@ -123,8 +123,8 @@ const PROXY = (() => {
 
   function normalize(input) {
     const value = String(input ?? '').trim();
-    if (/^https?:\\/\\//i.test(value)) return value;
-    if (/^[^\\s.]+\\.[^\\s]{2,}$/.test(value)) return `https://${value}`;
+    if (/^https?:\/\//i.test(value)) return value;
+    if (/^[^\s.]+\.[^\s]{2,}$/.test(value)) return `https://${value}`;
     return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
   }
 
