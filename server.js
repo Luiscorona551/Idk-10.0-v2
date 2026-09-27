@@ -158,8 +158,7 @@ app.get('/api/update', async (req, res) => res.json({
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
 app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));
-app.get('/uv/uv.sw.js', (req, res) => res.type('js').send(uvServiceWorker));
-app.get('/uv/sw.js', (req, res) => res.type('js').send(uvServiceWorkerLoader));
+app.get('/uv/uv.sw.js', (req, res) => res.type('js').sendFile(uvServiceWorker));
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
