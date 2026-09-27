@@ -3,51 +3,6 @@
 const PROXY = (() => {
   let ready = null;
   let connection = null;
-  let diagnostics = { stage: 'idle', secureContext: null, serviceWorkerSupported: null, serviceWorkerController: null, registrationState: null, backend: null, scope: null, transport: null, error: null, updatedAt: null };
-  function record(patch) {
-    diagnostics = { ...diagnostics, ...patch, updatedAt: new Date().toISOString() };
-    async function diagnose() {
-    const result = {
-      secureContext: Boolean(window.isSecureContext),
-      serviceWorkerSupported: 'serviceWorker' in navigator,
-      serviceWorkerController: Boolean(navigator.serviceWorker?.controller),
-      registrationState: null,
-      backend: null,
-      scope: null,
-      transport: null,
-      error: null
-    };
-    try { result.backend = await status(); } catch (error) { result.error = describeError(error); }
-    try { result.scope = await serverScope(); } catch (error) { result.error = result.error || describeError(error); }
-    if (result.serviceWorkerSupported) {
-      try {
-        const registration = await navigator.serviceWorker.getRegistration(window.__uv$config?.prefix || '/uv/service/');
-        result.registrationState = registration ? {
-          scope: registration.scope,
-          active: Boolean(registration.active),
-          installing: Boolean(registration.installing),
-          waiting: Boolean(registration.waiting)
-        } : null;
-      } catch (error) { result.error = result.error || describeError(error); }
-    }
-    if (window.__uv$config) {
-      result.transport = {
-        prefix: window.__uv$config.prefix,
-        sw: window.__uv$config.sw,
-        host: location.host
-      };
-    }
-    record(result);
-    return { ...diagnostics };
-  }
-
-  window.IDKProxyDiagnostics = { ...diagnostics };
-    window.dispatchEvent(new CustomEvent('idk-proxy-diagnostics', { detail: { ...diagnostics } }));
-  }
-  function describeError(error) {
-    if (!error) return null;
-    return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack ? String(error.stack).split('\n').slice(0, 3).join('\n') : null };
-  }
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const existing = [...document.scripts].find(tag => tag.src && new URL(tag.src, location.href).pathname === src);
@@ -67,7 +22,7 @@ const PROXY = (() => {
     if (!('serviceWorker' in navigator)) throw new Error('This browser has no service worker support.');
     await loadScript('/uv/uv.bundle.js'); await loadScript('/uv/uv.config.js'); await loadScript('/baremux/index.js');
     if (!window.Ultraviolet || !window.__uv$config || !window.BareMux?.BareMuxConnection) throw new Error('The browser service loaded incompletely. Try again.');
-    const registration = await navigator.serviceWorker.register(__uv$config.sw, { scope: __uv$config.prefix, updateViaCache: 'none' });
+    const registration = await navigator.serviceWorker.register(__uv$config.sw, { scope: __uv$config.prefix });
     registration.update().catch(() => {});
     const deadline = Date.now() + 10000;
     while (!registration.active && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
@@ -93,8 +48,7 @@ const PROXY = (() => {
       }
     }
   }
-  window.IDKProxyDiagnostics = { ...diagnostics };
-  return { encode, backendAvailable, chatAvailable, serverScope, status, diagnose, reset };
+  return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
 })();
 (async () => {
   if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
