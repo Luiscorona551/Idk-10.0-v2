@@ -12,7 +12,12 @@ const PROXY = (() => {
       const absolute = new URL(src, location.href).href;
       const existing = [...document.scripts].find(script => script.src === absolute);
       if (existing) {
-        if (existing.dataset.idkLoaded === 'true') return resolve();
+        if (
+          existing.dataset.idkLoaded === 'true' ||
+          (src === '/uv/uv.bundle.js' && window.Ultraviolet) ||
+          (src === '/uv/uv.config.js' && window.__uv$config) ||
+          (src === '/baremux/index.js' && window.BareMux?.BareMuxConnection)
+        ) return resolve();
         existing.addEventListener('load', resolve, { once: true });
         existing.addEventListener('error', () => reject(new Error(`Could not load ${src}.`)), { once: true });
         return;
@@ -97,6 +102,16 @@ const PROXY = (() => {
       throw new Error('The Ultraviolet service worker did not activate.');
     }
 
+    if (!navigator.serviceWorker.controller) {
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 1500);
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+    }
+
     connection = new BareMux.BareMuxConnection('/baremux/worker.js');
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wisp = `${protocol}//${location.host}/wisp/`;
@@ -129,8 +144,17 @@ const PROXY = (() => {
   }
 
   async function encode(input) {
-    await ensureReady();
-    return __uv$config.prefix + __uv$config.encodeUrl(normalize(input));
+    const target = normalize(input);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await ensureReady();
+        return __uv$config.prefix + __uv$config.encodeUrl(target);
+      } catch (error) {
+        reset();
+        if (attempt === 1) throw error;
+        await sleep(150);
+      }
+    }
   }
 
   return { encode, backendAvailable, chatAvailable, serverScope, status, reset };
