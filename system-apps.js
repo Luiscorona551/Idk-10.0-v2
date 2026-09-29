@@ -1126,6 +1126,7 @@ window.SYSTEM_APPS = (() => {
   }
 
   window.IDKFiles = {
+    importFiles: importFileEntries,
     openLocation: name => document.querySelector('.files-app')?.dispatchEvent(new CustomEvent('idk-files-navigate', { detail: { name } })),
     writeTextFile,
     writeBlobFile,
