@@ -158,10 +158,27 @@ function applyMotion(mode) {
   document.getElementById('desktop')?.setAttribute('data-motion', mode === 'off' ? 'off' : 'on');
 }
 
+const JSON_FALLBACKS = {
+  'games.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/games.json',
+  'game-icons.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/game-icons.json'
+};
 async function loadJSON(path) {
-  const res = await fetch(path, { cache: 'no-cache' });
-  if (!res.ok) throw new Error(`Failed to load ${path} (${res.status})`);
-  return res.json();
+  const urls = [path, JSON_FALLBACKS[path]].filter(Boolean);
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load ${path} (${res.status})`);
+      const data = await res.json();
+      try { localStorage.setItem(`idk-json-cache:${path}`, JSON.stringify(data)); } catch {}
+      return data;
+    } catch (error) { lastError = error; }
+  }
+  try {
+    const cached = JSON.parse(localStorage.getItem(`idk-json-cache:${path}`) || 'null');
+    if (cached !== null) return cached;
+  } catch {}
+  throw lastError || new Error(`Failed to load ${path}`);
 }
 
 function gameFileName(name) {
@@ -1880,6 +1897,15 @@ const APPS = {
     render: () => window.SYSTEM_APPS.ai()
   },
 
+  agent: {
+    title: 'IDK Web Agent',
+    glyph: '🤖',
+    desktop: true,
+    width: 760,
+    height: 560,
+    render: () => window.SYSTEM_APPS.agent()
+  },
+
   terminal: {
     title: 'Terminal',
     glyph: '<span class="terminal-glyph">&gt;_</span>',
@@ -1919,10 +1945,17 @@ const APPS = {
     width: 900,
     height: 620,
     render: async function gamesRender() {
-      const [names, icons] = await Promise.all([
-        loadJSON('games.json'),
-        loadJSON('game-icons.json').catch(() => ({}))
-      ]);
+      let names = [];
+      let icons = {};
+      let catalogError = '';
+      try {
+        names = await loadJSON('games.json');
+        icons = await loadJSON('game-icons.json').catch(() => ({}));
+      } catch (error) {
+        catalogError = error?.message || 'The game catalog is unavailable.';
+      }
+      if (!Array.isArray(names)) names = [];
+      if (!icons || typeof icons !== 'object') icons = {};
       const items = names.map(name => ({
         id: name,
         title: gameTitle(name),
@@ -1949,6 +1982,11 @@ const APPS = {
       gamesToggle.onclick = showGames; cloudToggle.onclick = showCloud;
       root.append(modeBar, toolbar, grid, cloud);
       gamesToggle.classList.add('active');
+      if (catalogError) {
+        root.append(emptyState(`The Games catalog could not be loaded right now.<br><small>${catalogError}</small><br><button class="btn tab" type="button" data-games-retry>Retry</button>`));
+        root.querySelector('[data-games-retry]')?.addEventListener('click', () => window.OS?.open?.('games'));
+        return root;
+      }
       const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
       const recents = () => store.get(GAME_RECENTS_KEY, []);
       const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };

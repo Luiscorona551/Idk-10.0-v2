@@ -66,7 +66,7 @@
     document.getElementById('idk-echo-action-center')?.remove();
     const root = document.createElement('section');
     root.id = 'idk-echo-action-center';
-    root.innerHTML = '<div class="idk-echo-center-card"><button class="idk-echo-center-close" type="button" aria-label="Close Echo">×</button><div class="idk-echo-center-flag"><img src="official-flag.jpg" alt="IDK Echo"></div><span class="idk-echo-kicker">IDK ECHO</span><h2>What can I help you with?</h2><p>Choose an action and Echo will handle it on your IDK desktop.</p><div class="idk-echo-action-grid"><button data-echo-action="settings">⚙ Open Settings</button><button data-echo-action="green">🌿 Change wallpaper to Green</button><button data-echo-action="files">📁 Open Files</button><button data-echo-action="browser">🌐 Open Browser</button><button data-echo-action="ai">🤖 Open AI</button></div><div class="idk-echo-center-status">Ready.</div></div>';
+    root.innerHTML = '<div class="idk-echo-center-card"><button class="idk-echo-center-close" type="button" aria-label="Close Echo">×</button><div class="idk-echo-center-flag"><img src="official-flag.jpg" alt="IDK Echo"></div><span class="idk-echo-kicker">IDK ECHO</span><h2>What can I help you with?</h2><p>Choose an action and Echo will handle it on your IDK desktop.</p><div class="idk-echo-action-grid"><button data-echo-action="settings">⚙ Open Settings</button><button data-echo-action="green">🌿 Change wallpaper to Green</button><button data-echo-action="files">📁 Open Files</button><button data-echo-action="browser">🌐 Open Browser</button><button data-echo-action="agent">🤖 Open Web Agent</button></div><div class="idk-echo-center-status">Ready.</div></div>';
     document.body.append(root);
     const status = root.querySelector('.idk-echo-center-status');
     const close = () => root.remove();
@@ -77,9 +77,9 @@
       if (kind === 'settings') window.OS?.open?.('settings');
       if (kind === 'files') window.OS?.open?.('files');
       if (kind === 'browser') window.OS?.open?.('proxy');
-      if (kind === 'ai') window.OS?.open?.('ai');
+      if (kind === 'agent') window.OS?.open?.('agent');
       if (kind === 'green') { if (typeof window.applyWallpaper === 'function') window.applyWallpaper(GREEN_WALLPAPER); else document.documentElement.style.setProperty('--wallpaper', `url("${GREEN_WALLPAPER}")`); save('idkWallpaper', GREEN_WALLPAPER); }
-      const message = { settings: 'Settings opened.', green: 'Green wallpaper applied.', files: 'Files opened.', browser: 'Browser opened.', ai: 'AI opened.' }[kind] || 'Done.';
+      const message = { settings: 'Settings opened.', green: 'Green wallpaper applied.', files: 'Files opened.', browser: 'Browser opened.', agent: 'Web Agent opened.' }[kind] || 'Done.';
       status.textContent = message;
       notify('IDK Echo', message, 'success');
       setTimeout(close, 500);

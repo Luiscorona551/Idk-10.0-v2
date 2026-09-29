@@ -1133,5 +1133,79 @@ window.SYSTEM_APPS = (() => {
     getFiles,
     removeEntries: removeFileEntries
   };
-  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, writeBlobFile, readBlob: blobFor, getFiles, removeEntries: removeFileEntries, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
+
+  function webAgentApp() {
+    const root = ui('div', { className: 'system-app web-agent-app' });
+    const log = ui('div', { className: 'web-agent-log', role: 'log', 'aria-live': 'polite' });
+    const prompt = ui('textarea', { className: 'web-agent-prompt', rows: 2, placeholder: 'Ask Echo to open an app, list files, organize the desktop, tell a joke, or give a fun fact…' });
+    const send = ui('button', { className: 'btn', type: 'button', textContent: 'Ask Echo' });
+    const status = ui('span', { className: 'count', textContent: 'Ready' });
+
+    const add = (role, text) => {
+      log.append(ui('article', { className: `web-agent-message ${role}` }, [
+        ui('strong', { textContent: role === 'user' ? 'You' : AI_COMPANION_NAME }),
+        ui('p', { textContent: text })
+      ]));
+      log.scrollTop = log.scrollHeight;
+    };
+
+    const organizeDesktop = () => {
+      const icons = [...document.querySelectorAll('#icons .desktop-icon')];
+      icons.sort((a, b) => (a.querySelector('.label')?.textContent || '').localeCompare(b.querySelector('.label')?.textContent || '', undefined, { sensitivity: 'base' }));
+      const layer = document.getElementById('icons');
+      icons.forEach(icon => layer?.append(icon));
+      window.OS?.notify?.('IDK Echo', 'Desktop organized alphabetically.', 'success');
+      return 'Done — I organized the desktop alphabetically.';
+    };
+
+    const localAction = value => {
+      const text = String(value || '').trim();
+      const lower = text.toLowerCase();
+      if (/\b(joke|funny)\b/.test(lower)) return 'Why did the computer get cold? It left its Windows open. 😄';
+      if (/\b(fun fact|fact)\b/.test(lower)) return 'Fun fact: the first computer mouse was made of wood.';
+      if (/\b(organize|sort)\b.*\bdesktop\b/.test(lower)) return organizeDesktop();
+      if (/\b(list|show)\b.*\bfiles?\b/.test(lower)) {
+        const files = getFiles().filter(item => item.type === 'file' && item.parent === '').slice(0, 20);
+        return files.length ? `I found ${files.length} desktop file${files.length === 1 ? '' : 's'}: ${files.map(item => item.name).join(', ')}.` : 'There are no files on the desktop right now.';
+      }
+      const open = lower.match(/\b(?:open|launch|start)\s+(.+)$/);
+      if (open) {
+        const aliases = { browser: 'proxy', files: 'files', file: 'files', settings: 'settings', notes: 'notes', note: 'notes', games: 'games', music: 'music', movies: 'movies', calendar: 'calendar', terminal: 'terminal', paint: 'paint', ai: 'ai' };
+        const target = aliases[open[1].trim()] || open[1].trim();
+        if (window.OS?.open) { window.OS.open(target); return `Opened ${open[1].trim()}.`; }
+      }
+      if (/^(help|what can you do)\??$/.test(lower)) return 'I can open IDK apps, inspect your local IDK Files, organize the desktop, tell jokes, and share fun facts.';
+      return null;
+    };
+
+    const ask = async () => {
+      const text = prompt.value.trim();
+      if (!text) return;
+      add('user', text); prompt.value = ''; send.disabled = true; status.textContent = 'Working…';
+      try {
+        const result = localAction(text);
+        if (result) { add('assistant', result); status.textContent = 'Ready'; return; }
+        add('assistant', 'I can help with the IDK desktop. Try “organize desktop”, “list my files”, “open Files”, “tell me a joke”, or “fun fact”.');
+        status.textContent = 'Ready';
+      } catch (error) {
+        add('assistant', error?.message || 'I could not complete that action.');
+        status.textContent = 'Error';
+      } finally { send.disabled = false; prompt.focus(); }
+    };
+
+    send.onclick = ask;
+    prompt.onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); ask(); } };
+    add('assistant', 'Hi! I’m IDK Echo. I can help you work with your IDK desktop and Files.');
+    root.append(
+      ui('header', { className: 'web-agent-header' }, [
+        ui('div', {}, [ui('strong', { textContent: 'IDK Web Agent' }), ui('span', { textContent: 'Contextual desktop assistant' })]),
+        status
+      ]),
+      log,
+      ui('div', { className: 'web-agent-composer' }, [prompt, send])
+    );
+    return root;
+  }
+
+  return { files: filesApp, notes: notesApp, calculator: calculatorApp, ai: aiApp, agent: webAgentApp, terminal: terminalApp, paint: paintApp, importFiles: importFileEntries, writeTextFile, writeBlobFile, readBlob: blobFor, getFiles, removeEntries: removeFileEntries, resetFileDB: () => { fileDBPromise?.then(db => db.close()).catch(() => {}); fileDBPromise = null; } };
 })();
