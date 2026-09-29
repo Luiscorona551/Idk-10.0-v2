@@ -70,29 +70,61 @@
   }
   function organizeByType() {
     const layer = document.getElementById('icons');
-    if (!layer) return;
-    const items = [...layer.children].filter(el => el.classList.contains('desktop-icon'));
-    if (!items.length) { notify('Smart Desktop', 'There is nothing to organize.'); return; }
-    undoOrder = items.map(el => el);
-    const rank = { image:1, video:2, audio:3, document:4, archive:5, other:6 };
-    items.sort((a,b) => {
-      const ak = a.dataset.fileId ? fileKind(a.dataset.fileName) : 'other';
-      const bk = b.dataset.fileId ? fileKind(b.dataset.fileName) : 'other';
-      if (rank[ak] !== rank[bk]) return rank[ak] - rank[bk];
-      return String(a.dataset.fileName || a.querySelector('.label')?.textContent || '').localeCompare(String(b.dataset.fileName || b.querySelector('.label')?.textContent || ''), undefined, {numeric:true,sensitivity:'base'});
-    });
-    items.forEach(el => layer.append(el));
-    write(ORDER_KEY, saveDesktopOrder());
-    notify('Smart Desktop', 'Desktop organized by file type.', 'success');
+    const all = files();
+    const stored = read('idkFileSystem', []);
+    if (Array.isArray(stored) && stored.length) {
+      const folderNames = { image:'Images', video:'Videos', audio:'Music', document:'Documents', other:'Other' };
+      const folders = {};
+      Object.entries(folderNames).forEach(([kind,name]) => {
+        let folder = stored.find(item => item.type === 'folder' && item.name === name && item.parent === '');
+        if (!folder) {
+          folder = { id:`smart-${kind}-${Date.now()}`, name, type:'folder', parent:'', updated:Date.now(), smart:true };
+          stored.push(folder);
+        }
+        folders[kind] = folder.id;
+      });
+      const previous = [];
+      stored.filter(item => item.type === 'file' && item.parent === '').forEach(item => {
+        const kind = fileKind(item.name);
+        previous.push({ id:item.id, parent:item.parent });
+        item.parent = folders[kind];
+        item.updated = Date.now();
+      });
+      if (previous.length) undoOrder = { desktop: saveDesktopOrder(), parents: previous };
+      write('idkFileSystem', stored);
+      window.dispatchEvent(new CustomEvent('idk-data-changed',{detail:{type:'files',smartOrganization:true}}));
+    }
+    if (layer) {
+      const items=[...layer.children].filter(el=>el.classList.contains('desktop-icon'));
+      const rank={image:1,video:2,audio:3,document:4,other:5};
+      items.sort((a,b)=>{
+        const ak=a.dataset.fileId?fileKind(a.dataset.fileName):'other';
+        const bk=b.dataset.fileId?fileKind(b.dataset.fileName):'other';
+        return (rank[ak]-rank[bk]) || String(a.dataset.fileName||a.querySelector('.label')?.textContent||'').localeCompare(String(b.dataset.fileName||b.querySelector('.label')?.textContent||''),undefined,{numeric:true,sensitivity:'base'});
+      });
+      items.forEach(el=>layer.append(el));
+      write(ORDER_KEY, saveDesktopOrder());
+    }
+    notify('Smart Desktop','Files organized into Images, Videos, Music, Documents, and Other.', 'success');
     updatePanel();
   }
   function undoOrganization() {
-    const layer = document.getElementById('icons');
-    if (!layer || !undoOrder?.length) { notify('Smart Desktop', 'There is no organization to undo.'); return; }
-    undoOrder.forEach(el => { if (el.isConnected) layer.append(el); });
-    undoOrder = null;
-    write(ORDER_KEY, saveDesktopOrder());
-    notify('Smart Desktop', 'Desktop organization undone.', 'success');
+    if (!undoOrder) { notify('Smart Desktop','There is no organization to undo.'); return; }
+    const stored=read('idkFileSystem',[]);
+    if (Array.isArray(stored) && undoOrder.parents) {
+      const previous=new Map(undoOrder.parents.map(item=>[String(item.id),item.parent||'']));
+      stored.forEach(item=>{ if(previous.has(String(item.id))) item.parent=previous.get(String(item.id)); });
+      write('idkFileSystem',stored);
+      window.dispatchEvent(new CustomEvent('idk-data-changed',{detail:{type:'files',smartUndo:true}}));
+    }
+    const layer=document.getElementById('icons');
+    if(layer && Array.isArray(undoOrder.desktop)){
+      const map=new Map([...layer.children].map(el=>[el.dataset.fileId||`app:${el.dataset.app}`,el]));
+      undoOrder.desktop.forEach(key=>{const el=map.get(key);if(el)layer.append(el);});
+      write(ORDER_KEY,saveDesktopOrder());
+    }
+    undoOrder=null;
+    notify('Smart Desktop','The last smart organization was undone.','success');
     updatePanel();
   }
   function highlightKind(kind) {
