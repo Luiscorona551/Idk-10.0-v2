@@ -676,8 +676,9 @@ const OS = (() => {
         icon.type = 'button';
         icon.dataset.fileId = file.id;
         icon.dataset.fileName = file.name;
+        icon.dataset.app = 'files';
         icon.innerHTML = '<span class="glyph">📄</span><span class="label"></span>';
-        icon.addEventListener('click', () => launch('files'));
+        makeIconDraggable(icon);
         iconLayer.append(icon);
       }
       icon.querySelector('.label').textContent = file.name;
