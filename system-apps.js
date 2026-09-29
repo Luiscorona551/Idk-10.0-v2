@@ -715,124 +715,190 @@ window.SYSTEM_APPS = (() => {
 
   function aiApp() {
     const root = ui('div', { className: 'system-app ai-app' });
-    const log = ui('div', { className: 'ai-log' });
-     const endpoint = ui('input', { className: 'field', type: 'text', value: read(AI_ENDPOINT_KEY, '/api/ai'), placeholder: 'Server AI route or custom endpoint' });
-     const model = ui('input', { className: 'field', type: 'text', value: read(AI_MODEL_KEY, 'gpt-4o-mini'), placeholder: 'Model' });
-     const key = ui('input', { className: 'field', type: 'password', placeholder: 'Optional one-time API key' });
-     const mode = ui('select', { className: 'field ai-mode', 'aria-label': 'AI mode' });
-    [['chat', 'Chat'], ['code', 'Code'], ['image', 'Image']].forEach(([value, label]) => mode.append(ui('option', { value, textContent: label })));
-    const prompt = ui('textarea', { className: 'ai-prompt', placeholder: 'Ask an everyday question...', rows: 2 });
-    const send = ui('button', { className: 'btn', type: 'button', textContent: 'Ask' });
-     const status = ui('span', { className: 'count', textContent: 'Ready' });
-      const history = [{ role: 'system', content: `You are ${AI_COMPANION_NAME}, the IDK AI companion. Be clear, practical, concise, and honest about uncertainty.` }];
-      const keyNote = ui('span', { className: 'ai-key-note', textContent: 'Checking server key…' });
-      const identity = ui('div', { className: 'ai-identity' }, [
-        ui('img', { className: 'ai-companion-flag', src: 'official-flag.jpg', alt: 'Official IDK flag' }),
-        ui('span', { className: 'ai-identity-copy' }, [
-          ui('strong', { textContent: AI_COMPANION_NAME }),
-          ui('span', { textContent: 'IDK AI companion' })
-        ])
-      ]);
+    const CHATS_KEY = 'idkAIChatsV2';
+    const makeId = () => `chat-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const readChats = () => {
+      const saved = read(CHATS_KEY, []);
+      return Array.isArray(saved) ? saved : [];
+    };
+    const writeChats = chats => write(CHATS_KEY, chats.slice(0, 50));
+    const endpoint = ui('input', { className: 'field', type: 'text', value: read(AI_ENDPOINT_KEY, '/api/ai'), placeholder: 'AI endpoint' });
+    const model = ui('input', { className: 'field', type: 'text', value: read(AI_MODEL_KEY, 'gpt-4o-mini'), placeholder: 'Model' });
+    const key = ui('input', { className: 'field', type: 'password', placeholder: 'Optional one-time API key' });
+    const mode = ui('select', { className: 'field ai-mode', 'aria-label': 'AI mode' });
+    [['chat','Chat'],['code','Code'],['image','Image'],['agent','Agent']].forEach(([value,label]) => mode.append(ui('option',{value,textContent:label})));
+    const prompt = ui('textarea', { className: 'ai-prompt', placeholder: 'Message IDK Echo…', rows: 2 });
+    const send = ui('button', { className: 'btn', type: 'button', textContent: 'Send' });
+    const status = ui('span', { className: 'count', textContent: 'Ready' });
+    const keyNote = ui('span', { className: 'ai-key-note', textContent: 'Checking server AI…' });
+    const log = ui('div', { className: 'ai-log', role: 'log', 'aria-live': 'polite' });
+    const list = ui('div', { className: 'ai-chat-list' });
+    const history = [{ role:'system', content:`You are ${AI_COMPANION_NAME}, the IDK AI companion. Be clear, practical, concise, and honest about uncertainty.` }];
+    let currentChat = null;
+    let busy = false;
 
-    const addMessage = (role, text, type = 'text') => {
-      const row = ui('div', { className: `ai-line ${role}${type === 'image' ? ' ai-line-image' : ''}` }, [ui('span', { className: 'ai-line-label', textContent: role === 'user' ? 'You' : AI_COMPANION_NAME })]);
-      if (type === 'code') {
-        const code = ui('pre', {}, [ui('code', { textContent: text })]);
-        const copy = ui('button', { className: 'btn tab', type: 'button', textContent: 'Copy code' });
-        const download = ui('a', { className: 'btn tab', href: `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`, download: 'idk-ai-code.txt', textContent: 'Download' });
-        copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(text); copy.textContent = 'Copied'; } catch { window.prompt('Copy this code', text); } });
-        row.append(code, ui('div', { className: 'ai-code-actions' }, [copy, download]));
-      } else if (type === 'image') {
-        row.append(ui('img', { src: text, alt: 'AI generated image' }), ui('a', { className: 'btn tab', href: text, download: 'idk-ai-image.png', textContent: 'Download image' }));
+    const identity = ui('div',{className:'ai-identity'},[
+      ui('img',{className:'ai-companion-flag',src:'official-flag.jpg',alt:'Official IDK flag'}),
+      ui('div',{className:'ai-identity-copy'},[
+        ui('strong',{textContent:AI_COMPANION_NAME}),
+        ui('span',{textContent:'Your IDK AI companion'})
+      ]),
+      ui('span',{className:'ai-online-dot',textContent:'●'}),
+      ui('span',{className:'ai-online-label',textContent:'Ready'})
+    ]);
+
+    const saveCurrent = () => {
+      if (!currentChat) return;
+      const chats = readChats();
+      const index = chats.findIndex(chat => chat.id === currentChat.id);
+      const messages = history.slice(1).filter(item => item.role !== 'system');
+      const title = currentChat.title === 'New chat' && messages.find(item => item.role === 'user')
+        ? String(messages.find(item => item.role === 'user').content).slice(0, 42)
+        : currentChat.title;
+      currentChat = {...currentChat,title,messages,updated:Date.now()};
+      if (index >= 0) chats[index]=currentChat; else chats.unshift(currentChat);
+      writeChats(chats);
+    };
+
+    const renderList = () => {
+      const chats = readChats().sort((a,b)=>(b.updated||0)-(a.updated||0));
+      list.replaceChildren();
+      if (!chats.length) list.append(ui('div',{className:'ai-empty-list',textContent:'No chats yet.'}));
+      chats.slice(0,30).forEach(chat => {
+        const row=ui('div',{className:`ai-chat-item${currentChat?.id===chat.id?' active':''}`});
+        const open=ui('button',{className:'ai-chat-open',type:'button',textContent:chat.title||'New chat'});
+        const del=ui('button',{className:'ai-chat-delete',type:'button',textContent:'×',title:'Delete chat','aria-label':`Delete ${chat.title||'chat'}`});
+        open.onclick=()=>loadChat(chat.id);
+        del.onclick=()=>{if(window.confirm('Delete this chat?')){writeChats(chats.filter(item=>item.id!==chat.id));if(currentChat?.id===chat.id)newChat();else renderList();}};
+        row.append(open,del); list.append(row);
+      });
+    };
+
+    const addMessage=(role,text,type='text')=>{
+      const row=ui('article',{className:`ai-message ${role}${type==='image'?' ai-message-image':''`});
+      const avatar=ui('div',{className:'ai-message-avatar',textContent:role==='user'?'You':'✦'});
+      const bubble=ui('div',{className:'ai-message-bubble'});
+      bubble.append(ui('small',{textContent:role==='user'?'You':AI_COMPANION_NAME}));
+      if(type==='code'){
+        const code=ui('pre',{},[ui('code',{textContent:text})]);
+        const copy=ui('button',{className:'btn tab',type:'button',textContent:'Copy'});
+        copy.onclick=async()=>{try{await navigator.clipboard.writeText(text);copy.textContent='Copied';}catch{window.prompt('Copy this code',text);}};
+        bubble.append(code,copy);
+      } else if(type==='image'){
+        bubble.append(ui('img',{src:text,alt:'AI generated image'}),ui('a',{className:'btn tab',href:text,download:'idk-ai-image.png',textContent:'Save image'}));
       } else {
-        row.append(ui('p', { textContent: text }));
+        bubble.append(ui('p',{textContent:text}));
       }
-      log.append(row);
-      log.scrollTop = log.scrollHeight;
+      row.append(avatar,bubble); log.append(row); log.scrollTop=log.scrollHeight;
     };
-     addMessage('assistant', `${AI_COMPANION_NAME} is ready. Choose Chat, Code, or Image mode. The server key is used automatically when configured.`);
 
-     fetch('/api/ai/status', { cache: 'no-store' })
-       .then(response => response.ok ? response.json() : Promise.reject(new Error('unavailable')))
-      .then(data => { keyNote.textContent = data.configured ? `Server key ready · ${data.model} · ${data.provider || 'provider ready'}` : 'Set AI_API_KEY on the server, or use a one-time key.'; })
-       .catch(() => { keyNote.textContent = 'Server AI route unavailable · custom endpoint still works.'; });
+    const newChat=()=>{
+      saveCurrent();
+      currentChat={id:makeId(),title:'New chat',messages:[],updated:Date.now()};
+      history.splice(0,history.length,{role:'system',content:`You are ${AI_COMPANION_NAME}, the IDK AI companion. Be clear, practical, concise, and honest about uncertainty.`});
+      log.replaceChildren();
+      addMessage('assistant',`Hi! I'm ${AI_COMPANION_NAME}. Start a message below.`);
+      renderList();
+      prompt.focus();
+    };
 
-    const ask = async () => {
-      const text = prompt.value.trim();
-      if (!text || send.disabled) return;
-       const url = endpoint.value.trim();
-       if (!url) return;
-       const selectedMode = mode.value;
-       const serverRoute = url === '/api/ai' || url === `${location.origin}/api/ai`;
-       if (!serverRoute && !key.value.trim()) {
-         addMessage('assistant', 'Add an API key above for a custom endpoint. It is used only for this window.');
-         return;
-       }
-      if (selectedMode !== 'image') history.push({ role: 'user', content: text });
-      addMessage('user', text);
-      prompt.value = '';
-      send.disabled = true;
-      status.textContent = selectedMode === 'image' ? 'Creating image...' : 'Thinking...';
-      try {
-         const messages = selectedMode === 'code'
-           ? [history[0], { role: 'system', content: 'You are an expert coding assistant. Return clear, complete code with a short explanation only when useful. Never claim code was executed.' }, ...history.slice(1)]
-           : history;
-         const body = serverRoute
-           ? selectedMode === 'image'
-             ? { mode: selectedMode, model: model.value.trim() || 'gpt-image-1', prompt: text, apiKey: key.value.trim() || undefined }
-             : { mode: selectedMode, model: model.value.trim() || 'gpt-4o-mini', messages, apiKey: key.value.trim() || undefined }
-           : selectedMode === 'image'
-             ? { model: model.value.trim() || 'gpt-image-1', prompt: text, n: 1, size: '1024x1024' }
-             : { model: model.value.trim() || 'gpt-4o-mini', messages, temperature: 0.7 };
-         const imageEndpoint = url.replace(/\/chat\/completions\/?$/i, '/images/generations');
-         const requestURL = serverRoute ? url : selectedMode === 'image' ? imageEndpoint : url;
-         const headers = { 'content-type': 'application/json' };
-         if (!serverRoute) headers.authorization = `Bearer ${key.value.trim()}`;
-         const response = await fetch(requestURL, {
-           method: 'POST',
-           headers,
-           body: JSON.stringify(body)
-         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error?.message || `Request failed (${response.status})`);
-        if (selectedMode === 'image') {
-          const image = data.data?.[0];
-          const imageURL = image?.url || (image?.b64_json ? `data:image/png;base64,${image.b64_json}` : '');
-          if (!imageURL) throw new Error('The AI returned no image.');
-          addMessage('assistant', imageURL, 'image');
-        } else {
-          const answer = data.choices?.[0]?.message?.content || data.output_text;
-          if (!answer) throw new Error('The AI returned no answer.');
-          history.push({ role: 'assistant', content: answer });
-          addMessage('assistant', answer, selectedMode === 'code' ? 'code' : 'text');
+    const loadChat=id=>{
+      saveCurrent();
+      const chat=readChats().find(item=>item.id===id);
+      if(!chat)return;
+      currentChat={...chat};
+      history.splice(0,history.length,{role:'system',content:`You are ${AI_COMPANION_NAME}, the IDK AI companion. Be clear, practical, concise, and honest about uncertainty.`},...(chat.messages||[]));
+      log.replaceChildren();
+      if(!chat.messages?.length)addMessage('assistant',`Chat restored. What would you like to work on?`);
+      (chat.messages||[]).forEach(item=>addMessage(item.role,item.content));
+      renderList();
+    };
+
+    const performAgentAction=async text=>{
+      const value=String(text||'').trim();
+      const lower=value.toLowerCase();
+      const openMatch=lower.match(/^(?:open|launch|start)\\s+(.+)$/);
+      if(openMatch){
+        const target=openMatch[1].trim();
+        const aliases={files:'files',file:'files',notes:'notes',note:'notes',settings:'settings',browser:'proxy',proxy:'proxy',terminal:'terminal',paint:'paint',calculator:'calculator',calendar:'calendar',todo:'todo',weather:'weather',movies:'movies',music:'music',messenger:'chat',chat:'chat',ai:'ai'};
+        const id=aliases[target]||target;
+        if(typeof window.OS?.open==='function'){window.OS.open(id);return `Opened ${target}.`;}
+      }
+      if(/^(?:show|list)\\s+(?:my\\s+)?files?$/.test(lower)){
+        const files=window.IDKFiles?.getFiles?.()||[];
+        const names=files.filter(item=>item.parent===''&&item.name).slice(0,25).map(item=>`• ${item.name}`);
+        return names.length?`Your IDK files:\\n${names.join('\\n')}`:'Your IDK Files are empty.';
+      }
+      const noteMatch=value.match(/^(?:create|make|write)\\s+(?:a\\s+)?note\\s*(?:called|named)?\\s*([^:]+?)(?::\\s*(.*))?$/i);
+      if(noteMatch&&window.IDKFiles?.writeTextFile){
+        const name=(noteMatch[1]||'Agent Note').trim().replace(/\\.txt$/i,'')+'.txt';
+        window.IDKFiles.writeTextFile(name,noteMatch[2]||'Created by IDK Agent.');
+        return `Created ${name} in IDK Files.`;
+      }
+      if(/^(?:help|what can you do|commands)$/.test(lower)) return 'I can open IDK apps, list your IDK Files, create text notes, and help you use the OS. I cannot access arbitrary files or control the rest of your computer.';
+      return null;
+    };
+
+    const ask=async()=>{
+      const text=prompt.value.trim();
+      if(!text||busy)return;
+      const selectedMode=mode.value;
+      if(selectedMode==='agent'){
+        addMessage('user',text); prompt.value=''; busy=true; send.disabled=true; status.textContent='Working…';
+        try{
+          const action=await performAgentAction(text);
+          if(action){addMessage('assistant',action);status.textContent='Ready';}
+          else {addMessage('assistant','I can help with IDK itself. Try “open Files”, “list my files”, or “create a note called Ideas: …”.');status.textContent='Ready';}
+        }catch(error){addMessage('assistant',friendlyAIError(error));status.textContent='Error';}
+        finally{busy=false;send.disabled=false;prompt.focus();}
+        return;
+      }
+      const url=endpoint.value.trim();
+      if(!url){addMessage('assistant','Set an AI endpoint first.');return;}
+      const serverRoute=url==='/api/ai'||url===`${location.origin}/api/ai`;
+      if(!serverRoute&&!key.value.trim()){addMessage('assistant','Add an API key for a custom endpoint. It is used only in this window.');return;}
+      history.push({role:'user',content:text}); addMessage('user',text); prompt.value=''; busy=true; send.disabled=true; status.textContent=selectedMode==='image'?'Creating image…':'Thinking…';
+      try{
+        const messages=selectedMode==='code'?[history[0],{role:'system',content:'You are an expert coding assistant. Return clear, complete code. Never claim code was executed.'},...history.slice(1)]:history;
+        const body=serverRoute?(selectedMode==='image'?{mode:selectedMode,model:model.value.trim()||'gpt-image-1',prompt:text,apiKey:key.value.trim()||undefined}:{mode:selectedMode,model:model.value.trim()||'gpt-4o-mini',messages,apiKey:key.value.trim()||undefined}):(selectedMode==='image'?{model:model.value.trim()||'gpt-image-1',prompt:text,n:1,size:'1024x1024'}:{model:model.value.trim()||'gpt-4o-mini',messages,temperature:.7});
+        const imageEndpoint=url.replace(/\\/chat\\/completions\\/?$/i,'/images/generations');
+        const requestURL=serverRoute?url:selectedMode==='image'?imageEndpoint:url;
+        const headers={'content-type':'application/json'}; if(!serverRoute)headers.authorization=`Bearer ${key.value.trim()}`;
+        const response=await fetch(requestURL,{method:'POST',headers,body:JSON.stringify(body)});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(data.error?.message||`Request failed (${response.status})`);
+        if(selectedMode==='image'){
+          const image=data.data?.[0]; const imageURL=image?.url||(image?.b64_json?`data:image/png;base64,${image.b64_json}`:'');
+          if(!imageURL)throw new Error('The AI returned no image.');
+          addMessage('assistant',imageURL,'image');
+        }else{
+          const answer=data.choices?.[0]?.message?.content||data.output_text;
+          if(!answer)throw new Error('The AI returned no answer.');
+          history.push({role:'assistant',content:answer}); addMessage('assistant',answer,selectedMode==='code'?'code':'text');
         }
-        status.textContent = 'Ready';
-       } catch (error) {
-         addMessage('assistant', friendlyAIError(error));
-        status.textContent = 'Connection error';
-      } finally {
-        send.disabled = false;
-        prompt.focus();
-      }
+        saveCurrent(); renderList(); status.textContent='Ready';
+      }catch(error){addMessage('assistant',friendlyAIError(error));status.textContent='Connection error';}
+      finally{busy=false;send.disabled=false;prompt.focus();}
     };
-     endpoint.addEventListener('change', () => write(AI_ENDPOINT_KEY, endpoint.value.trim()));
-    model.addEventListener('change', () => write(AI_MODEL_KEY, model.value.trim()));
-    mode.addEventListener('change', () => {
-      const imageMode = mode.value === 'image';
-      prompt.placeholder = imageMode ? 'Describe the image to create...' : mode.value === 'code' ? 'Describe the code to create...' : 'Ask an everyday question...';
-      send.textContent = imageMode ? 'Generate' : mode.value === 'code' ? 'Create code' : 'Ask';
-      if (imageMode && model.value === 'gpt-4o-mini') model.value = 'gpt-image-1';
-      if (!imageMode && model.value === 'gpt-image-1') model.value = 'gpt-4o-mini';
-    });
-    send.addEventListener('click', ask);
-    prompt.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); ask(); } });
 
-     root.append(
-       identity,
-        ui('div', { className: 'ai-config' }, [endpoint, model, mode, key, keyNote]),
-      log,
-      ui('div', { className: 'ai-composer' }, [prompt, send, status])
-    );
+    endpoint.onchange=()=>write(AI_ENDPOINT_KEY,endpoint.value.trim());
+    model.onchange=()=>write(AI_MODEL_KEY,model.value.trim());
+    mode.onchange=()=>{
+      const m=mode.value;
+      prompt.placeholder=m==='image'?'Describe the image to create…':m==='code'?'Describe the code to create…':m==='agent'?'Try “open Files” or “create a note called Ideas: …”':'Message IDK Echo…';
+      send.textContent=m==='image'?'Generate':m==='agent'?'Run':m==='code'?'Create code':'Send';
+      if(m==='image'&&model.value==='gpt-4o-mini')model.value='gpt-image-1';
+      if(m!=='image'&&model.value==='gpt-image-1')model.value='gpt-4o-mini';
+    };
+    send.onclick=ask;
+    prompt.onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask();}};
+    fetch('/api/ai/status',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(new Error('unavailable'))).then(data=>{keyNote.textContent=data.configured?`Server AI ready · ${data.model}`:'Server AI key not configured';identity.querySelector('.ai-online-label').textContent=data.configured?'Online':'Setup needed';}).catch(()=>{keyNote.textContent='AI status unavailable';identity.querySelector('.ai-online-label').textContent='Offline';});
+    const newButton=ui('button',{className:'btn tab',type:'button',textContent:'+ New chat'}); newButton.onclick=newChat;
+    const settingsButton=ui('button',{className:'btn tab',type:'button',textContent:'Settings'}); settingsButton.onclick=()=>config.classList.toggle('open');
+    const config=ui('div',{className:'ai-config'},[endpoint,model,mode,key,keyNote]);
+    const sidebar=ui('aside',{className:'ai-sidebar'},[ui('div',{className:'ai-sidebar-head'},[ui('strong',{textContent:'Chats'}),newButton]),list]);
+    root.append(identity,sidebar,ui('main',{className:'ai-main'},[ui('div',{className:'ai-toolbar'},[ui('strong',{textContent:'AI Workspace'}),settingsButton,status]),config,log,ui('div',{className:'ai-composer'},[prompt,send])]));
+    const chats=readChats(); if(chats.length)loadChat(chats[0].id); else newChat();
     return root;
   }
 
