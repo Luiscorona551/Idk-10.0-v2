@@ -444,7 +444,7 @@ const OS = (() => {
   }
 
   function saveDesktopOrder() {
-    store.set('desktopOrder', [...iconLayer.querySelectorAll('.desktop-icon')].map(icon => icon.dataset.app));
+    store.set('desktopOrder', [...iconLayer.querySelectorAll('.desktop-icon:not(.desktop-file-icon)')].map(icon => icon.dataset.app).filter(Boolean));
   }
 
   function makeIconDraggable(icon) {
@@ -675,11 +675,13 @@ const OS = (() => {
         icon.className = 'desktop-icon desktop-file-icon';
         icon.type = 'button';
         icon.dataset.fileId = file.id;
+        icon.dataset.fileName = file.name;
         icon.innerHTML = '<span class="glyph">📄</span><span class="label"></span>';
         icon.addEventListener('click', () => launch('files'));
         iconLayer.append(icon);
       }
       icon.querySelector('.label').textContent = file.name;
+      icon.dataset.fileName = file.name;
       icon.title = file.name;
       existing.delete(file.id);
     });
