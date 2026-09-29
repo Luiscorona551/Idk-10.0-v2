@@ -250,6 +250,10 @@ async function gameBlobURL(name) {
   return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
 }
 function openGame(name, title) {
+  if (window.OS?.open) {
+    window.OS.open('game-player', { gameName: name, title: title || gameTitle(name) });
+    return Promise.resolve(true);
+  }
   const popup = window.open(gameTabURL(name), '_blank', 'noopener');
   if (!popup) {
     window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
