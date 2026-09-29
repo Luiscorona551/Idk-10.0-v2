@@ -30,6 +30,9 @@
   const install = () => {
     if (typeof APPS === 'undefined' || !APPS.games || typeof listApp !== 'function') return false;
     if (window.IDKGamesUI?.render) { APPS.games.render = window.IDKGamesUI.render; return true; }
+    // The main Games app owns its catalog loading and error handling now.
+    // Never overwrite a stable renderer with this legacy compatibility patch.
+    if (typeof APPS.games.render === 'function') return true;
     APPS.games.render = async () => {
       const [names, icons] = await Promise.all([loadJSON('games.json'), loadJSON('game-icons.json').catch(() => ({}))]);
       const items = names.map(name => ({ id: name, title: typeof gameTitle === 'function' ? gameTitle(name) : name, iconURL: typeof gameIconURL === 'function' ? gameIconURL(icons[name]) : '', search: `${name} ${typeof gameTitle === 'function' ? gameTitle(name) : name}`.toLowerCase() }));
