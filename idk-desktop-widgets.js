@@ -6,6 +6,7 @@
     weather: { label: 'Weather', icon: '☁', width: 245, height: 170 },
     news: { label: 'News', icon: '▤', width: 285, height: 205 },
     calendar: { label: 'Calendar events', icon: '□', width: 245, height: 180 },
+    music: { label: 'Music', icon: '♫', width: 285, height: 180 },
     stocks: { label: 'Stock prices', icon: '↗', width: 245, height: 180 },
     sports: { label: 'Sports scores', icon: '★', width: 285, height: 205 },
     clock: { label: 'Clock', icon: '◷', width: 245, height: 150 },
@@ -72,6 +73,12 @@
           return `${symbol}: ${row.split(',')[6] || '—'}`;
         }));
         body.innerHTML = prices.map(item => `<span class="idk-widget-line">${esc(item)}</span>`).join('');
+      } else if (type === 'music') {
+        const state = window.IDK_AUDIO_STATE || {};
+        const active = Boolean(state.name || state.track || state.audio || state.type === 'youtube');
+        body.innerHTML = `<strong>${esc(active ? (state.name || state.track || 'Playing') : 'Music idle')}</strong><span>${active && state.playing ? 'Playing now' : 'Ready to play'}</span><div class="idk-widget-music-actions"><button type="button" data-play>${active && state.playing ? 'Pause' : 'Play'}</button><button type="button" data-open>Open Music</button></div>`;
+        body.querySelector('[data-play]').onclick = () => { if (window.IDK_MUSIC_PLAYER && active) window.IDK_MUSIC_PLAYER.toggle(); else window.OS?.open?.('music'); };
+        body.querySelector('[data-open]').onclick = () => window.OS?.open?.('music');
       } else if (type === 'clock') {
         const now = new Date();
         body.innerHTML = `<strong class="idk-widget-clock">${esc(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}</strong><span>${esc(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }))}</span>`;
