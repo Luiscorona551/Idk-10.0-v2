@@ -157,9 +157,16 @@ app.get('/api/update', async (req, res) => res.json({
 }));
 app.get('/api/ai/status', (req, res) => res.json(aiStatus()));
 app.post('/api/ai', aiRequest);
-app.get('/uv/uv.config.js', (req, res) => res.sendFile(join(root, 'uv.config.js')));
-app.get('/uv/uv-core.sw.js', (req, res) => res.type('js').send(uvServiceWorker));
-app.get('/uv/uv.sw.js', (req, res) => res.type('js').send(uvServiceWorkerLoader));
+const serviceWorkerResponse = (res, body) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Service-Worker-Allowed', '/uv/');
+  return res.type('js').send(body);
+};
+app.get('/uv/uv.config.js', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.sendFile(join(root, 'uv.config.js')); });
+app.get('/uv/uv-core.sw.js', (req, res) => serviceWorkerResponse(res, uvServiceWorker));
+app.get('/uv/uv.sw.js', (req, res) => serviceWorkerResponse(res, uvServiceWorkerLoader));
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
