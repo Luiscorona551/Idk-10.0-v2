@@ -167,10 +167,12 @@
     document.body.append(panel);
     panel.querySelector('[data-close]').onclick = () => { panel.remove(); panel=null; };
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => renderTab(b.dataset.tab));
+    panel.dataset.tab = tab;
     renderTab(tab);
   }
   function renderTab(tab) {
     if (!panel) return;
+    panel.dataset.tab = tab;
     const body = panel.querySelector('[data-body]');
     if (tab === 'recent') {
       body.innerHTML = recent.length ? recent.map(item => `<button class="idk-smart-recent" data-id="${String(item.id).replace(/"/g,'&quot;')}"><span>${iconFor(item.kind)}</span><b></b><small>${new Date(item.at).toLocaleString()}</small></button>`).join('') : '<p class="sub">No recently added files yet.</p>';
@@ -236,7 +238,7 @@
     desktop.append(tools);
   }
 
-  function updatePanel(){ if(panel && panel.isConnected) renderTab('overview'); }
+  function updatePanel(){ if(panel && panel.isConnected) renderTab(panel.dataset.tab || 'overview'); }
 
   function scan() {
     const list=files();
