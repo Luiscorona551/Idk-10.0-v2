@@ -220,15 +220,15 @@ html, body {
   position: absolute;
   top: 106px;
   left: 20px;
+  right: 20px;
   display: grid;
-  grid-template-rows: repeat(2, 106px);
+  grid-template-rows: repeat(auto-fill, 106px);
   grid-auto-flow: column;
   grid-auto-columns: var(--icon-size, 92px);
   gap: 14px 12px;
-  width: 210px;
   max-height: calc(100% - 150px);
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
+  align-content: start;
 }
 
 .desktop-icon {
@@ -991,4 +991,71 @@ html, body {
   .idk-playlists-layout { grid-template-columns: 1fr; }
   .player-controls { gap: 5px; }
   .player-control { flex: 1 1 auto; }
+}
+
+
+.desktop-import {
+  position: absolute;
+  left: 20px;
+  bottom: 86px;
+  z-index: 8;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: rgba(12,18,32,.62);
+  color: var(--text);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  font: inherit;
+}
+.desktop-import:hover, .desktop-import:focus-visible { background: rgba(255,255,255,.14); outline: none; }
+#desktop.file-drop-active::after {
+  content: 'Drop files here to import them to the desktop';
+  position: absolute;
+  inset: 18% 12%;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255,255,255,.6);
+  border-radius: 24px;
+  background: rgba(5,10,20,.58);
+  color: var(--text);
+  font-size: 18px;
+  pointer-events: none;
+}
+.idk-echo-question {
+  position: absolute;
+  z-index: 60;
+  width: min(330px, calc(100vw - 32px));
+  padding: 15px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 18px;
+  background: rgba(12,18,32,.88);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgba(0,0,0,.38);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  transform: translateY(8px) scale(.98);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.idk-echo-question.show { opacity: 1; transform: translateY(0) scale(1); }
+.idk-echo-question strong { display: block; margin-bottom: 5px; }
+.idk-echo-question p { margin: 0; line-height: 1.4; }
+.idk-echo-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.idk-echo-actions button {
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.idk-echo-actions button:hover { background: rgba(255,255,255,.15); }
+.desktop-file-icon .label { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desktop-file-sorted { animation: desktop-file-pop .28s ease; }
+@keyframes desktop-file-pop { 50% { transform: translateY(-4px) scale(1.05); } }
+@media (max-width: 680px) {
+  #icons { left: 10px; right: 10px; top: 92px; grid-template-rows: repeat(auto-fill, 92px); grid-auto-columns: var(--icon-size, 76px); gap: 8px 6px; }
+  .desktop-import { left: 10px; bottom: 74px; }
 }

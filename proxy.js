@@ -88,10 +88,29 @@ const PROXY = (() => {
     if (!window.BareMux?.BareMuxConnection) throw new Error('BareMux failed to load.');
 
     const scope = __uv$config.prefix;
-    const registration = await navigator.serviceWorker.register(__uv$config.sw, {
-      scope,
-      updateViaCache: 'none'
-    });
+    let registration;
+    try {
+      registration = await navigator.serviceWorker.register(__uv$config.sw, {
+        scope,
+        updateViaCache: 'none'
+      });
+    } catch (firstError) {
+      // A stale/broken UV worker can survive a redeploy. Remove only the
+      // registration for the IDK proxy scope, then retry once with a clean
+      // worker registration.
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations
+        .filter(item => item.scope === new URL(scope, location.href).href || item.active?.scriptURL === new URL(__uv$config.sw, location.href).href)
+        .map(item => item.unregister()));
+      registration = await navigator.serviceWorker.register(__uv$config.sw, {
+        scope,
+        updateViaCache: 'none'
+      }).catch(() => { throw firstError; });
+    }
+
+    if (registration.scope !== new URL(scope, location.href).href) {
+      throw new Error('The Ultraviolet service worker registered with the wrong scope.');
+    }
 
     await registration.update().catch(() => {});
 

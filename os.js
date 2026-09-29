@@ -444,7 +444,7 @@ const OS = (() => {
   }
 
   function saveDesktopOrder() {
-    store.set('desktopOrder', [...iconLayer.querySelectorAll('.desktop-icon')].map(icon => icon.dataset.app));
+    store.set('desktopOrder', [...iconLayer.querySelectorAll('.desktop-icon:not(.desktop-file-icon)')].map(icon => icon.dataset.app).filter(Boolean));
   }
 
   function makeIconDraggable(icon) {
@@ -660,9 +660,145 @@ const OS = (() => {
     clockWeek.textContent = `Week ${String(isoWeekNumber(now, timeZone)).padStart(2, '0')}`;
   }
 
+  function desktopFiles() {
+    return [...iconLayer.querySelectorAll('.desktop-file-icon')];
+  }
+
+  function syncDesktopFiles() {
+    if (!window.IDKFiles?.getFiles) return [];
+    const files = window.IDKFiles.getFiles().filter(item => item && item.type === 'file');
+    const existing = new Map(desktopFiles().map(icon => [icon.dataset.fileId, icon]));
+    files.forEach(file => {
+      let icon = existing.get(file.id);
+      if (!icon) {
+        icon = document.createElement('button');
+        icon.className = 'desktop-icon desktop-file-icon';
+        icon.type = 'button';
+        icon.dataset.fileId = file.id;
+        icon.dataset.fileName = file.name;
+        icon.dataset.app = 'files';
+        icon.innerHTML = '<span class="glyph">📄</span><span class="label"></span>';
+        makeIconDraggable(icon);
+        iconLayer.append(icon);
+      }
+      icon.querySelector('.label').textContent = file.name;
+      icon.dataset.fileName = file.name;
+      icon.title = file.name;
+      existing.delete(file.id);
+    });
+    existing.forEach(icon => icon.remove());
+    return files;
+  }
+
+  function organizeDesktopFiles() {
+    const files = desktopFiles().sort((a, b) => a.dataset.fileName.localeCompare(b.dataset.fileName, undefined, { numeric: true, sensitivity: 'base' }));
+    files.forEach(icon => iconLayer.append(icon));
+    files.forEach(icon => icon.classList.remove('desktop-file-sorted'));
+    files.forEach((icon, index) => setTimeout(() => icon.classList.add('desktop-file-sorted'), index * 25));
+    saveDesktopOrder();
+    notify('Desktop organized', 'Your desktop files are now in alphabetical order.', 'success');
+  }
+
+  function showEchoQuestion(anchor, message, actions) {
+    document.querySelector('.idk-echo-question')?.remove();
+    const card = document.createElement('section');
+    card.className = 'idk-echo-question';
+    card.setAttribute('role', 'dialog');
+    card.innerHTML = '<strong>IDK Echo</strong><p></p><div class="idk-echo-actions"></div>';
+    card.querySelector('p').textContent = message;
+    const actionsEl = card.querySelector('.idk-echo-actions');
+    actions.forEach(action => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = action.label;
+      button.addEventListener('click', () => {
+        card.remove();
+        action.run();
+      });
+      actionsEl.append(button);
+    });
+    desktop.append(card);
+    const rect = anchor?.getBoundingClientRect();
+    const desktopRect = desktop.getBoundingClientRect();
+    const x = rect ? Math.min(rect.right + 14, desktopRect.right - 300) : desktopRect.left + 24;
+    const y = rect ? Math.max(desktopRect.top + 24, Math.min(rect.top, desktopRect.bottom - 170)) : desktopRect.top + 120;
+    card.style.left = Math.max(12, x - desktopRect.left) + 'px';
+    card.style.top = Math.max(12, y - desktopRect.top) + 'px';
+    requestAnimationFrame(() => card.classList.add('show'));
+  }
+
+  function openEchoExperience() {
+    const files = syncDesktopFiles();
+    if (files.length) {
+      const names = files.slice(0, 6).map(file => file.name).join(', ');
+      const anchor = desktopFiles()[0] || echoCompanion;
+      showEchoQuestion(
+        anchor,
+        files.length === 1
+          ? `I found 1 file: ${names}. Want me to organize your desktop?`
+          : `I found ${files.length} files: ${names}. Want me to organize them in alphabetical order?`,
+        [
+          {
+            label: files.length === 1 ? 'Organize' : 'Yes, organize',
+            run: () => files.length > 1 ? organizeDesktopFiles() : notify('Desktop organized', 'Your desktop is ready.', 'success')
+          },
+          { label: 'No thanks', run: () => {} }
+        ]
+      );
+      return;
+    }
+
+    const anchor = echoCompanion;
+    showEchoQuestion(anchor, 'What can I help you with?', [
+      { label: 'Tell me a joke', run: () => notify('IDK Echo', 'Why did the computer go to the doctor? It had a byte of a problem. 😄') },
+      { label: 'Fun fact', run: () => notify('IDK Echo', 'A group of flamingos is called a flamboyance. 🦩') },
+      { label: 'Organize desktop', run: () => organizeDesktopApps() }
+    ]);
+  }
+
+  function organizeDesktopApps() {
+    const apps = [...iconLayer.querySelectorAll('.desktop-icon:not(.desktop-file-icon):not(.tv-desktop)')];
+    apps.sort((a, b) => a.querySelector('.label')?.textContent.localeCompare(b.querySelector('.label')?.textContent, undefined, { sensitivity: 'base' }));
+    apps.forEach(icon => iconLayer.append(icon));
+    saveDesktopOrder();
+    notify('Desktop organized', 'Your apps are now in alphabetical order.', 'success');
+  }
+
+  function setupDesktopImport() {
+    const importButton = document.getElementById('desktop-import');
+    const input = document.getElementById('desktop-import-input');
+    if (!importButton || !input) return;
+    importButton.addEventListener('click', () => input.click());
+    input.addEventListener('change', async () => {
+      if (input.files?.length && window.IDKFiles?.importFiles) {
+        await window.IDKFiles.importFiles(input.files);
+        syncDesktopFiles();
+        input.value = '';
+      }
+    });
+    desktop.addEventListener('dragover', event => {
+      event.preventDefault();
+      desktop.classList.add('file-drop-active');
+    });
+    desktop.addEventListener('dragleave', event => {
+      if (!desktop.contains(event.relatedTarget)) desktop.classList.remove('file-drop-active');
+    });
+    desktop.addEventListener('drop', async event => {
+      event.preventDefault();
+      desktop.classList.remove('file-drop-active');
+      if (event.dataTransfer?.files?.length && window.IDKFiles?.importFiles) {
+        await window.IDKFiles.importFiles(event.dataTransfer.files);
+        syncDesktopFiles();
+      }
+    });
+    window.addEventListener('idk-data-changed', event => {
+      if (event.detail?.type === 'files') syncDesktopFiles();
+    });
+  }
+
   function setupEchoCompanion() {
     if (!echoCompanion) return;
-    echoCompanion.addEventListener('click', () => window.IDKAIControls?.openSelected?.() || launch('ai'));
+    echoCompanion.addEventListener('click', openEchoExperience);
   }
 
   function buildStartMenu() {
@@ -763,6 +899,8 @@ const OS = (() => {
     applyDockPosition(store.get('dockPosition', 'bottom'));
     applyMotion(store.get('motion', 'on'));
     setupEchoCompanion();
+    setupDesktopImport();
+    syncDesktopFiles();
     buildStartMenu();
     tickClock();
     setInterval(tickClock, 1000);
