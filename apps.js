@@ -290,10 +290,21 @@ async function gamePlayerApp(options = {}) {
       generatedSource = !options.src;
       frame.src = source;
       window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
-    } catch (error) {
-      status.textContent = error?.message || 'Game unavailable.';
-      frame.removeAttribute('src');
-      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message: error?.message || 'Game unavailable.' } }));
+    } catch (directError) {
+      try {
+        const target = GAME_CDN + encodeURIComponent(gameFileName(options.gameName));
+        if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw directError;
+        source = await PROXY.encode(target);
+        generatedSource = false;
+        frame.src = source;
+        status.textContent = 'Running through IDK proxy…';
+        window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true, transport: 'proxy' } }));
+      } catch (proxyError) {
+        const message = proxyError?.message || directError?.message || 'Game unavailable.';
+        status.textContent = message;
+        frame.removeAttribute('src');
+        window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message } }));
+      }
     }
   };
   reload.onclick = load;
