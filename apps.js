@@ -1880,6 +1880,15 @@ const APPS = {
     render: () => window.SYSTEM_APPS.ai()
   },
 
+  agent: {
+    title: 'IDK Web Agent',
+    glyph: '🤖',
+    desktop: true,
+    width: 760,
+    height: 560,
+    render: () => window.SYSTEM_APPS.ai()
+  },
+
   terminal: {
     title: 'Terminal',
     glyph: '<span class="terminal-glyph">&gt;_</span>',
