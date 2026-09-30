@@ -1555,7 +1555,7 @@ function listApp({ items, placeholder, empty, onOpen, subtitle }) {
       : items;
     grid.replaceChildren();
     count.textContent = `${matches.length} of ${items.length}`;
-    matches.slice(0, 400).forEach(item => {
+    matches.slice(0, 80).forEach(item => {
       const tile = el('button', { className: 'tile', type: 'button' });
       const tileIcon = el('span', { className: 'tile-icon' });
       tileIcon.setAttribute('aria-hidden', 'true');
