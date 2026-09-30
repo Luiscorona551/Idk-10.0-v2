@@ -10,7 +10,7 @@ const VM_DATA_FILE = path.join(DATA_DIR, 'idk-vms.json');
 const DISK_DIR = path.join(DATA_DIR, 'vm-disks');
 const QEMU_BINARY = process.env.QEMU_BINARY || 'qemu-system-x86_64';
 const QEMU_IMG_BINARY = process.env.QEMU_IMG_BINARY || 'qemu-img';
-const ENABLE_QEMU = process.env.ENABLE_QEMU === 'true';
+const ENABLE_QEMU = process.env.ENABLE_QEMU !== 'false';
 const running = new Map();
 const vncSockets = new Map();
 const vmVnc = new Map();
@@ -83,7 +83,8 @@ async function startQemu(vm) {
   if(!ENABLE_QEMU){const error=new Error('QEMU execution is disabled. Set ENABLE_QEMU=true on a dedicated VM host.');error.code='QEMU_DISABLED';throw error;}
   if(running.has(vm.id))return running.get(vm.id);
   const disk=await ensureDisk(vm);
-  const args=['-name',vm.name,'-m',String(vm.ramMb),'-smp',String(vm.cpuCores),'-cpu',vm.cpuModel==='qemu64'?'qemu64':vm.cpuModel==='max'?'max':'host','-nodefaults'];
+  const cpuModel = vm.cpuModel === 'qemu64' ? 'qemu64' : vm.cpuModel === 'max' ? 'max' : 'max';
+  const args=['-name',vm.name,'-m',String(vm.ramMb),'-smp',String(vm.cpuCores),'-cpu',cpuModel,'-accel','tcg,thread=multi','-nodefaults'];
   if(vm.firmware==='uefi') args.push('-machine','q35');
   const driveBus=vm.diskBus==='nvme'?'none':vm.diskBus;
   if(vm.diskBus==='nvme'){args.push('-drive','file='+disk+',if=none,id=disk0,format=qcow2','-device','nvme,drive=disk0,serial=IDKDISK');}
