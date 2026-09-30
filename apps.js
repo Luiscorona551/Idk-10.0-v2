@@ -1999,7 +1999,7 @@ const APPS = {
         if (!query && filter.value === 'all') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches.sort((a, b) => (order.has(a.id) ? order.get(a.id) : 9999) - (order.has(b.id) ? order.get(b.id) : 9999)); }
         grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
-        matches.slice(0, 400).forEach(item => {
+        matches.slice(0, 80).forEach(item => {
           const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
           const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
           const icon = el('span', { className: 'tile-icon' });
