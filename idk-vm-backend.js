@@ -101,7 +101,7 @@ async function restartQemu(vm){stopQemu(vm.id);return startQemu(vm);}
 export function vmBackendStatus(){return{enabled:true,qemu:qemuStatus(),dataFile:VM_DATA_FILE,diskDirectory:DISK_DIR};}
 
 export function vmRoutes(router) {
-  const setCors=(req,res,next)=>{const origin=req.get('origin');if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,DELETE,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Max-Age','600');}if(req.method==='OPTIONS')return res.sendStatus(204);next();};
+  const setCors=(req,res,next)=>{const origin=req.get('origin');if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,DELETE,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, X-ISO-Name');res.setHeader('Access-Control-Max-Age','600');}if(req.method==='OPTIONS')return res.sendStatus(204);next();};
   router.use(setCors);
   router.get('/health',(req,res)=>res.json({ok:true,service:'idk-vm-backend',version:'0.3.0',hostedBy:'Idk 10.0 server',time:new Date().toISOString()}));
   router.get('/host',(req,res)=>res.json({ok:true,virtualization:qemuStatus()}));
