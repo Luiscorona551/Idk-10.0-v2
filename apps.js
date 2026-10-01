@@ -1,3 +1,1532 @@
+const GAME_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
+const GAME_ICON_CDN = 'https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/';
+
+const store = {
+  get(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch (e) {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) { /* storage unavailable */ }
+  }
+};
+
+const PANIC_URL = 'https://classroom.google.com/';
+const DEFAULT_WALLPAPER = 'https://cdn.phototourl.com/member/2026-09-25-8f19f079-9694-4973-af98-5f3add5f3868.png';
+const FALLBACK_WALLPAPER = 'linear-gradient(135deg, #16224a, #2b1748)';
+const LEGACY_WALLPAPER_MAP = {
+  'https://kommodo.ai/i/SSsUaAWZPviBJHWcyLM': 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg',
+  'https://kommodo.ai/i/kucWPjqO64Wx2jr2Byun': 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg',
+  'https://kommodo.ai/i/hdSlLTe6uuxgLc9LaurW': 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg',
+  'https://kommodo.ai/i/NgrJyYk2J4PoV0hjkopI': DEFAULT_WALLPAPER
+};
+const THEMES = ['midnight', 'neon', 'sunset', 'mono', 'ocean', 'forest', 'candy'];
+const CUSTOM_THEME_KEY = 'idkCustomTheme';
+const CUSTOM_THEME_DEFAULTS = { accent: '#5986da', panel: '#0c1226', panelSolid: '#0d1226', text: '#eaf0ff' };
+const APP_PERMISSIONS_KEY = 'idkAppPermissions';
+const PERMISSION_TYPES = [
+  ['open', 'Open app'],
+  ['storage', 'Saved data'],
+  ['notifications', 'Notifications'],
+  ['network', 'Internet access'],
+  ['microphone', 'Microphone'],
+  ['camera', 'Camera']
+];
+const PERMISSION_DEFAULTS = { open: true, storage: true, notifications: true, network: true, microphone: false, camera: false };
+const WALLPAPER_PRESETS = [
+  { value: DEFAULT_WALLPAPER, label: 'Blue / Classic' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-e806c32c-31fd-4f54-a378-8eba729b9eda.jpg', label: 'Purple / Grape' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-b9324e05-93bd-445b-b799-c75b6ff7b455.jpg', label: 'Green' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-99dc02ce-44e6-4b64-965a-6674dcca4695.jpg', label: 'Red / Cherry' },
+  { value: 'https://cdn.phototourl.com/member/2026-09-25-8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c.jpg', label: 'Yellow / Lemon' }
+];
+const MOVIE_WATCHLIST_KEY = 'idkMovieWatchlist';
+const TAB_CLOAKER_KEY = 'idkTabCloaker';
+const DEFAULT_TAB_TITLE = 'IDK 10.0';
+
+function applyTabCloaker(settings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' })) {
+  const config = settings && typeof settings === 'object' ? settings : { enabled: false, url: '' };
+  const enabled = Boolean(config.enabled);
+  const rawURL = String(config.url || '').trim();
+  let target;
+  try { target = new URL(rawURL); } catch (e) { target = null; }
+  if (!enabled || !target || !/^https?:$/.test(target.protocol)) {
+    document.title = DEFAULT_TAB_TITLE;
+    const icon = document.querySelector('link[data-idk-tab-cloak]');
+    if (icon) icon.remove();
+    return false;
+  }
+  const hostname = target.hostname.replace(/^www\./i, '');
+  document.title = hostname || target.host;
+  let icon = document.querySelector('link[data-idk-tab-cloak]');
+  if (!icon) {
+    icon = document.createElement('link');
+    icon.rel = 'icon';
+    icon.dataset.idkTabCloak = 'true';
+    document.head.append(icon);
+  }
+  icon.href = target.origin + '/favicon.ico';
+  return true;
+}
+const MOVIE_HISTORY_KEY = 'idkMovieHistory';
+const GAME_FAVORITES_KEY = 'idkGameFavorites';
+const GAME_RECENTS_KEY = 'idkGameRecents';
+
+function applyWallpaper(url) {
+  let safeURL = String(url || '').trim().replace(/[\"\\\r\n]/g, '');
+  safeURL = LEGACY_WALLPAPER_MAP[safeURL] || safeURL;
+  const isGradient = /^(linear|radial|conic)-gradient\(/.test(safeURL);
+  const root = document.documentElement;
+
+  if (!safeURL) {
+    root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+    return;
+  }
+
+  if (isGradient) {
+    root.style.setProperty('--wallpaper', safeURL);
+    return;
+  }
+
+  // Prefer a compatibility proxy, then the original CDN, then a second
+  // compatibility proxy. Older Chromebooks can have trouble negotiating
+  // some modern image/CDN endpoints even when the same page loads.
+  const localFallback = (() => {
+    const id = safeURL;
+    if (id.includes('e806c32c-31fd-4f54-a378-8eba729b9eda')) return 'backgrounds/grape.svg';
+    if (id.includes('b9324e05-93bd-445b-b799-c75b6ff7b455')) return 'backgrounds/green.svg';
+    if (id.includes('99dc02ce-44e6-4b64-965a-6674dcca4695')) return 'backgrounds/red.svg';
+    if (id.includes('8f011df4-5dcb-4f2d-98c8-f93aaa5fce6c')) return 'backgrounds/yellow.svg';
+    return 'backgrounds/blue.svg';
+  })();
+  const sources = [
+    `https://wsrv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
+    safeURL,
+    `https://images.weserv.nl/?url=${encodeURIComponent(safeURL)}&output=jpg&q=88`,
+    localFallback
+  ];
+
+  const applySource = source => {
+    root.style.setProperty('--wallpaper', `url("${source}")`);
+  };
+  const trySource = index => {
+    if (index >= sources.length) {
+      root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+      return;
+    }
+    const test = new Image();
+    test.onload = () => applySource(sources[index]);
+    test.onerror = () => trySource(index + 1);
+    test.src = sources[index] + (sources[index].includes('?') ? '&' : '?') + 'idkbg=' + Date.now();
+  };
+  root.style.setProperty('--wallpaper', FALLBACK_WALLPAPER);
+  trySource(0);
+}
+function applyTheme(name) {
+  const desktop = document.getElementById('desktop');
+  if (!desktop) return;
+  if (name === 'custom') {
+    const saved = store.get(CUSTOM_THEME_KEY, CUSTOM_THEME_DEFAULTS);
+    const theme = { ...CUSTOM_THEME_DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) };
+    desktop.setAttribute('data-theme', 'custom');
+    desktop.style.setProperty('--accent', theme.accent);
+    desktop.style.setProperty('--panel', theme.panel);
+    desktop.style.setProperty('--panel-solid', theme.panelSolid);
+    desktop.style.setProperty('--text', theme.text);
+    desktop.style.setProperty('--muted', `color-mix(in srgb, ${theme.text} 62%, transparent)`);
+    return;
+  }
+  ['--accent', '--panel', '--panel-solid', '--text', '--muted'].forEach(property => desktop.style.removeProperty(property));
+  desktop.setAttribute('data-theme', THEMES.includes(name) ? name : 'midnight');
+}
+
+function applyIconSize(size) {
+  document.getElementById('desktop')?.setAttribute('data-icon-size', ['compact', 'normal', 'large'].includes(size) ? size : 'normal');
+}
+
+function applyDockPosition(position) {
+  document.getElementById('desktop')?.setAttribute('data-dock', ['bottom', 'left', 'right'].includes(position) ? position : 'bottom');
+}
+
+function applyMotion(mode) {
+  document.getElementById('desktop')?.setAttribute('data-motion', mode === 'off' ? 'off' : 'on');
+}
+
+const JSON_FALLBACKS = {
+  'games.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/games.json',
+  'game-icons.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/game-icons.json'
+};
+async function loadJSON(path) {
+  const urls = [path, JSON_FALLBACKS[path]].filter(Boolean);
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load ${path} (${res.status})`);
+      const data = await res.json();
+      try { localStorage.setItem(`idk-json-cache:${path}`, JSON.stringify(data)); } catch {}
+      return data;
+    } catch (error) { lastError = error; }
+  }
+  try {
+    const cached = JSON.parse(localStorage.getItem(`idk-json-cache:${path}`) || 'null');
+    if (cached !== null) return cached;
+  } catch {}
+  throw lastError || new Error(`Failed to load ${path}`);
+}
+
+function gameFileName(name) {
+  return name.includes('.') && name.lastIndexOf('.') > 0 ? name : `${name}.html`;
+}
+
+function gameTitle(name) {
+  const base = name.replace(/^cl/i, '').replace(/\.[a-z0-9]+$/i, '');
+  return base.replace(/[-_]+/g, ' ').trim() || name;
+}
+
+function gameIconURL(path) {
+  return path ? `${GAME_ICON_CDN}${path.split('/').map(encodeURIComponent).join('/')}` : '';
+}
+
+function gameTabURL(name) {
+  return `game.html?game=${encodeURIComponent(name)}`;
+}
+
+const GAMING_CLOUD_PROVIDERS = [
+  { id: 'xbox', title: 'Xbox Cloud Gaming', url: 'https://www.xbox.com/play', glyph: 'X' },
+  { id: 'geforce', title: 'GeForce NOW', url: 'https://play.geforcenow.com/', glyph: 'N' },
+  { id: 'luna', title: 'Amazon Luna', url: 'https://luna.amazon.com/', glyph: 'L' },
+  { id: 'boosteroid', title: 'Boosteroid', url: 'https://cloud.boosteroid.com/', glyph: 'B' },
+  { id: 'blacknut', title: 'Blacknut', url: 'https://www.blacknut.com/', glyph: 'B' }
+];
+
+function gamingCloudApp() {
+  const root = el('section', { className: 'gaming-cloud-panel' });
+  const intro = el('div', { className: 'gaming-cloud-intro' }, [
+    el('div', { className: 'gaming-cloud-badge', textContent: 'ULTRAVIOLET' }),
+    el('h3', { textContent: 'Gaming Cloud' }),
+    el('p', { textContent: 'Cloud gaming services open through the IDK Ultraviolet proxy, so the launcher stays inside the IDK browser environment.' })
+  ]);
+  const providerGrid = el('div', { className: 'gaming-cloud-providers' });
+  const status = el('span', { className: 'count', textContent: 'Choose a cloud gaming service.' });
+  const frame = el('iframe', { className: 'gaming-cloud-frame', title: 'IDK Gaming Cloud', allow: 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write' });
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  const openProvider = async provider => {
+    status.textContent = 'Starting Ultraviolet…';
+    try {
+      if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.');
+      frame.src = await PROXY.encode(provider.url);
+      status.textContent = provider.title + ' · Running through Ultraviolet';
+    } catch (error) {
+      frame.removeAttribute('src');
+      status.textContent = error?.message || 'Could not start the cloud gaming service.';
+      window.OS?.notify?.('Gaming Cloud', status.textContent, 'danger');
+    }
+  };
+  GAMING_CLOUD_PROVIDERS.forEach(provider => {
+    const button = el('button', { className: 'gaming-cloud-provider btn', type: 'button' });
+    button.append(el('span', { className: 'gaming-cloud-provider-glyph', textContent: provider.glyph }), el('span', { textContent: provider.title }));
+    button.onclick = () => openProvider(provider);
+    providerGrid.append(button);
+  });
+  const head = el('div', { className: 'gaming-cloud-head' }, [el('strong', { textContent: 'Cloud services' }), status]);
+  root.append(intro, providerGrid, head, frame);
+  root.cleanup = () => { frame.src = 'about:blank'; };
+  return root;
+}
+
+async function gameBlobURL(name) {
+  const file = gameFileName(name);
+  const url = GAME_CDN + encodeURIComponent(file) + "?t=" + Date.now();
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
+  return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
+}
+function openGame(name, title) {
+  const popup = window.open(gameTabURL(name), '_blank', 'noopener');
+  if (!popup) {
+    window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
+    return Promise.resolve(false);
+  }
+  return Promise.resolve(true);
+}
+
+async function gamePlayerApp(options = {}) {
+  const root = el('div', { className: 'game-player' });
+  const toolbar = el('div', { className: 'game-player-toolbar' });
+  const status = el('span', { className: 'count', textContent: 'Loading game…' });
+  const reload = el('button', { className: 'btn tab', type: 'button', textContent: 'Reload' });
+  const fullscreen = el('button', { className: 'btn tab', type: 'button', textContent: 'Fullscreen' });
+  const help = el('button', { className: 'btn tab', type: 'button', textContent: 'Controls help' });
+  const helpText = el('p', { className: 'game-controls-help', textContent: 'Click inside the game to focus it. Use browser fullscreen to expand the player. Press Escape to leave fullscreen.', hidden: true });
+  const frame = el('iframe', {
+    className: 'game-player-frame',
+    title: options.title || 'IDK game',
+    allow: 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write'
+  });
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  frame.addEventListener('load', () => { status.textContent = 'Ready'; });
+  frame.addEventListener('error', () => { status.textContent = 'Game frame failed to load.'; });
+  toolbar.append(status, reload, fullscreen, help);
+  root.append(toolbar, helpText, frame);
+  let source = options.src || '', generatedSource = false;
+  const load = async () => {
+    status.textContent = 'Loading game…';
+    try {
+      if (generatedSource && source) URL.revokeObjectURL(source);
+      source = options.src || await gameBlobURL(options.gameName);
+      generatedSource = !options.src;
+      frame.src = source;
+      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
+    } catch (error) {
+      status.textContent = error?.message || 'Game unavailable.';
+      frame.removeAttribute('src');
+      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message: error?.message || 'Game unavailable.' } }));
+    }
+  };
+  reload.onclick = load;
+  fullscreen.onclick = () => frame.requestFullscreen?.().catch(() => { status.textContent = 'Fullscreen is unavailable in this browser.'; });
+  help.onclick = () => { helpText.hidden = !helpText.hidden; };
+  await load();
+  root.cleanup = () => { if (generatedSource && source) URL.revokeObjectURL(source); };
+  return root;
+}
+
+function el(tag, props = {}, children = []) {
+  const node = Object.assign(document.createElement(tag), props);
+  Object.entries(props).filter(([key]) => key.startsWith('aria-') || key.startsWith('data-')).forEach(([key, value]) => node.setAttribute(key, String(value)));
+  children.forEach(child => node.append(child));
+  return node;
+}
+
+function emptyState(message) {
+  return el('div', { className: 'empty-state', innerHTML: message });
+}
+
+function appPermissionState(appId) {
+  const all = store.get(APP_PERMISSIONS_KEY, {});
+  const saved = all && typeof all === 'object' ? all[appId] : null;
+  return { ...PERMISSION_DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) };
+}
+
+function setAppPermission(appId, permission, allowed) {
+  const all = store.get(APP_PERMISSIONS_KEY, {});
+  const permissions = all && typeof all === 'object' ? all : {};
+  permissions[appId] = { ...appPermissionState(appId), [permission]: Boolean(allowed) };
+  store.set(APP_PERMISSIONS_KEY, permissions);
+  window.dispatchEvent(new CustomEvent('idk-permissions-changed', { detail: { appId, permission, allowed: Boolean(allowed) } }));
+}
+
+function permissionsApp() {
+  const root = el('div', { className: 'app permissions-app' });
+  const appSelect = el('select', { className: 'field', 'aria-label': 'Choose an app' });
+  const table = el('div', { className: 'permissions-list' });
+  const status = el('p', { className: 'permissions-status', textContent: 'Changes are saved on this device.' });
+  Object.entries(APPS).filter(([id]) => !['panic', 'player'].includes(id)).forEach(([id, app]) => appSelect.append(el('option', { value: id, textContent: app.title })));
+
+  const render = () => {
+    const appId = appSelect.value;
+    const state = appPermissionState(appId);
+    table.replaceChildren(...PERMISSION_TYPES.map(([permission, label]) => {
+      const toggle = el('input', { type: 'checkbox', checked: state[permission], 'aria-label': `${label} for ${APPS[appId].title}` });
+      toggle.addEventListener('change', () => {
+        setAppPermission(appId, permission, toggle.checked);
+        status.textContent = `${label} ${toggle.checked ? 'allowed' : 'blocked'} for ${APPS[appId].title}.`;
+      });
+      return el('label', { className: 'permission-row' }, [el('span', { textContent: label }), toggle]);
+    }));
+  };
+  appSelect.addEventListener('change', render);
+  root.append(
+    el('h2', { textContent: 'App Permissions' }),
+    el('p', { textContent: 'Choose what each built-in app may use. These choices stay in this browser.' }),
+    el('div', { className: 'permissions-picker' }, [el('label', { textContent: 'App' }), appSelect]),
+    table,
+    status
+  );
+  render();
+  return root;
+}
+
+function activityCenterApp() {
+  const root = el('div', { className: 'app activity-center-app' });
+  const list = el('div', { className: 'activity-list' });
+  const count = el('span', { className: 'count' });
+  const render = () => {
+    const items = window.OS?.getActivityHistory?.() || [];
+    count.textContent = `${items.length} entr${items.length === 1 ? 'y' : 'ies'}`;
+    list.replaceChildren();
+    if (!items.length) {
+      list.append(emptyState('No activity yet. System updates and app messages will appear here.'));
+      return;
+    }
+    items.forEach(item => list.append(el('article', { className: `activity-entry ${item.kind || 'info'}` }, [
+      el('div', { className: 'activity-entry-copy' }, [el('strong', { textContent: item.title }), el('p', { textContent: item.message })]),
+      el('time', { dateTime: new Date(item.at).toISOString(), textContent: new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
+    ])));
+  };
+  const clear = el('button', { className: 'btn tab', type: 'button', textContent: 'Clear activity' });
+  clear.addEventListener('click', () => window.OS?.clearActivity?.());
+  window.addEventListener('idk-activity', render);
+  window.addEventListener('idk-activity-cleared', render);
+  root.cleanup = () => {
+    window.removeEventListener('idk-activity', render);
+    window.removeEventListener('idk-activity-cleared', render);
+  };
+  root.append(el('div', { className: 'activity-heading' }, [el('div', {}, [el('h2', { textContent: 'Activity Center' }), el('p', { textContent: 'Your recent IDK updates, alerts, and app activity.' })]), count, clear]), list);
+  render();
+  return root;
+}
+
+function loadingState(label = 'Loading') {
+  return el('div', { className: 'loading-state', role: 'status', 'aria-live': 'polite' }, [
+    el('span', { className: 'loading-orbit', 'aria-hidden': 'true' }),
+    el('strong', { textContent: label }),
+    el('span', { className: 'loading-dots', textContent: 'Please wait' })
+  ]);
+}
+
+// Sites that send X-Frame-Options / frame-ancestors cannot render inside an
+// iframe at all, so they get a launch card instead of a permanently broken frame.
+function externalSite(url, label, { embeddable = true } = {}) {
+  const root = el('div', { className: 'site-frame' });
+  const openTab = () => window.open(url, '_blank', 'noopener');
+
+  const bar = el('div', { className: 'toolbar' }, [
+    el('span', { className: 'count', textContent: new URL(url).hostname })
+  ]);
+  const popOut = el('button', { className: 'btn tab', type: 'button', textContent: 'Open in new tab' });
+  popOut.addEventListener('click', openTab);
+  bar.append(el('span', { style: 'flex:1' }), popOut);
+
+  if (embeddable) {
+    root.append(bar, el('iframe', { src: url, allow: 'autoplay; fullscreen; clipboard-write' }));
+    return root;
+  }
+
+  const launch = el('button', { className: 'btn', type: 'button', textContent: `Open ${label}` });
+  launch.addEventListener('click', openTab);
+
+  const viaProxy = el('button', { className: 'btn', type: 'button', textContent: 'Open here through the proxy' });
+  viaProxy.hidden = true;
+  viaProxy.addEventListener('click', async () => {
+    viaProxy.textContent = 'Connecting…';
+    try {
+      const frame = el('iframe', { src: await PROXY.encode(url), allow: 'autoplay; fullscreen; clipboard-write' });
+      root.replaceChildren(bar, frame);
+    } catch (err) {
+      viaProxy.textContent = err.message;
+    }
+  });
+  PROXY.backendAvailable().then(ok => { viaProxy.hidden = !ok; });
+
+  root.append(bar, el('div', { className: 'empty-state blocked' }, [
+    el('p', { textContent: `${label} blocks being embedded in another page, so it opens in its own tab.` }),
+    launch,
+    viaProxy
+  ]));
+  return root;
+}
+
+function movieSource(url, label, repository, options = {}) {
+  const root = externalSite(url, label, options);
+  const frame = root.querySelector('iframe');
+  const status = el('span', { className: 'movie-source-status checking', textContent: 'Checking source…' });
+  if (frame) {
+    frame.dataset.tvSource = 'movie';
+    frame.title = `${label} browser`;
+    frame.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+    frame.allowFullscreen = true;
+    const markOnline = () => {
+      status.className = 'movie-source-status online';
+      status.textContent = 'Source online';
+      status.title = `${label} responded successfully.`;
+    };
+    const markOffline = () => {
+      status.className = 'movie-source-status offline';
+      status.textContent = 'Unavailable · try other source';
+      status.title = `Try another source or open ${label} in a new tab.`;
+    };
+    const timeout = setTimeout(markOffline, 9000);
+    frame.addEventListener('load', () => { clearTimeout(timeout); markOnline(); }, { once: true });
+    frame.addEventListener('error', () => { clearTimeout(timeout); markOffline(); }, { once: true });
+  }
+  const bar = root.querySelector('.toolbar');
+  if (!bar) return root;
+  bar.querySelector('span[style*="flex"]')?.before(status);
+  if (!repository) return root;
+  const source = el('button', { className: 'btn tab', type: 'button', textContent: 'View GitHub repo' });
+  source.addEventListener('click', () => window.open(repository, '_blank', 'noopener'));
+  bar.append(source);
+  return root;
+}
+
+function movieEntries(key, limit = 24) {
+  const entries = store.get(key, []);
+  return Array.isArray(entries)
+    ? entries.filter(item => item && item.title && item.url).slice(0, limit)
+    : [];
+}
+
+function saveMovieEntries(key, entries, limit = 24) {
+  store.set(key, entries.slice(0, limit));
+}
+
+function moviesApp() {
+  const sources = [
+    {
+      id: 'archive',
+      title: 'Archive Browser',
+      url: 'https://archive-movie-browser.vercel.app/',
+      repository: 'https://github.com/amponce/archive-movie-browser'
+    },
+    {
+      id: 'globe-tv',
+      title: 'Globe TV',
+      url: 'https://globetv.app/'
+    },
+    {
+      id: 'bw-cinema',
+      title: 'BW Cinema Fork',
+      url: 'https://corvid-agent.github.io/bw-cinema/',
+      repository: 'https://github.com/corvid-agent/bw-cinema'
+    },
+    {
+      id: 'archive-official',
+      title: 'Internet Archive Movies',
+      url: 'https://archive.org/details/movies',
+      embeddable: false
+    },
+    {
+      id: 'youtube-official',
+      title: 'YouTube',
+      url: 'https://www.youtube.com/',
+      embeddable: false
+    }
+  ];
+  const root = el('div', { className: 'movies-app' });
+  const browser = tabbedApp(sources.map(source => ({
+    title: source.title,
+    render: () => movieSource(source.url, source.title, source.repository, { embeddable: source.embeddable !== false })
+  })));
+  const toggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Watchlist (0)', 'aria-expanded': 'false' });
+  const count = el('span', { className: 'count', textContent: '0 saved' });
+  const titleInput = el('input', { className: 'field', type: 'text', placeholder: 'Movie or show title' });
+  const urlInput = el('input', { className: 'field', type: 'url', placeholder: 'Paste a movie or show link to save' });
+  const sourceInput = el('select', { className: 'field', 'aria-label': 'Movie source' });
+  sources.forEach(source => sourceInput.append(el('option', { value: source.id, textContent: source.title })));
+  const feedback = el('span', { className: 'movie-watchlist-feedback', role: 'status' });
+  const list = el('div', { className: 'movie-watchlist-list' });
+  const panel = el('section', { className: 'movie-watchlist', hidden: true }, [
+    el('div', { className: 'movie-watchlist-heading' }, [
+      el('div', {}, [el('strong', { textContent: 'Watchlist' }), el('small', { textContent: 'Save a movie or TV show link to return to it later.' })]),
+      count
+    ]),
+    el('form', { className: 'movie-watchlist-form' }, [
+      titleInput,
+      urlInput,
+      sourceInput,
+      el('button', { className: 'btn', type: 'submit', textContent: 'Save item' })
+    ]),
+    feedback,
+    list
+  ]);
+  const toolbar = el('div', { className: 'movies-toolbar' }, [
+    el('div', { className: 'movies-heading' }, [el('strong', { textContent: 'Movies & TV' }), el('small', { textContent: 'Choose a catalog, then minimize it to watch on TV.' })]),
+    toggle
+  ]);
+
+  const sourceFor = item => sources.find(source => source.id === item.source) || sources[0];
+  const record = item => {
+    const history = movieEntries(MOVIE_HISTORY_KEY, 12);
+    const next = [{ ...item, lastWatched: Date.now() }, ...history.filter(entry => entry.url !== item.url)].slice(0, 12);
+    saveMovieEntries(MOVIE_HISTORY_KEY, next, 12);
+  };
+  const navigateTo = item => {
+    const source = sourceFor(item);
+    const tabs = [...browser.querySelectorAll(':scope > .toolbar > .tab')];
+    tabs.find(button => button.textContent === source.title)?.click();
+    let tries = 0;
+    const apply = () => {
+      const frame = browser.querySelector('.tab-body iframe[data-tv-source="movie"]');
+      if (frame) {
+        frame.src = item.url;
+        feedback.textContent = `Opening ${item.title}`;
+        return;
+      }
+      if (tries++ < 30) setTimeout(apply, 100);
+    };
+    apply();
+  };
+  const card = (item, removable) => {
+    const source = sourceFor(item);
+    const open = el('button', { className: 'btn tab', type: 'button', textContent: 'Resume' });
+    open.addEventListener('click', () => { record(item); navigateTo(item); render(); });
+    const actions = [open];
+    if (removable) {
+      const remove = el('button', { className: 'btn tab', type: 'button', textContent: 'Remove' });
+      remove.addEventListener('click', () => {
+        saveMovieEntries(MOVIE_WATCHLIST_KEY, movieEntries(MOVIE_WATCHLIST_KEY).filter(entry => entry.url !== item.url));
+        render();
+      });
+      actions.push(remove);
+    }
+    return el('article', { className: 'movie-watchlist-card' }, [
+      el('div', { className: 'movie-watchlist-copy' }, [
+        el('strong', { textContent: item.title }),
+        el('small', { textContent: `${source.title} · ${item.lastWatched ? 'Ready to resume' : 'Saved item'}` })
+      ]),
+      el('div', { className: 'movie-watchlist-actions' }, actions)
+    ]);
+  };
+  const render = () => {
+    const saved = movieEntries(MOVIE_WATCHLIST_KEY);
+    const history = movieEntries(MOVIE_HISTORY_KEY, 12).sort((a, b) => (b.lastWatched || 0) - (a.lastWatched || 0));
+    count.textContent = `${saved.length} saved`;
+    toggle.textContent = `Watchlist (${saved.length})`;
+    list.replaceChildren();
+    if (history.length) {
+      list.append(el('h3', { className: 'movie-watchlist-section-title', textContent: 'Continue watching' }));
+      history.slice(0, 4).forEach(item => list.append(card(item, false)));
+    }
+    list.append(el('h3', { className: 'movie-watchlist-section-title', textContent: 'My watchlist' }));
+    if (!saved.length) list.append(el('div', { className: 'movie-watchlist-empty', textContent: 'Your saved movies will appear here.' }));
+    saved.forEach(item => list.append(card(item, true)));
+  };
+  panel.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const title = titleInput.value.trim();
+    const url = urlInput.value.trim();
+    try {
+      const parsed = new URL(url);
+      if (!title || !['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+    } catch {
+      feedback.textContent = 'Enter a title and a valid movie link.';
+      return;
+    }
+    const saved = movieEntries(MOVIE_WATCHLIST_KEY).filter(item => item.url !== url);
+    saveMovieEntries(MOVIE_WATCHLIST_KEY, [{ id: `${Date.now()}`, title, url, source: sourceInput.value }, ...saved]);
+    titleInput.value = urlInput.value = '';
+    feedback.textContent = `${title} saved.`;
+    render();
+  });
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) render();
+  });
+  render();
+  root.append(toolbar, panel, browser);
+  return root;
+}
+
+function tabbedApp(tabs) {
+  const root = el('div', { className: 'tabbed' });
+  const bar = el('div', { className: 'toolbar' });
+  const body = el('div', { className: 'tab-body' });
+  root.append(bar, body);
+  let tabLoadId = 0;
+  let busyTab = 0;
+  const renderedViews = new Set();
+
+  const renderTab = tab => {
+    const setBusy = loading => {
+      if (typeof OS !== 'undefined') OS.setLoading(loading);
+    };
+    if (busyTab) {
+      setBusy(false);
+      busyTab = 0;
+    }
+    const loadId = ++tabLoadId;
+    const stopBusy = () => {
+      if (busyTab !== loadId) return;
+      busyTab = 0;
+      body.classList.remove('is-loading');
+      setBusy(false);
+    };
+
+    setBusy(true);
+    busyTab = loadId;
+    body.classList.remove('tab-swap');
+    void body.offsetWidth;
+    body.classList.add('is-loading');
+    let view;
+    try {
+      view = tab.render();
+      renderedViews.add(view);
+      body.replaceChildren(view);
+    } catch (error) {
+      body.replaceChildren(emptyState(error.message));
+      stopBusy();
+      return;
+    }
+    body.classList.add('tab-swap');
+
+    const frame = view.matches?.('iframe') ? view : view.querySelector?.('iframe');
+    if (frame) {
+      frame.addEventListener('load', stopBusy, { once: true });
+      setTimeout(stopBusy, 6000);
+    } else {
+      setTimeout(stopBusy, 350);
+    }
+  };
+
+  const buttons = tabs.map((tab, index) => {
+    const btn = el('button', { className: 'btn tab', type: 'button', textContent: tab.title });
+    btn.addEventListener('click', () => {
+      buttons.forEach(other => other.classList.remove('active'));
+      btn.classList.add('active');
+      renderTab(tab);
+    });
+    if (index === 0) btn.classList.add('active');
+    bar.append(btn);
+    return btn;
+  });
+
+  renderTab(tabs[0]);
+  root.cleanup = () => {
+    if (busyTab) {
+      busyTab = 0;
+      if (typeof OS !== 'undefined') OS.setLoading(false);
+    }
+    renderedViews.forEach(view => view?.cleanup?.());
+  };
+  return root;
+}
+
+// Drive blocks the normal UI in an iframe, but the embedded folder view renders
+// fine for anyone-with-the-link folders.
+function driveFolder(id, label) {
+  const root = el('div', { className: 'site-frame' });
+  const shareURL = `https://drive.google.com/drive/folders/${id}`;
+
+  const bar = el('div', { className: 'toolbar' }, [
+    el('span', { className: 'count', textContent: label }),
+    el('span', { style: 'flex:1' })
+  ]);
+  const openTab = el('button', { className: 'btn tab', type: 'button', textContent: 'Open in Drive' });
+  openTab.addEventListener('click', () => window.open(shareURL, '_blank', 'noopener'));
+  bar.append(openTab);
+
+  root.append(bar, el('iframe', {
+    src: `https://drive.google.com/embeddedfolderview?id=${id}#grid`
+  }));
+  return root;
+}
+
+function audioPlayer() {
+  const root = el('div', { className: 'app player-app' });
+  const audio = el('audio', { controls: true, className: 'audio' });
+  const youtube = el('iframe', {
+    className: 'youtube-player',
+    title: 'YouTube music player',
+    hidden: true,
+    allow: 'autoplay; encrypted-media; picture-in-picture'
+  });
+  youtube.allowFullscreen = true;
+  const now = el('p', { className: 'now-playing', textContent: 'Nothing loaded yet.' });
+  const visualizer = el('div', { className: 'audio-visualizer', 'aria-hidden': 'true' });
+  const visualizerBars = Array.from({ length: 18 }, () => el('i', { className: 'audio-bar' }));
+  visualizer.append(...visualizerBars);
+  const queueList = el('div', { className: 'player-queue-list' });
+  const queueCount = el('span', { className: 'player-queue-count' });
+  let meterFrame = 0;
+  const objectURLs = new Set();
+  let youtubeActive = false;
+  let youtubePlaying = false;
+  let youtubeStopRequested = false;
+  let tracks = [];
+  let currentIndex = -1;
+  let shuffle = false;
+  let repeat = 'off';
+
+  const trackOf = track => ({
+    id: String(track?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    title: String(track?.title || track?.name || track?.url || 'Untitled track'),
+    url: String(track?.url || '')
+  });
+  const currentTrack = () => tracks[currentIndex] || null;
+
+  const visualLevel = () => {
+    const time = audio.currentTime || 0;
+    const beat = .5 + .5 * Math.sin(time * 7.4 + performance.now() / 180);
+    return .16 + beat * .84;
+  };
+  const syncSpeaker = (type, level = visualLevel()) => {
+    const track = currentTrack();
+    const detail = {
+      type,
+      name: now.textContent,
+      playing: !audio.paused && !audio.ended,
+      currentTime: audio.currentTime || 0,
+      duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+      volume: audio.volume,
+      level,
+      audio,
+      track,
+      queue: tracks.map(item => ({ ...item })),
+      queueIndex: currentIndex,
+      shuffle,
+      repeat
+    };
+    window.IDK_AUDIO_STATE = detail;
+    window.dispatchEvent(new CustomEvent('idk-audio-state', { detail }));
+  };
+  const animateMeter = () => {
+    if (audio.paused || audio.ended) {
+      visualizerBars.forEach((bar, index) => { bar.style.height = `${8 + (index % 3) * 3}px`; });
+      meterFrame = 0;
+      return;
+    }
+    const level = visualLevel();
+    visualizerBars.forEach((bar, index) => {
+      const wave = .35 + .65 * Math.abs(Math.sin(audio.currentTime * 5.5 + index * .72));
+      bar.style.height = `${8 + Math.round(level * wave * 42)}px`;
+    });
+    syncSpeaker('meter', level);
+    meterFrame = requestAnimationFrame(animateMeter);
+  };
+  const startMeter = () => {
+    cancelAnimationFrame(meterFrame);
+    meterFrame = requestAnimationFrame(animateMeter);
+  };
+  const renderQueue = () => {
+    queueCount.textContent = `${tracks.length} song${tracks.length === 1 ? '' : 's'}`;
+    queueList.replaceChildren();
+    if (!tracks.length) {
+      queueList.innerHTML = '<div class="player-queue-empty">Add a link or choose local files to build your queue.</div>';
+      return;
+    }
+    tracks.forEach((track, index) => {
+      const row = el('div', { className: `player-queue-row${index === currentIndex ? ' active' : ''}` });
+      const play = el('button', { className: 'player-queue-track', type: 'button', textContent: `${index + 1}. ${track.title}` });
+      const remove = el('button', { className: 'player-queue-remove', type: 'button', textContent: 'Remove', 'aria-label': `Remove ${track.title} from queue` });
+      play.addEventListener('click', () => setCurrent(index, true));
+      remove.addEventListener('click', () => removeFromQueue(index));
+      row.append(play, remove);
+      queueList.append(row);
+    });
+  };
+  const syncControls = () => {
+    playToggle.textContent = audio.paused && !youtubePlaying ? 'Play' : 'Pause';
+    playToggle.setAttribute('aria-label', audio.paused && !youtubePlaying ? 'Play music' : 'Pause music');
+    shuffleButton.textContent = `Shuffle: ${shuffle ? 'On' : 'Off'}`;
+    repeatButton.textContent = `Repeat: ${repeat === 'one' ? 'One' : repeat === 'all' ? 'All' : 'Off'}`;
+  };
+
+  const emitQueueState = () => syncSpeaker('queue', 0);
+  const stopPlayback = () => {
+    if (youtubeActive) {
+      youtubeStopRequested = true;
+      sendYouTubeCommand('stopVideo');
+      youtubePlaying = false;
+      syncYouTube();
+      return;
+    }
+    audio.pause();
+    audio.currentTime = 0;
+    syncSpeaker('stop');
+  };
+  const advanceTrack = () => {
+    if (!tracks.length || currentIndex < 0) return;
+    if (repeat === 'one') {
+      setCurrent(currentIndex, true);
+      return;
+    }
+    let nextIndex = -1;
+    if (shuffle && tracks.length > 1) {
+      const choices = tracks.map((_, index) => index).filter(index => index !== currentIndex);
+      nextIndex = choices[Math.floor(Math.random() * choices.length)];
+    } else if (currentIndex + 1 < tracks.length) {
+      nextIndex = currentIndex + 1;
+    } else if (repeat === 'all') {
+      nextIndex = 0;
+    }
+    if (nextIndex < 0) {
+      youtubePlaying = false;
+      syncSpeaker('ended', 0);
+      syncControls();
+      return;
+    }
+    setCurrent(nextIndex, true);
+  };
+  const previousTrack = () => {
+    if (!tracks.length || currentIndex < 0) return;
+    if (!youtubeActive && audio.currentTime > 3) {
+      audio.currentTime = 0;
+      syncSpeaker('seek');
+      return;
+    }
+    const previousIndex = currentIndex > 0 ? currentIndex - 1 : (repeat === 'all' ? tracks.length - 1 : 0);
+    setCurrent(previousIndex, true);
+  };
+  const togglePlayback = () => {
+    if (youtubeActive) {
+      window.dispatchEvent(new CustomEvent('idk-youtube-control', { detail: { action: 'toggle' } }));
+      return;
+    }
+    if (!currentTrack()) return;
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
+  };
+  const removeFromQueue = index => {
+    if (!tracks[index]) return;
+    tracks.splice(index, 1);
+    if (currentIndex === index) {
+      if (tracks.length) {
+        currentIndex = Math.min(index, tracks.length - 1);
+        setCurrent(currentIndex, false);
+      } else {
+        currentIndex = -1;
+        audio.pause();
+        audio.removeAttribute('src');
+        youtubeActive = false;
+        youtubePlaying = false;
+        youtube.hidden = true;
+        youtube.src = 'about:blank';
+        audio.hidden = false;
+        now.textContent = 'Nothing loaded yet.';
+        syncSpeaker('source', 0);
+      }
+    } else if (currentIndex > index) currentIndex -= 1;
+    renderQueue();
+    emitQueueState();
+  };
+
+  const setCurrent = (index, autoplay = true) => {
+    const track = tracks[index];
+    if (!track) return;
+    currentIndex = index;
+    const videoId = youtubeVideoId(track.url);
+    youtubeStopRequested = false;
+    if (videoId) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.hidden = true;
+      youtubeActive = true;
+      youtubePlaying = Boolean(autoplay);
+      youtube.hidden = false;
+      youtube.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${autoplay ? 1 : 0}&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+      now.textContent = track.title;
+      syncYouTube();
+    } else {
+      youtubeActive = false;
+      youtubePlaying = false;
+      youtube.hidden = true;
+      youtube.src = 'about:blank';
+      audio.hidden = false;
+      audio.src = driveDirectURL(track.url);
+      audio.dataset.name = track.title;
+      now.textContent = track.title;
+      syncSpeaker('source');
+      if (autoplay) audio.play().catch(() => { now.textContent = `Click play to start ${track.title}.`; syncSpeaker('pause'); });
+    }
+    renderQueue();
+    syncControls();
+  };
+
+  ['play', 'pause', 'loadedmetadata', 'timeupdate', 'volumechange'].forEach(type => audio.addEventListener(type, () => {
+    syncSpeaker(type);
+    if (type === 'play') startMeter();
+    if (type === 'pause') cancelAnimationFrame(meterFrame);
+    syncControls();
+  }));
+  audio.addEventListener('ended', () => { syncSpeaker('ended'); cancelAnimationFrame(meterFrame); advanceTrack(); });
+
+  const syncYouTube = () => {
+    const track = currentTrack();
+    const detail = {
+      type: 'youtube',
+      name: now.textContent,
+      playing: youtubePlaying,
+      currentTime: 0,
+      duration: 0,
+      volume: 1,
+      level: youtubePlaying ? .72 : 0,
+      audio: null,
+      track,
+      queue: tracks.map(item => ({ ...item })),
+      queueIndex: currentIndex,
+      shuffle,
+      repeat
+    };
+    window.IDK_AUDIO_STATE = detail;
+    window.dispatchEvent(new CustomEvent('idk-audio-state', { detail }));
+  };
+  const sendYouTubeCommand = func => {
+    youtube.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+  };
+  const onYouTubeMessage = event => {
+    if (!youtubeActive || event.source !== youtube.contentWindow) return;
+    let data;
+    try { data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
+    if (data?.event !== 'onStateChange') return;
+    if (data.info === 0) {
+      if (youtubeStopRequested) {
+        youtubeStopRequested = false;
+        youtubePlaying = false;
+        syncYouTube();
+      } else advanceTrack();
+      return;
+    }
+    youtubePlaying = data.info === 1;
+    syncYouTube();
+    syncControls();
+  };
+  const onYouTubeControl = event => {
+    if (!youtubeActive) return;
+    const action = event.detail?.action;
+    if (action === 'toggle') {
+      sendYouTubeCommand(youtubePlaying ? 'pauseVideo' : 'playVideo');
+      youtubePlaying = !youtubePlaying;
+      syncYouTube();
+    } else if (action === 'stop') {
+      stopPlayback();
+    }
+  };
+  window.addEventListener('message', onYouTubeMessage);
+  window.addEventListener('idk-youtube-control', onYouTubeControl);
+
+  const url = el('input', { className: 'field', type: 'url', placeholder: 'Paste an audio URL, Drive link, or YouTube link' });
+  const play = el('button', { className: 'btn', type: 'button', textContent: 'Play' });
+  play.addEventListener('click', () => {
+    const value = url.value.trim();
+    if (!value) return;
+    setQueue([{ title: youtubeVideoId(value) ? `YouTube · ${value}` : value, url: value }], 0, true);
+  });
+
+  const picker = el('input', { type: 'file', accept: 'audio/*', multiple: true, className: 'field' });
+  const fileTiles = el('div', { className: 'tile-grid' });
+  picker.addEventListener('change', () => {
+    fileTiles.replaceChildren();
+    const selected = Array.from(picker.files).map(file => {
+      const source = URL.createObjectURL(file);
+      objectURLs.add(source);
+      return { title: file.name, url: source };
+    });
+    selected.forEach((track, index) => {
+      const tile = el('button', { className: 'tile', type: 'button', textContent: track.title });
+      tile.addEventListener('click', () => setCurrent(index, true));
+      fileTiles.append(tile);
+    });
+    setQueue(selected, 0, true);
+  });
+
+  const playToggle = el('button', { className: 'player-control', type: 'button', textContent: 'Play' });
+  const previous = el('button', { className: 'player-control', type: 'button', textContent: 'Prev' });
+  const next = el('button', { className: 'player-control', type: 'button', textContent: 'Next' });
+  const shuffleButton = el('button', { className: 'player-control', type: 'button', textContent: 'Shuffle: Off' });
+  const repeatButton = el('button', { className: 'player-control', type: 'button', textContent: 'Repeat: Off' });
+  const clearQueue = el('button', { className: 'player-control', type: 'button', textContent: 'Clear queue' });
+  playToggle.addEventListener('click', togglePlayback);
+  previous.addEventListener('click', previousTrack);
+  next.addEventListener('click', advanceTrack);
+  shuffleButton.addEventListener('click', () => { shuffle = !shuffle; renderQueue(); emitQueueState(); syncControls(); });
+  repeatButton.addEventListener('click', () => { repeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'; renderQueue(); emitQueueState(); syncControls(); });
+  clearQueue.addEventListener('click', () => {
+    tracks = [];
+    currentIndex = -1;
+    audio.pause();
+    audio.removeAttribute('src');
+    youtubeActive = false;
+    youtubePlaying = false;
+    youtube.hidden = true;
+    youtube.src = 'about:blank';
+    audio.hidden = false;
+    now.textContent = 'Nothing loaded yet.';
+    renderQueue();
+    syncSpeaker('source', 0);
+    syncControls();
+  });
+  const controls = el('div', { className: 'player-controls' }, [previous, playToggle, next, shuffleButton, repeatButton]);
+  const queuePanel = el('section', { className: 'player-queue' }, [
+    el('div', { className: 'player-queue-head' }, [el('strong', { textContent: 'Up Next' }), queueCount, clearQueue]),
+    queueList
+  ]);
+
+  const setQueue = (nextTracks, index = 0, autoplay = true) => {
+    tracks = nextTracks.map(trackOf).filter(track => track.url);
+    currentIndex = tracks.length ? Math.min(Math.max(index, 0), tracks.length - 1) : -1;
+    if (currentIndex >= 0) setCurrent(currentIndex, autoplay);
+    else {
+      audio.pause();
+      youtubeActive = false;
+      youtubePlaying = false;
+      youtube.hidden = true;
+      youtube.src = 'about:blank';
+      audio.hidden = false;
+      now.textContent = 'Nothing loaded yet.';
+      renderQueue();
+      syncSpeaker('source', 0);
+      syncControls();
+    }
+  };
+  const playerAPI = {
+    setQueue,
+    playTrack(track, options = {}) {
+      if (options.enqueue) {
+        const item = trackOf(track);
+        tracks.push(item);
+        renderQueue();
+        emitQueueState();
+        if (currentIndex < 0) setCurrent(tracks.length - 1, true);
+        return item;
+      }
+      setQueue([track], 0, true);
+      return currentTrack();
+    },
+    enqueue(track) { return this.playTrack(track, { enqueue: true }); },
+    remove(index) { removeFromQueue(index); },
+    next: advanceTrack,
+    previous: previousTrack,
+    toggle: togglePlayback,
+    stop: stopPlayback,
+    getState: () => ({ track: currentTrack(), queue: tracks.map(item => ({ ...item })), queueIndex: currentIndex, shuffle, repeat })
+  };
+  window.IDK_MUSIC_PLAYER = playerAPI;
+  renderQueue();
+  syncControls();
+
+  root.append(
+    el('h2', { textContent: 'Player' }),
+    audio,
+    youtube,
+    now,
+    visualizer,
+    el('div', { className: 'settings-row' }, [
+      el('label', { textContent: 'Stream a link' }),
+      el('div', { style: 'display:flex; gap:8px;' }, [url, play])
+    ]),
+    el('div', { className: 'settings-row' }, [
+      el('label', { textContent: 'Or play files from this device' }),
+      picker
+    ]),
+    controls,
+    queuePanel,
+    fileTiles
+  );
+  root.cleanup = () => {
+    cancelAnimationFrame(meterFrame);
+    audio.pause();
+    youtubeActive = false;
+    youtubePlaying = false;
+    youtube.src = 'about:blank';
+    window.removeEventListener('message', onYouTubeMessage);
+    window.removeEventListener('idk-youtube-control', onYouTubeControl);
+    objectURLs.forEach(url => URL.revokeObjectURL(url));
+    if (window.IDK_MUSIC_PLAYER === playerAPI) delete window.IDK_MUSIC_PLAYER;
+    if (window.IDK_AUDIO_STATE?.audio === audio || window.IDK_AUDIO_STATE?.type === 'youtube') syncSpeaker('closed', 0);
+  };
+  return root;
+}
+
+function speakerApp() {
+  const root = el('div', { className: 'app speaker-app' });
+  const status = el('div', { className: 'speaker-status', textContent: 'Waiting for music' });
+  const title = el('h2', { className: 'speaker-title', textContent: 'IDK Speaker' });
+  const woofer = el('div', { className: 'speaker-woofer', 'aria-label': 'Animated speaker' }, [el('div', { className: 'speaker-cone' })]);
+  const level = el('div', { className: 'speaker-level' }, [el('span')]);
+  const spectrum = el('div', { className: 'speaker-spectrum', 'aria-hidden': 'true' });
+  const spectrumBars = Array.from({ length: 12 }, () => el('i'));
+  spectrum.append(...spectrumBars);
+  const volume = el('input', { className: 'speaker-volume', type: 'range', min: '0', max: '1', step: '.01', value: '1', 'aria-label': 'Speaker volume' });
+  const openMusic = el('button', { className: 'btn', type: 'button', textContent: 'Open Music' });
+  let source = null;
+  let frame = 0;
+  let state = window.IDK_AUDIO_STATE || { playing: false, currentTime: 0, volume: 1, level: 0 };
+
+  const animate = () => {
+    const beat = .5 + .5 * Math.sin((state.currentTime * 5.2) + (performance.now() / 120));
+    const pulse = state.playing ? Math.max(.12, (state.level || .2) * .76 + beat * .24) * Math.max(.2, state.volume) : .08;
+    root.style.setProperty('--speaker-pulse', pulse.toFixed(3));
+    level.querySelector('span').style.width = `${Math.round(pulse * 100)}%`;
+    spectrumBars.forEach((bar, index) => { bar.style.height = `${8 + Math.round(pulse * (18 + Math.abs(Math.sin(index * .8 + performance.now() / 220)) * 32))}px`; });
+    root.classList.toggle('playing', state.playing);
+    if (!state.playing) { frame = 0; return; }
+    frame = requestAnimationFrame(animate);
+  };
+  const onAudio = event => {
+    const next = event.detail || {};
+    state = { playing: Boolean(next.playing), currentTime: Number(next.currentTime) || 0, volume: Number(next.volume) || 0, level: Number(next.level) || 0 };
+    source = next.type === 'closed' || next.type === 'youtube' ? null : next.audio || source;
+    if (source && source !== volume) volume.value = String(source.volume);
+    status.textContent = next.type === 'closed' || !next.name || next.name === 'Nothing loaded yet.' ? 'Waiting for music' : `${state.playing ? 'Playing' : 'Paused'} · ${next.name}`;
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(animate);
+  };
+  volume.addEventListener('input', () => { if (source) source.volume = Number(volume.value); });
+  openMusic.addEventListener('click', () => OS.open('music'));
+  window.addEventListener('idk-audio-state', onAudio);
+  root.cleanup = () => { cancelAnimationFrame(frame); window.removeEventListener('idk-audio-state', onAudio); };
+  root.append(title, status, woofer, level, spectrum, el('label', { className: 'speaker-volume-label' }, [el('span', { textContent: 'Volume' }), volume]), openMusic);
+  if (window.IDK_AUDIO_STATE) onAudio({ detail: window.IDK_AUDIO_STATE });
+  return root;
+}
+
+const TV = (() => {
+  let widget = null;
+  let screen = null;
+  let staticLayer = null;
+  let remote = null;
+  let muted = false;
+  let active = null;
+
+  const watchedWindow = win => {
+    if (!win || !['movies', 'proxy'].includes(win.dataset.app)) return null;
+    const frame = win.querySelector('.content iframe[data-tv-source="movie"], .content iframe');
+    const source = frame?.getAttribute('src') || frame?.src || '';
+    return frame && source && source !== 'about:blank' ? frame : null;
+  };
+
+  const setStatic = () => {
+    if (!screen || !staticLayer) return;
+    screen.replaceChildren(staticLayer);
+    screen.classList.remove('live');
+    widget?.classList.remove('tv-live');
+    if (remote) remote.hidden = true;
+    muted = false;
+    const muteButton = remote?.querySelector('[data-remote="mute"]');
+    if (muteButton) {
+      muteButton.textContent = '🔊';
+      muteButton.setAttribute('aria-pressed', 'false');
+    }
+    if (widget) widget.title = 'TV standby';
+  };
+
+  const restore = win => {
+    if (!active || (win && active.win !== win)) return false;
+    active.placeholder.replaceWith(active.frame);
+    active = null;
+    setStatic();
+    return true;
+  };
+
+  const show = win => {
+    const frame = watchedWindow(win);
+    if (!frame) return false;
+    if (active && active.win !== win) restore(active.win);
+    if (active?.win === win) return true;
+    const placeholder = document.createComment('TV frame placeholder');
+    frame.parentNode.insertBefore(placeholder, frame);
+    active = { win, frame, placeholder };
+    screen?.replaceChildren(frame);
+    screen?.classList.add('live');
+    widget?.classList.add('tv-live');
+    if (remote) remote.hidden = false;
+    if (widget) widget.title = `Watching ${win.querySelector('.title')?.textContent || 'show'} · click TV to resume`;
+    return true;
+  };
+
+  const resume = () => {
+    if (!active) return false;
+    const win = active.win;
+    restore(win);
+    win.classList.remove('minimized');
+    win.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    return true;
+  };
+
+  const openSource = () => {
+    const source = active?.frame?.getAttribute('src') || active?.frame?.src;
+    if (source) window.open(source, '_blank', 'noopener');
+  };
+
+  const fullscreen = () => active?.frame?.requestFullscreen?.();
+
+  const sendRemoteCommand = command => {
+    const frame = active?.frame;
+    if (!frame) return false;
+    frame.contentWindow?.postMessage({ source: 'idk-tv-remote', command }, '*');
+    if (widget) widget.title = `${command === 'toggle-playback' ? 'Play/pause' : 'Mute'} command sent to movie page`;
+    return true;
+  };
+
+  const toggleMute = () => {
+    muted = !muted;
+    sendRemoteCommand('toggle-mute');
+    const button = remote?.querySelector('[data-remote="mute"]');
+    if (button) {
+      button.textContent = muted ? '🔇' : '🔊';
+      button.setAttribute('aria-pressed', String(muted));
+    }
+  };
+
+  const stop = () => {
+    if (!active) return false;
+    const win = active.win;
+    restore(win);
+    win.classList.add('minimized');
+    return true;
+  };
+
+  const mount = icon => {
+    widget = icon;
+    widget.classList.add('tv-desktop');
+    const glyph = widget.querySelector('.glyph');
+    screen = el('span', { className: 'tv-screen' });
+    staticLayer = el('span', { className: 'tv-static', 'aria-hidden': 'true' });
+    screen.append(staticLayer);
+    glyph.replaceChildren(
+      el('span', { className: 'tv-antenna', 'aria-hidden': 'true' }),
+      screen,
+      el('span', { className: 'tv-stand', 'aria-hidden': 'true' })
+    );
+    const control = (label, title, action, name = '') => {
+      const button = el('button', { type: 'button', textContent: label, title, 'aria-label': title });
+      if (name) button.dataset.remote = name;
+      button.addEventListener('pointerdown', event => event.stopPropagation());
+      button.addEventListener('click', event => { event.stopPropagation(); action(); });
+      return button;
+    };
+    remote = el('span', { className: 'tv-remote', hidden: true, 'aria-label': 'TV remote controls' }, [
+      control('▶', 'Send play or pause command', () => sendRemoteCommand('toggle-playback'), 'playback'),
+      control('🔊', 'Send mute or unmute command', toggleMute, 'mute'),
+      control('↩', 'Return to movie window', resume),
+      control('⛶', 'Fullscreen', fullscreen),
+      control('↗', 'Open movie in a new tab', openSource),
+      control('■', 'Stop TV playback', stop)
+    ]);
+    widget.append(remote);
+    setStatic();
+  };
+
+  return { mount, minimize: show, restore, release: restore, resume };
+})();
+
+window.TV = TV;
+
+function calendarApp() {
+  const root = el('div', { className: 'app calendar-app' });
+  const cursor = new Date();
+  cursor.setDate(1);
+  const title = el('strong');
+  const grid = el('div', { className: 'calendar-grid' });
+  const render = () => {
+    title.textContent = cursor.toLocaleDateString([], { month: 'long', year: 'numeric' });
+    grid.replaceChildren(...['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => el('div', { className: 'calendar-weekday', textContent: day })));
+    const first = cursor.getDay();
+    const total = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    for (let index = 0; index < first; index += 1) grid.append(el('div', { className: 'calendar-day blank' }));
+    for (let day = 1; day <= total; day += 1) {
+      const cell = el('button', { className: 'calendar-day', type: 'button', textContent: String(day) });
+      const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
+      if (date.toDateString() === new Date().toDateString()) cell.classList.add('today');
+      cell.addEventListener('click', () => window.OS?.notify('Calendar', date.toLocaleDateString([], { dateStyle: 'full' })));
+      grid.append(cell);
+    }
+  };
+  const previous = el('button', { className: 'btn tab', type: 'button', textContent: '‹', 'aria-label': 'Previous month' });
+  const next = el('button', { className: 'btn tab', type: 'button', textContent: '›', 'aria-label': 'Next month' });
+  previous.addEventListener('click', () => { cursor.setMonth(cursor.getMonth() - 1); render(); });
+  next.addEventListener('click', () => { cursor.setMonth(cursor.getMonth() + 1); render(); });
+  root.append(el('div', { className: 'calendar-toolbar' }, [previous, title, next]), grid);
+  render();
+  return root;
+}
+
+function todoApp() {
+  const root = el('div', { className: 'app todo-app' });
+  const saved = store.get('idkTodos', []);
+  const items = Array.isArray(saved) ? saved : [];
+  const input = el('input', { className: 'field', type: 'text', placeholder: 'Add a task…' });
+  const add = el('button', { className: 'btn', type: 'button', textContent: 'Add' });
+  const list = el('div', { className: 'todo-list' });
+  const persist = () => store.set('idkTodos', items);
+  const render = () => {
+    list.replaceChildren();
+    if (!items.length) list.append(el('div', { className: 'empty-state', textContent: 'Nothing here yet.' }));
+    items.forEach((item, index) => {
+      const check = el('input', { type: 'checkbox', checked: Boolean(item.done) });
+      const label = el('span', { className: item.done ? 'todo-text done' : 'todo-text', textContent: item.text });
+      const remove = el('button', { className: 'btn tab todo-remove', type: 'button', textContent: '×', 'aria-label': `Remove ${item.text}` });
+      check.addEventListener('change', () => { item.done = check.checked; persist(); render(); });
+      remove.addEventListener('click', () => { items.splice(index, 1); persist(); render(); });
+      list.append(el('div', { className: 'todo-row' }, [check, label, remove]));
+    });
+  };
+  const addTask = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    items.unshift({ text, done: false, added: Date.now() });
+    input.value = '';
+    persist();
+    render();
+    input.focus();
+  };
+  add.addEventListener('click', addTask);
+  input.addEventListener('keydown', event => { if (event.key === 'Enter') addTask(); });
+  root.append(el('div', { className: 'todo-compose' }, [input, add]), list);
+  render();
+  return root;
+}
+
+function stopwatchApp() {
+  const root = el('div', { className: 'app stopwatch-app' });
+  const display = el('div', { className: 'stopwatch-display', textContent: '00:00.00' });
+  const start = el('button', { className: 'btn', type: 'button', textContent: 'Start' });
+  const reset = el('button', { className: 'btn tab', type: 'button', textContent: 'Reset' });
+  let started = 0;
+  let elapsed = 0;
+  let timer = null;
+  const format = value => {
+    const minutes = Math.floor(value / 60000).toString().padStart(2, '0');
+    const seconds = Math.floor(value / 1000 % 60).toString().padStart(2, '0');
+    const hundredths = Math.floor(value / 10 % 100).toString().padStart(2, '0');
+    return `${minutes}:${seconds}.${hundredths}`;
+  };
+  const tick = () => { elapsed = Date.now() - started; display.textContent = format(elapsed); };
+  start.addEventListener('click', () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+      elapsed = Date.now() - started;
+      start.textContent = 'Resume';
+    } else {
+      started = Date.now() - elapsed;
+      timer = setInterval(tick, 35);
+      start.textContent = 'Pause';
+    }
+  });
+  reset.addEventListener('click', () => { clearInterval(timer); timer = null; elapsed = 0; display.textContent = '00:00.00'; start.textContent = 'Start'; });
+  root.cleanup = () => clearInterval(timer);
+  root.append(display, el('div', { className: 'stopwatch-actions' }, [start, reset]));
+  return root;
+}
+
+function imageViewerApp() {
+  const root = el('div', { className: 'app image-viewer-app' });
+  const picker = el('input', { className: 'field', type: 'file', accept: 'image/*', multiple: true });
+  const gallery = el('div', { className: 'image-gallery' });
+  const preview = el('div', { className: 'image-viewer-preview' }, [el('span', { className: 'empty-state', textContent: 'Choose images from this device.' })]);
+  const urls = [];
+  picker.addEventListener('change', () => {
+    gallery.replaceChildren();
+    urls.splice(0).forEach(url => URL.revokeObjectURL(url));
+    Array.from(picker.files || []).forEach((file, index) => {
+      const url = URL.createObjectURL(file);
+      urls.push(url);
+      const thumb = el('button', { className: 'image-thumb', type: 'button', title: file.name });
+      thumb.append(el('img', { src: url, alt: file.name }));
+      thumb.addEventListener('click', () => preview.replaceChildren(el('img', { src: url, alt: file.name }), el('small', { textContent: `${file.name} · ${file.size.toLocaleString()} bytes` })));
+      gallery.append(thumb);
+      if (index === 0) thumb.click();
+    });
+  });
+  root.cleanup = () => urls.forEach(url => URL.revokeObjectURL(url));
+  root.append(el('div', { className: 'viewer-toolbar' }, [picker]), gallery, preview);
+  return root;
+}
+
+function weatherApp() {
+  const root = el('div', { className: 'app weather-app' });
+  const city = el('input', { className: 'field', type: 'search', value: store.get('weatherCity', 'New York'), placeholder: 'City' });
+  const search = el('button', { className: 'btn', type: 'button', textContent: 'Get weather' });
+  const locate = el('button', { className: 'btn tab', type: 'button', textContent: 'Use my location' });
+  const status = el('div', { className: 'weather-status', textContent: 'Ready' });
+  const card = el('div', { className: 'weather-card' });
+  const codeText = code => ({ 0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Foggy', 48: 'Rime fog', 51: 'Light drizzle', 61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 80: 'Rain showers', 95: 'Thunderstorm' }[code] || 'Mixed conditions');
+  const show = (place, data) => {
+    const current = data.current;
+    card.replaceChildren(el('strong', { textContent: place }), el('div', { className: 'weather-temp', textContent: `${Math.round(current.temperature_2m)}°F` }), el('p', { textContent: `${codeText(current.weather_code)} · Wind ${Math.round(current.wind_speed_10m)} mph` }));
+  };
+  const fetchWeather = async (latitude, longitude, place) => {
+    status.textContent = 'Loading…';
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Weather service unavailable.');
+      show(place, await response.json());
+      status.textContent = 'Updated just now';
+    } catch (error) { status.textContent = error.message; }
+  };
+  const lookup = async () => {
+    const name = city.value.trim();
+    if (!name) return;
+    store.set('weatherCity', name);
+    status.textContent = 'Finding city…';
+    try {
+      const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
+      const data = await response.json();
+      const result = data.results?.[0];
+      if (!result) throw new Error('City not found.');
+      await fetchWeather(result.latitude, result.longitude, `${result.name}${result.country ? `, ${result.country}` : ''}`);
+    } catch (error) { status.textContent = error.message; }
+  };
+  search.addEventListener('click', lookup);
+  city.addEventListener('keydown', event => { if (event.key === 'Enter') lookup(); });
+  locate.addEventListener('click', () => {
+    if (!navigator.geolocation) { status.textContent = 'Location is unavailable.'; return; }
+    status.textContent = 'Requesting location…';
+    navigator.geolocation.getCurrentPosition(position => fetchWeather(position.coords.latitude, position.coords.longitude, 'Your location'), () => { status.textContent = 'Location permission was not granted.'; });
+  });
+  root.append(el('div', { className: 'weather-toolbar' }, [city, search, locate]), status, card);
+  lookup();
+  return root;
+}
+
+function appsHub() {
+  const root = el('div', { className: 'app apps-hub' });
+  const grid = el('div', { className: 'app-grid' });
+  const sites = [
+    { title: 'Facebook', url: 'https://www.facebook.com/', icon: 'f' },
+    { title: 'Instagram', url: 'https://www.instagram.com/', icon: '◎' },
+    { title: 'TikTok', url: 'https://www.tiktok.com/', icon: '♪' },
+    { title: 'YouTube', url: 'https://www.youtube.com/', icon: '▶' },
+    { title: 'Twitter', url: 'https://twitter.com/', icon: 't' },
+    { title: 'Reddit', url: 'https://www.reddit.com/', icon: 'r' },
+    { title: 'Discord', url: 'https://discord.com/app', icon: '☁' },
+    { title: 'Twitch', url: 'https://www.twitch.tv/', icon: '▰' },
+    { title: 'Internet Archive', url: 'https://archive.org/', icon: 'ia' },
+    { title: 'LinkedIn', url: 'https://www.linkedin.com/', icon: 'in' },
+    { title: 'Pinterest', url: 'https://www.pinterest.com/', icon: 'P' },
+    { title: 'Tumblr', url: 'https://www.tumblr.com/', icon: 't' },
+    { title: 'Mastodon', url: 'https://mastodon.social/', icon: 'm' }
+  ];
+
+  sites.forEach(site => {
+    const button = el('button', { className: 'app-card', type: 'button' }, [
+      el('span', { className: 'app-icon', textContent: site.icon }),
+      el('span', { className: 'app-card-copy' }, [
+        el('strong', { textContent: site.title }),
+         el('small', { textContent: 'Open through Browser' })
+      ])
+    ]);
+    button.addEventListener('click', () => {
+       OS.open('proxy', { title: `${site.title} — Browser`, url: site.url });
+    });
+    grid.append(button);
+  });
+
+  root.append(
+    el('h2', { textContent: 'Apps' }),
+     el('p', { className: 'apps-description', textContent: 'Popular sites and Internet Archive open immediately inside IDK Browser.' }),
+    grid
+  );
+  return root;
+}
+
+// Turn a Drive share link into something an <audio> element can stream.
+function driveDirectURL(value) {
+  const match = value.match(/drive\.google\.com\/file\/d\/([^/]+)/) || value.match(/[?&]id=([^&]+)/);
+  return match ? `https://drive.google.com/uc?export=download&id=${match[1]}` : value;
+}
+
+function youtubeVideoId(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    const id = host === 'youtu.be'
+      ? url.pathname.split('/').filter(Boolean)[0]
+      : ['youtube.com', 'm.youtube.com'].includes(host) && url.pathname === '/watch'
+        ? url.searchParams.get('v')
         : ['youtube.com', 'm.youtube.com'].includes(host)
           ? url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/)?.[1]
           : '';
@@ -47,8 +1576,10 @@ function listApp({ items, placeholder, empty, onOpen, subtitle }) {
       tile.addEventListener('click', () => onOpen(item, tile));
       grid.append(tile);
     });
-    if (matches.length > 400) {
-      grid.append(emptyState('Showing the first 400 results — keep typing to narrow it down.'));
+    if (visibleCount < matches.length) {
+      const loadMore = el('button', { className: 'btn tab', type: 'button', textContent: `Load more (${Math.min(PAGE_SIZE, matches.length - visibleCount)})` });
+      loadMore.addEventListener('click', () => { visibleCount = Math.min(visibleCount + PAGE_SIZE, matches.length); render(); });
+      grid.append(loadMore);
     }
     if (!matches.length) grid.append(emptyState('Nothing matched that search.'));
   };
@@ -64,3 +1595,1278 @@ async function searchApp() {
   const status = el('span', { className: 'count', textContent: 'Loading index…' });
   const results = el('div', { className: 'search-results' });
   root.append(el('div', { className: 'toolbar' }, [input, status]), results);
+
+  try {
+    const [names, icons] = await Promise.all([
+      loadJSON('games.json'),
+      loadJSON('game-icons.json').catch(() => ({}))
+    ]);
+    const apps = Object.entries(APPS)
+      .filter(([id]) => !['player', 'panic', 'search'].includes(id))
+      .map(([id, app]) => ({ kind: 'app', id, title: app.title, glyph: app.glyph, search: app.title.toLowerCase() }));
+    const games = names.map(name => ({ kind: 'game', id: name, title: gameTitle(name), iconURL: gameIconURL(icons[name]), search: `${name} ${gameTitle(name)}`.toLowerCase() }));
+    const items = [...apps, ...games];
+    const render = () => {
+      const query = input.value.trim().toLowerCase();
+      const matches = query ? items.filter(item => item.search.includes(query)) : apps;
+      results.replaceChildren();
+      status.textContent = query ? `${matches.length} result${matches.length === 1 ? '' : 's'}` : `${games.length} games · ${apps.length} apps`;
+      if (!matches.length) {
+        results.append(emptyState('Nothing matched that search.'));
+        return;
+      }
+      matches.slice(0, 120).forEach(item => {
+        const icon = el('span', { className: 'search-result-icon' });
+        icon.setAttribute('aria-hidden', 'true');
+        if (item.iconURL) {
+          const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy' });
+          image.addEventListener('error', () => icon.replaceChildren(el('span', { className: 'search-result-fallback', textContent: '🎮' })), { once: true });
+          icon.append(image);
+        } else {
+          icon.innerHTML = item.glyph || '🎮';
+        }
+        const button = el('button', { className: 'search-result', type: 'button' }, [icon, el('span', { className: 'search-result-copy' }, [el('strong', { textContent: item.title }), el('small', { textContent: item.kind === 'app' ? 'Desktop app' : 'Game' })])]);
+        button.addEventListener('click', async () => {
+          if (item.kind === 'app') return OS.open(item.id);
+          const label = button.querySelector('strong');
+          label.textContent = 'Loading…';
+           try { await openGame(item.id, item.title); }
+          catch (error) { alert(error.message); }
+          finally { label.textContent = item.title; }
+        });
+        results.append(button);
+      });
+      if (matches.length > 120) results.append(emptyState('Showing the first 120 results. Keep typing to narrow it down.'));
+    };
+    input.addEventListener('input', render);
+    render();
+    setTimeout(() => input.focus(), 0);
+  } catch (error) {
+    status.textContent = 'Unavailable';
+    results.append(emptyState(error.message));
+  }
+  return root;
+}
+
+const APPS = {
+  extras: {
+    title: 'Extras',
+    glyph: '✦',
+    desktop: true,
+    dock: false,
+    width: 1040,
+    height: 720,
+    render() {
+      const root = el('div', { className: 'app idk-extras-app' });
+      const header = el('div', { className: 'app-heading' }, [
+        el('div', {}, [
+          el('h2', { textContent: 'Extras' }),
+          el('p', { textContent: 'Extra IDK tools and companion apps.' })
+        ])
+      ]);
+
+      const card = el('section', { className: 'idk-extras-card' });
+      const icon = el('div', { className: 'idk-extras-icon', textContent: '▣' });
+      const info = el('div', { className: 'idk-extras-info' }, [
+        el('strong', { textContent: 'Virtual Machine' }),
+        el('span', { textContent: 'Open the IDK Virtual Machine manager through the Ultraviolet proxy.' })
+      ]);
+      const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
+      const status = el('span', { className: 'idk-extras-status', textContent: 'Ready · Ultraviolet' });
+
+      const frame = el('iframe', {
+        className: 'idk-extras-vm-frame',
+        title: 'IDK Virtual Machine Manager',
+        src: 'about:blank',
+        allow: 'fullscreen'
+      });
+      frame.setAttribute('allowfullscreen', '');
+      frame.setAttribute('referrerpolicy', 'no-referrer');
+
+      open.addEventListener('click', async () => {
+        open.disabled = true;
+        status.textContent = 'Connecting through Ultraviolet…';
+        try {
+          if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') {
+            throw new Error('Ultraviolet proxy is not available.');
+          }
+          frame.src = await PROXY.encode('https://luiscorona551.github.io/idk-Virtual-Machine/');
+          status.textContent = 'Virtual Machine connected · Ultraviolet';
+        } catch (error) {
+          frame.src = 'about:blank';
+          status.textContent = error?.message || 'Could not connect through Ultraviolet.';
+          window.OS?.notify?.('Virtual Machine', status.textContent, 'danger');
+        } finally {
+          open.disabled = false;
+        }
+      });
+
+      card.append(icon, info, open, status);
+      root.append(header, card, frame);
+      root.cleanup = () => { frame.src = 'about:blank'; };
+      return root;
+    }
+  },
+  extras: {
+    title: 'Extras', glyph: '✦', desktop: true, dock: false, width: 1040, height: 720,
+    render() {
+      const root = el('div', { className: 'idk-extras-app' });
+      root.append(el('section', { className: 'idk-extras-hero' }, [el('div', { className: 'idk-extras-badge', textContent: 'IDK EXTRAS' }), el('h2', { textContent: 'Extras' }), el('p', { textContent: 'Additional IDK tools and companion apps.' })]));
+      const card = el('article', { className: 'idk-extra-card' });
+      card.append(el('div', { className: 'idk-extra-icon', textContent: '▣' }), el('div', { className: 'idk-extra-copy' }, [el('strong', { textContent: 'Virtual Machine' }), el('span', { textContent: 'Virt-Manager-style VM configuration and management through Ultraviolet.' })]));
+      const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
+      const status = el('span', { className: 'idk-extra-status', textContent: 'Ready · Ultraviolet' });
+      const frame = el('iframe', { className: 'idk-vm-frame', title: 'IDK Virtual Machine Manager', src: 'about:blank', allow: 'fullscreen' });
+      frame.setAttribute('allowfullscreen', ''); frame.setAttribute('referrerpolicy', 'no-referrer');
+      open.onclick = async () => { open.disabled = true; status.textContent = 'Connecting through Ultraviolet…'; try { if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.'); const vmUrl = new URL('https://luiscorona551.github.io/idk-Virtual-Machine/'); vmUrl.searchParams.set('idkApi', `${window.location.origin}/api/vm`); frame.src = await PROXY.encode(vmUrl.toString()); status.textContent = 'Virtual Machine Manager connected through Ultraviolet · IDK backend'; } catch (error) { frame.src = 'about:blank'; status.textContent = error?.message || 'Could not connect through Ultraviolet'; window.OS?.notify?.('Virtual Machine', status.textContent, 'error'); } finally { open.disabled = false; } };
+      card.append(open, status); root.append(card, frame, el('p', { className: 'idk-extras-note', textContent: 'The VM manager UI is hosted on GitHub Pages, while its API is served by the existing IDK 10.0 backend through /api/vm.' })); root.cleanup = () => { frame.src = 'about:blank'; }; return root;
+    }
+  },
+  search: {
+    title: 'Search',
+    glyph: '🔎',
+    desktop: true,
+    width: 720,
+    height: 560,
+    render: searchApp
+  },
+
+  apps: {
+    title: 'Apps',
+    glyph: '<span class="apps-glyph">▦</span>',
+    desktop: true,
+    width: 700,
+    height: 520,
+    render: appsHub
+  },
+
+  activity: {
+    title: 'Activity Center',
+    glyph: '◌',
+    desktop: true,
+    width: 680,
+    height: 560,
+    render: activityCenterApp
+  },
+
+  'system-monitor': {
+    title: 'System Monitor',
+    glyph: '◫',
+    desktop: false,
+    dock: false,
+    width: 720,
+    height: 560,
+    render: () => window.IDKBatchFive?.systemMonitor?.() || document.createElement('div')
+  },
+
+  gallery: {
+    title: 'Gallery',
+    glyph: '▧',
+    desktop: false,
+    dock: false,
+    width: 760,
+    height: 580,
+    render: () => window.IDKBatchSix?.gallery?.() || document.createElement('div')
+  },
+
+  contacts: {
+    title: 'Contacts',
+    glyph: '♙',
+    desktop: false,
+    dock: false,
+    width: 620,
+    height: 560,
+    render: () => window.IDKBatchSix?.contacts?.() || document.createElement('div')
+  },
+
+
+  permissions: {
+    title: 'App Permissions',
+    glyph: '🛡️',
+    desktop: true,
+    width: 620,
+    height: 540,
+    render: permissionsApp
+  },
+
+  files: {
+    title: 'Files',
+    glyph: '📁',
+    desktop: true,
+    width: 760,
+    height: 540,
+    render: () => window.SYSTEM_APPS.files()
+  },
+
+  notes: {
+    title: 'Notes',
+    glyph: '🗒️',
+    desktop: true,
+    width: 720,
+    height: 560,
+    render: () => window.SYSTEM_APPS.notes()
+  },
+
+  calculator: {
+    title: 'Calculator',
+    glyph: '🧮',
+    desktop: true,
+    width: 360,
+    height: 520,
+    render: () => window.SYSTEM_APPS.calculator()
+  },
+
+  calendar: {
+    title: 'Calendar',
+    glyph: '📅',
+    desktop: true,
+    width: 520,
+    height: 520,
+    render: calendarApp
+  },
+
+  todo: {
+    title: 'To-do',
+    glyph: '✅',
+    desktop: true,
+    width: 520,
+    height: 520,
+    render: todoApp
+  },
+
+  viewer: {
+    title: 'Images',
+    glyph: '🖼️',
+    desktop: true,
+    width: 760,
+    height: 600,
+    render: imageViewerApp
+  },
+
+  tv: {
+    title: 'TV',
+    glyph: '📺',
+    desktop: true,
+    dock: false,
+    action() {
+      if (!TV.resume()) window.OS?.notify('TV', 'Minimize a movie or show window to watch it here.');
+    }
+  },
+
+  stopwatch: {
+    title: 'Stopwatch',
+    glyph: '⏱️',
+    desktop: true,
+    width: 420,
+    height: 340,
+    render: stopwatchApp
+  },
+
+  speaker: {
+    title: 'Speaker',
+    glyph: '🔊',
+    desktop: true,
+    dock: false,
+    width: 460,
+    height: 560,
+    render: speakerApp
+  },
+
+  paint: {
+    title: 'Paint',
+    glyph: '🎨',
+    desktop: true,
+    width: 900,
+    height: 660,
+    render: () => window.SYSTEM_APPS.paint()
+  },
+
+  weather: {
+    title: 'Weather',
+    glyph: '☀️',
+    desktop: true,
+    width: 620,
+    height: 460,
+    render: weatherApp
+  },
+
+  ai: {
+    title: 'IDK Echo AI',
+    glyph: '✦',
+    desktop: true,
+    width: 900,
+    height: 640,
+    render: () => window.SYSTEM_APPS.ai()
+  },
+
+  agent: {
+    title: 'IDK Web Agent',
+    glyph: '🤖',
+    desktop: true,
+    width: 760,
+    height: 560,
+    render: () => window.SYSTEM_APPS.agent()
+  },
+
+  terminal: {
+    title: 'Terminal',
+    glyph: '<span class="terminal-glyph">&gt;_</span>',
+    desktop: true,
+    width: 760,
+    height: 500,
+    render: () => window.SYSTEM_APPS.terminal()
+  },
+
+  'game-player': {
+    title: 'Game Player',
+    glyph: '🎮',
+    multi: true,
+    width: 1040,
+    height: 700,
+    render: gamePlayerApp
+  },
+
+  roblox: {
+    title: 'Roblox',
+    glyph: '<span class="roblox-glyph">R</span>',
+    desktop: true,
+    width: 1040,
+    height: 680,
+    action() {
+      OS.open('proxy', {
+         title: 'Roblox — Browser',
+        url: 'https://frogiesarcade.win/algebra.html'
+      });
+    }
+  },
+
+  games: {
+    title: 'Games',
+    glyph: '<img src="ugs-icon.jpeg" alt="">',
+    desktop: true,
+    width: 900,
+    height: 620,
+    render: async function gamesRender() {
+      let names = [];
+      let icons = {};
+      let catalogError = '';
+      try {
+        names = await loadJSON('games.json');
+        icons = await loadJSON('game-icons.json').catch(() => ({}));
+      } catch (error) {
+        catalogError = error?.message || 'The game catalog is unavailable.';
+      }
+      if (!Array.isArray(names)) names = [];
+      if (!icons || typeof icons !== 'object') icons = {};
+      const items = names.map(name => ({
+        id: name,
+        title: gameTitle(name),
+        iconURL: gameIconURL(icons[name]),
+        search: `${name} ${gameTitle(name)}`.toLowerCase()
+      }));
+      const root = el('div', { className: 'games-app' });
+      const search = el('input', { className: 'field', type: 'search', placeholder: 'Search games…', 'aria-label': 'Search games' });
+      const filter = el('select', { className: 'field', 'aria-label': 'Game list filter' }, [
+        el('option', { value: 'all', textContent: 'All games' }),
+        el('option', { value: 'favorites', textContent: 'Favorites' }),
+        el('option', { value: 'recent', textContent: 'Recently played' })
+      ]);
+      const count = el('span', { className: 'count' });
+      const grid = el('div', { className: 'tile-grid' });
+      const toolbar = el('div', { className: 'toolbar' }, [search, filter, count]);
+      const cloud = gamingCloudApp();
+      const cloudToggle = el('button', { className: 'btn tab games-cloud-toggle', type: 'button', textContent: 'Gaming Cloud' });
+      const gamesToggle = el('button', { className: 'btn tab games-library-toggle', type: 'button', textContent: 'Game Library' });
+      const modeBar = el('div', { className: 'games-mode-bar' }, [gamesToggle, cloudToggle]);
+      cloud.hidden = true;
+      const showGames = () => { grid.hidden = false; toolbar.hidden = false; cloud.hidden = true; gamesToggle.classList.add('active'); cloudToggle.classList.remove('active'); };
+      const showCloud = () => { grid.hidden = true; toolbar.hidden = true; cloud.hidden = false; gamesToggle.classList.remove('active'); cloudToggle.classList.add('active'); };
+      gamesToggle.onclick = showGames; cloudToggle.onclick = showCloud;
+      root.append(modeBar, toolbar, grid, cloud);
+      gamesToggle.classList.add('active');
+      if (catalogError) {
+        root.append(emptyState(`The Games catalog could not be loaded right now.<br><small>${catalogError}</small><br><button class="btn tab" type="button" data-games-retry>Retry</button>`));
+        root.querySelector('[data-games-retry]')?.addEventListener('click', () => window.OS?.open?.('games'));
+        return root;
+      }
+      const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
+      const recents = () => store.get(GAME_RECENTS_KEY, []);
+      const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
+      const render = () => {
+        const query = search.value.trim().toLowerCase();
+        const saved = favorites();
+        let matches = items.filter(item => !query || item.search.includes(query));
+        if (filter.value === 'favorites') matches = matches.filter(item => saved.has(item.id));
+        if (filter.value === 'recent') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches = matches.filter(item => order.has(item.id)).sort((a, b) => order.get(a.id) - order.get(b.id)); }
+        if (!query && filter.value === 'all') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches.sort((a, b) => (order.has(a.id) ? order.get(a.id) : 9999) - (order.has(b.id) ? order.get(b.id) : 9999)); }
+        grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
+        if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
+        matches.slice(0, 80).forEach(item => {
+          const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
+          const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
+          const icon = el('span', { className: 'tile-icon' });
+          if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
+          const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
+          const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
+          const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
+          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
+          tile.onclick = () => remember(item);
+          card.append(tile, favorite, availability); grid.append(card);
+        });
+      };
+      search.oninput = render; filter.onchange = render; render();
+      return root;
+    }
+  },
+
+  movies: {
+    title: 'Movies',
+    glyph: '🎬',
+    desktop: true,
+    width: 1000,
+    height: 660,
+    render: moviesApp
+  },
+
+  soundboard: {
+    title: 'Soundboard',
+    glyph: '🔊',
+    desktop: true,
+    width: 1000,
+    height: 660,
+    render() {
+      const sites = [
+        { title: 'SoundboardMax', url: 'https://soundboardmax.com/' },
+        { title: 'Realm of Darkness', url: 'https://www.realmofdarkness.net/sb/soundboards/' },
+        { title: 'iMyFone Soundboards', url: 'https://filme.imyfone.com/soundboards/?search=csgo', embeddable: false }
+      ];
+
+      return tabbedApp(sites.map(site => ({
+        title: site.title,
+        render: () => externalSite(site.url, site.title, { embeddable: site.embeddable !== false })
+      })));
+    }
+  },
+
+  music: {
+    title: 'Music',
+    glyph: '🎵',
+    desktop: true,
+    width: 1000,
+    height: 660,
+    render() {
+      const folders = [
+        { title: 'Library 1', id: '1P6Vco6iRavlUZy___wDNXNjYHoPWORUH' },
+        { title: 'Library 2', id: '1Q-m97t5_WKaSQzj8FYB3H0GYLsnnaReb' },
+        { title: 'Library 3', id: '1SLPMQ8c9PZInb8xviLJmyiGXXh_FYFa0' }
+      ];
+
+      const tabs = folders.map(folder => ({
+        title: folder.title,
+        render: () => driveFolder(folder.id, folder.title)
+      }));
+      tabs.push({ title: 'Player', render: audioPlayer });
+      tabs.push({
+        title: 'Spotify',
+        render: () => externalSite('https://open.spotify.com/', 'Spotify', { embeddable: false })
+      });
+
+      return tabbedApp(tabs);
+    }
+  },
+
+  cheats: {
+    title: 'Blooket',
+    glyph: '<span class="binary">01<br>10</span>',
+    desktop: true,
+    width: 1000,
+    height: 660,
+    render() {
+      return externalSite('https://blooketbot.schoolcheats.net/', 'Blooket Bot', { embeddable: false });
+    }
+  },
+
+   proxy: {
+     title: 'Browser',
+    glyph: '🌐',
+    desktop: true,
+    multi: true,
+    width: 1040,
+    height: 680,
+    async render(opts = {}) {
+      const root = el('div', { className: 'site-frame' });
+      const frame = el('iframe', { allow: 'autoplay; fullscreen; clipboard-write' });
+      const status = el('span', { className: 'count', textContent: 'Checking browser server…' });
+      const scopePanel = el('section', { className: 'idk-browser-scope', hidden: true });
+      const scopeToggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Server scope' });
+
+      const bar = el('div', { className: 'toolbar' });
+      const url = el('input', {
+        className: 'field',
+        type: 'text',
+        placeholder: 'Search or enter a URL',
+        value: opts.url || ''
+      });
+      const go = el('button', { className: 'btn tab', type: 'button', textContent: 'Go' });
+      bar.append(url, go, scopeToggle, status);
+
+      if (!await PROXY.backendAvailable()) {
+        root.append(bar, emptyState(
+           'The Browser server is not running.<br>Start the site with <code>npm start</code> ' +
+          '(or deploy it to a Node host) instead of opening the files directly.'
+        ));
+        url.disabled = true;
+        go.disabled = true;
+        return root;
+      }
+
+      const scope = await PROXY.serverScope();
+      status.textContent = scope.scope ? `Server scope ${scope.scope} · Ready` : 'Ready';
+      const scopeHeading = el('div', { className: 'idk-browser-scope-heading' }, [
+        el('strong', { textContent: 'Browser Server Scope' }),
+        el('small', { textContent: 'The server routes browser traffic through this scope.' })
+      ]);
+      const scopeGrid = el('div', { className: 'idk-browser-scope-grid' }, [
+        el('div', {}, [el('small', { textContent: 'Status' }), el('strong', { textContent: scope.proxy ? 'Ready' : 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Scope' }), el('strong', { textContent: scope.scope || 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Transport' }), el('strong', { textContent: scope.transport || 'Unavailable' })]),
+        el('div', {}, [el('small', { textContent: 'Origin' }), el('strong', { textContent: scope.origin || location.origin })])
+      ]);
+      scopePanel.append(scopeHeading, scopeGrid);
+      scopeToggle.addEventListener('click', () => { scopePanel.hidden = !scopePanel.hidden; scopeToggle.textContent = scopePanel.hidden ? 'Server scope' : 'Hide scope'; });
+       const navigate = async () => {
+        if (!url.value.trim()) return;
+        status.textContent = 'Connecting…';
+        try {
+          frame.src = await PROXY.encode(url.value);
+          status.textContent = 'Connected';
+        } catch (err) {
+          status.textContent = err.message;
+        }
+      };
+
+      go.addEventListener('click', navigate);
+      url.addEventListener('keydown', event => {
+        if (event.key === 'Enter') navigate();
+      });
+
+       root.append(bar, scopePanel, frame);
+      if (opts.url) await navigate();
+      return root;
+    }
+  },
+
+  chat: {
+    title: 'Idk Messenger',
+    glyph: '💬',
+    desktop: true,
+    width: 720,
+    height: 560,
+    async render() {
+      const root = el('div', { className: 'chat-app' });
+
+      if (!await PROXY.chatAvailable()) {
+        root.append(emptyState(
+          'Chat needs the Node server.<br>Start the site with <code>npm start</code> ' +
+          '(or deploy it to a Node host) instead of opening the files directly.'
+        ));
+        return root;
+      }
+
+      const name = el('input', {
+        className: 'field',
+        type: 'text',
+        placeholder: 'Your name',
+        value: store.get('chatName', '')
+      });
+      const room = el('input', {
+        className: 'field',
+        type: 'text',
+        placeholder: 'Room name',
+        value: store.get('chatRoom', new URLSearchParams(location.search).get('room') || '')
+      });
+      const conversation = el('select', { className: 'field chat-mode', 'aria-label': 'Conversation type' }, [
+        el('option', { value: 'room', textContent: 'Room chat' }),
+        el('option', { value: 'direct', textContent: 'Personal chat' })
+      ]);
+      const recipient = el('select', { className: 'field chat-recipient', 'aria-label': 'Personal chat recipient', hidden: true });
+      const join = el('button', { className: 'btn tab', type: 'button', textContent: 'Join' });
+      const share = el('button', { className: 'btn tab', type: 'button', textContent: 'Copy invite' });
+      const chatStatus = el('span', { className: 'count', textContent: 'Not connected' });
+      const bar = el('div', { className: 'toolbar' }, [name, room, conversation, recipient, join, share, chatStatus]);
+
+      const moderationTarget = el('select', { className: 'field moderation-target', disabled: true });
+      const muteMinutes = el('select', { className: 'field moderation-minutes' });
+      [[1, '1 min'], [5, '5 min'], [15, '15 min'], [60, '1 hour']].forEach(([value, label]) => muteMinutes.append(el('option', { value: String(value), textContent: label })));
+      const muteMember = el('button', { className: 'btn tab', type: 'button', textContent: 'Mute', disabled: true });
+      const kickMember = el('button', { className: 'btn tab', type: 'button', textContent: 'Kick', disabled: true });
+      const banMember = el('button', { className: 'btn moderation-danger', type: 'button', textContent: 'Ban', disabled: true });
+      const promoteMember = el('button', { className: 'btn tab', type: 'button', textContent: 'Promote to moderator', disabled: true, hidden: true });
+      const ownerPanel = el('section', { className: 'owner-panel', hidden: true }, [
+        el('div', { className: 'owner-panel-heading' }, [el('strong', { className: 'moderation-heading', textContent: 'Room controls' }), el('span', { textContent: 'Manage room members' })]),
+        el('div', { className: 'owner-panel-controls' }, [moderationTarget, muteMinutes, muteMember, kickMember, banMember, promoteMember])
+      ]);
+
+      const log = el('div', { className: 'chat-log' });
+       const text = el('input', { className: 'field', type: 'text', placeholder: 'Message', disabled: true });
+       const send = el('button', { className: 'btn tab', type: 'button', textContent: 'Send', disabled: true });
+       const typingStatus = el('span', { className: 'count chat-typing', hidden: true, textContent: '' });
+       const dmUnread = el('span', { className: 'count chat-unread', hidden: true, textContent: '0', title: 'Unread personal messages' });
+       const composer = el('div', { className: 'toolbar' }, [text, send, typingStatus, dmUnread]);
+
+       let socket = null;
+       let currentUserId = '';
+       let currentRole = 'member';
+       let mutedUntil = 0;
+       let muteTimer = null;
+       let reconnectTimer = null;
+        let reconnectAttempt = 0;
+        let connectionId = 0;
+        let reconnectAllowed = true;
+        let hasJoined = false;
+         let roomUsers = [];
+         let typingTimer = null;
+         let unreadDirect = 0;
+
+      const line = (className, body) => {
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+        log.append(el('div', { className, innerHTML: body }));
+        if (atBottom) log.scrollTop = log.scrollHeight;
+      };
+
+      const escape = value =>
+        value.replace(/[&<>"']/g, char =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+         const message = (data, announce = false) => {
+           const personal = data.private === true;
+           const prefix = personal ? '<span class="chat-private-label">Personal</span> ' : '';
+           line(`chat-line${personal ? ' private' : ''}`, `${prefix}<b>${escape(data.name)}</b> ${escape(data.text)}`);
+           if (personal && conversation.value !== 'direct') { unreadDirect += 1; dmUnread.textContent = String(unreadDirect); dmUnread.hidden = false; }
+           if (announce && data.name !== name.value.trim()) window.OS?.notify(personal ? 'Idk Messenger · Personal chat' : 'Idk Messenger', `${data.name}: ${data.text}`, 'chat');
+         };
+
+        const sendSocket = payload => {
+          if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload));
+        };
+
+        const showTyping = (who, active) => {
+          clearTimeout(typingTimer);
+          typingStatus.hidden = !active;
+          typingStatus.textContent = active ? `${who || 'Someone'} is typing…` : '';
+          if (active) typingTimer = setTimeout(() => showTyping('', false), 1600);
+        };
+        const emitTyping = active => {
+          if (!hasJoined || socket?.readyState !== WebSocket.OPEN) return;
+          const personal = conversation.value === 'direct';
+          if (personal && !recipient.value) return;
+          sendSocket({ type: 'typing', private: personal, targetId: personal ? recipient.value : '', typing: Boolean(active) });
+        };
+
+       const updateComposer = () => {
+         const connected = hasJoined && socket?.readyState === WebSocket.OPEN;
+         const directNeedsRecipient = conversation.value === 'direct' && !recipient.value;
+         text.disabled = send.disabled = mutedUntil > Date.now() || !connected || directNeedsRecipient;
+       };
+
+       const updateConversationStatus = () => {
+         if (!hasJoined) return;
+         if (conversation.value === 'direct') {
+           const selected = recipient.selectedOptions[0]?.textContent || 'someone';
+           chatStatus.textContent = recipient.value ? `Personal chat with ${selected}` : `No one else in #${room.value.trim()}`;
+         } else {
+           chatStatus.textContent = `In #${room.value.trim()} · ${currentRole}`;
+         }
+       };
+
+       const updateDirectTargets = users => {
+         roomUsers = Array.isArray(users) ? users : [];
+         const previous = recipient.value;
+         const peers = roomUsers.filter(user => user.id && user.id !== currentUserId);
+         recipient.replaceChildren(el('option', { value: '', textContent: peers.length ? 'Choose a person' : 'No one else in room' }));
+         peers.forEach(user => recipient.append(el('option', { value: user.id, textContent: user.name })));
+         recipient.value = peers.some(user => user.id === previous) ? previous : peers[0]?.id || '';
+         recipient.hidden = conversation.value !== 'direct';
+         recipient.disabled = conversation.value !== 'direct' || !peers.length;
+         updateConversationStatus();
+         updateComposer();
+       };
+
+       const updateModerationTargets = users => {
+        const canModerate = currentRole === 'owner' || currentRole === 'moderator';
+        const peers = (Array.isArray(users) ? users : []).filter(user => {
+          if (!user.id || user.id === currentUserId) return false;
+          return currentRole === 'owner' || user.role === 'member';
+        });
+        ownerPanel.hidden = !canModerate;
+        ownerPanel.querySelector('.moderation-heading').textContent = currentRole === 'owner' ? 'Owner controls' : 'Moderator controls';
+        moderationTarget.replaceChildren();
+        if (!canModerate || !peers.length) {
+          moderationTarget.append(el('option', { value: '', textContent: peers.length ? 'No members' : 'No one else in room' }));
+          moderationTarget.disabled = true;
+          muteMember.disabled = kickMember.disabled = banMember.disabled = promoteMember.disabled = true;
+          promoteMember.hidden = true;
+          return;
+        }
+        peers.forEach(user => {
+          const option = el('option', { value: user.id, textContent: `${user.name} · ${user.role}` });
+          option.dataset.role = user.role;
+          moderationTarget.append(option);
+        });
+        moderationTarget.disabled = false;
+        muteMember.disabled = kickMember.disabled = banMember.disabled = false;
+        promoteMember.hidden = currentRole !== 'owner';
+        promoteMember.disabled = currentRole !== 'owner' || moderationTarget.selectedOptions[0]?.dataset.role !== 'member';
+      };
+
+       const updateMembers = users => {
+         const list = Array.isArray(users) ? users : [];
+         const self = list.find(user => user.id === currentUserId);
+         if (self?.role) currentRole = self.role;
+         updateModerationTargets(list);
+         updateDirectTargets(list);
+       };
+
+       const setMuted = until => {
+         clearTimeout(muteTimer);
+         mutedUntil = Number(until) || 0;
+         const muted = mutedUntil > Date.now();
+         updateComposer();
+         if (muted) {
+           chatStatus.textContent = `Muted for ${Math.ceil((mutedUntil - Date.now()) / 60000)} more minute(s)`;
+           muteTimer = setTimeout(() => setMuted(0), Math.max(0, mutedUntil - Date.now()) + 50);
+         }
+       };
+
+       const scheduleReconnect = () => {
+         if (!reconnectAllowed || reconnectTimer || !root.isConnected) return;
+         const delay = Math.min(15000, 1000 * 2 ** Math.min(reconnectAttempt, 4));
+         reconnectAttempt += 1;
+         chatStatus.textContent = `Disconnected · retrying in ${Math.ceil(delay / 1000)}s`;
+         reconnectTimer = setTimeout(() => {
+           reconnectTimer = null;
+           connect({ automatic: true });
+         }, delay);
+       };
+
+       const connect = ({ automatic = false } = {}) => {
+         if (!name.value.trim() || !room.value.trim()) {
+           chatStatus.textContent = 'Enter a name and room first';
+           return;
+         }
+         if (!automatic) {
+           reconnectAllowed = true;
+           reconnectAttempt = 0;
+           clearTimeout(reconnectTimer);
+           reconnectTimer = null;
+         }
+         store.set('chatName', name.value.trim());
+         store.set('chatRoom', room.value.trim());
+         const previous = socket;
+         const thisConnection = ++connectionId;
+         hasJoined = false;
+         if (previous) previous.close();
+
+         chatStatus.textContent = 'Connecting…';
+         socket = new WebSocket(
+           `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/chat`
+         );
+
+           socket.addEventListener('open', () => {
+           if (thisConnection !== connectionId) return;
+           socket.send(JSON.stringify({ type: 'join', room: room.value.trim(), name: name.value.trim() }));
+         });
+
+          socket.addEventListener('message', event => {
+            if (thisConnection !== connectionId) return;
+            let data;
+            try { data = JSON.parse(event.data); } catch { return; }
+            if (data.type === 'joined') {
+              log.replaceChildren();
+               hasJoined = true;
+               reconnectAttempt = 0;
+               currentUserId = data.peerId;
+                currentRole = data.role || 'member';
+                data.history.forEach(item => message(item));
+                updateMembers(data.users);
+                updateConversationStatus();
+               setMuted(0);
+              text.focus();
+             } else if (data.type === 'message') {
+               message(data, true);
+             } else if (data.type === 'typing') {
+               const relevant = !data.private || conversation.value === 'direct' && (!recipient.value || data.fromId === recipient.value);
+               if (relevant) showTyping(data.name, data.typing);
+            } else if (data.type === 'presence') {
+             line('chat-line system', `${escape(data.text)} · ${data.users.length} here`);
+             updateMembers(data.users);
+              if (data.text && !data.text.startsWith(`${name.value.trim()} joined`)) window.OS?.notify('Idk Messenger', data.text, 'chat');
+           } else if (data.type === 'moderation-result') {
+             chatStatus.textContent = data.text;
+             window.OS?.notify('Owner controls', data.text, 'chat');
+           } else if (data.type === 'muted') {
+             setMuted(data.until);
+              window.OS?.notify('Idk Messenger', 'The room owner muted you.', 'chat');
+            } else if (data.type === 'kicked') {
+              reconnectAllowed = false;
+              hasJoined = false;
+              chatStatus.textContent = data.reason;
+               window.OS?.notify('Idk Messenger', data.reason, 'chat');
+              socket.close();
+             } else if (data.type === 'error') {
+              if (!hasJoined) reconnectAllowed = false;
+              chatStatus.textContent = data.text;
+              window.OS?.notify('Chat room', data.text, 'chat');
+            }
+          });
+
+          socket.addEventListener('close', () => {
+             if (thisConnection !== connectionId) return;
+             hasJoined = false;
+             currentUserId = '';
+             currentRole = 'member';
+             updateMembers([]);
+             setMuted(0);
+               updateComposer();
+             if (reconnectAllowed) scheduleReconnect();
+             else chatStatus.textContent = 'Disconnected';
+          });
+       };
+
+         const post = () => {
+           if (!text.value.trim() || mutedUntil > Date.now() || socket?.readyState !== WebSocket.OPEN || (conversation.value === 'direct' && !recipient.value)) return;
+           emitTyping(false);
+           socket.send(conversation.value === 'direct'
+           ? JSON.stringify({ type: 'direct-message', targetId: recipient.value, text: text.value })
+           : JSON.stringify({ type: 'message', text: text.value }));
+         text.value = '';
+       };
+
+       const moderate = action => {
+         const targetId = moderationTarget.value;
+         if (!targetId) return;
+         const targetName = moderationTarget.selectedOptions[0]?.textContent || 'this member';
+         const label = action === 'promote' ? 'Promote' : `${action[0].toUpperCase()}${action.slice(1)}`;
+         if (!window.confirm(`${label} ${targetName}?`)) return;
+         sendSocket({ type: 'moderation', action, targetId, minutes: Number(muteMinutes.value) || 5 });
+       };
+
+      const copyInvite = async () => {
+        const code = room.value.trim();
+        if (!code) { chatStatus.textContent = 'Enter a room name first'; return; }
+        const invite = new URL(location.href);
+        invite.searchParams.set('room', code);
+        invite.hash = 'chat';
+        try {
+          await navigator.clipboard.writeText(invite.href);
+          chatStatus.textContent = 'Invite link copied';
+          window.OS?.notify('Chat invite', `Room ${code} is ready to share.`);
+        } catch {
+          window.prompt('Copy this invite link', invite.href);
+        }
+      };
+
+         conversation.addEventListener('change', () => {
+           if (conversation.value === 'direct') { unreadDirect = 0; dmUnread.textContent = '0'; dmUnread.hidden = true; }
+           updateDirectTargets(roomUsers);
+          updateConversationStatus();
+        });
+        recipient.addEventListener('change', () => {
+          updateConversationStatus();
+          updateComposer();
+        });
+        join.addEventListener('click', connect);
+       share.addEventListener('click', copyInvite);
+       room.addEventListener('keydown', event => { if (event.key === 'Enter') connect(); });
+        send.addEventListener('click', post);
+        text.addEventListener('input', () => { if (!text.value.trim()) { emitTyping(false); return; } emitTyping(true); clearTimeout(typingTimer); typingTimer = setTimeout(() => emitTyping(false), 1400); });
+        text.addEventListener('keydown', event => { if (event.key === 'Enter') post(); });
+       muteMember.addEventListener('click', () => moderate('mute'));
+       kickMember.addEventListener('click', () => moderate('kick'));
+       banMember.addEventListener('click', () => moderate('ban'));
+       promoteMember.addEventListener('click', () => moderate('promote'));
+       moderationTarget.addEventListener('change', () => {
+         promoteMember.disabled = currentRole !== 'owner' || moderationTarget.selectedOptions[0]?.dataset.role !== 'member';
+       });
+
+       root.cleanup = () => {
+         reconnectAllowed = false;
+          clearTimeout(reconnectTimer);
+          clearTimeout(muteTimer);
+          clearTimeout(typingTimer);
+         socket?.close();
+       };
+
+         root.append(bar, ownerPanel, log, composer);
+       return root;
+    }
+  },
+
+  panic: {
+    title: 'Power',
+    glyph: '⏻',
+    desktop: false,
+    danger: true,
+    action() {
+      window.location.replace('index.html?shutdown=1');
+    }
+  },
+
+  settings: {
+    title: 'Settings',
+    glyph: '⚙️',
+    desktop: true,
+    width: 760,
+    height: 700,
+    render(opts = {}) {
+      const root = el('div', { className: 'app idk-unified-settings' });
+      const tabs = el('div', { className: 'idk-settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
+      const body = el('div', { className: 'idk-settings-body' });
+      const requestedTab = ['general','appearance','system','privacy'].includes(opts.tab) ? opts.tab : (store.get('idkSettingsSection','general') || 'general');
+      const input = el('input', {
+        className: 'field',
+        type: 'text',
+        placeholder: 'Image URL or CSS gradient',
+        value: store.get('wallpaper', DEFAULT_WALLPAPER) || ''
+      });
+      const wallpaperPreset = el('select', { className: 'field' });
+      WALLPAPER_PRESETS.forEach(preset => wallpaperPreset.append(el('option', { value: preset.value, textContent: preset.label })));
+      const currentWallpaper = input.value;
+      if (!WALLPAPER_PRESETS.some(preset => preset.value === currentWallpaper) && currentWallpaper) {
+        wallpaperPreset.prepend(el('option', { value: currentWallpaper, textContent: 'Custom wallpaper' }));
+      }
+      wallpaperPreset.value = currentWallpaper;
+      wallpaperPreset.addEventListener('change', () => { if (wallpaperPreset.value) input.value = wallpaperPreset.value; });
+      const uiColor = el('select', { className: 'field' });
+      [['auto', 'Auto — match wallpaper'], ['blue', 'Blue / Classic'], ['grape', 'Purple / Grape'], ['green', 'Green'], ['red', 'Red / Cherry'], ['yellow', 'Yellow / Lemon']].forEach(([value, label]) => uiColor.append(el('option', { value, textContent: label })));
+      uiColor.value = store.get('idkUIColorTheme', 'auto');
+      const clock24 = el('input', { type: 'checkbox', checked: store.get('clock24', false) });
+      const theme = el('select', { className: 'field', value: store.get('theme', 'midnight') });
+      [['midnight', 'Midnight'], ['neon', 'Neon'], ['sunset', 'Sunset'], ['mono', 'Monochrome'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['candy', 'Candy'], ['custom', 'Custom']].forEach(([value, label]) => theme.append(el('option', { value, textContent: label })));
+      theme.value = store.get('theme', 'midnight');
+      const savedCustomTheme = store.get(CUSTOM_THEME_KEY, CUSTOM_THEME_DEFAULTS);
+      const customThemeValues = { ...CUSTOM_THEME_DEFAULTS, ...(savedCustomTheme && typeof savedCustomTheme === 'object' ? savedCustomTheme : {}) };
+      const customThemeInputs = Object.fromEntries(Object.entries({
+        accent: 'Accent',
+        panel: 'Panel',
+        panelSolid: 'Window panel',
+        text: 'Text'
+      }).map(([key, label]) => [key, el('label', { textContent: label }, [el('input', { className: 'field', type: 'color', value: customThemeValues[key] })])]));
+      const customTheme = el('div', { className: 'settings-custom-theme' }, [
+        el('strong', { textContent: 'Custom theme colors' }),
+        el('div', { className: 'settings-color-grid' }, Object.values(customThemeInputs))
+      ]);
+      const readCustomTheme = () => Object.fromEntries(Object.entries(customThemeInputs).map(([key, label]) => [key, label.querySelector('input').value]));
+      const updateCustomTheme = () => {
+        const values = readCustomTheme();
+        store.set(CUSTOM_THEME_KEY, values);
+        customTheme.hidden = theme.value !== 'custom';
+        if (theme.value === 'custom') applyTheme('custom');
+      };
+      Object.values(customThemeInputs).forEach(label => label.querySelector('input').addEventListener('input', updateCustomTheme));
+      theme.addEventListener('change', updateCustomTheme);
+      updateCustomTheme();
+      const iconSize = el('select', { className: 'field', value: store.get('iconSize', 'normal') });
+      [['compact', 'Compact'], ['normal', 'Normal'], ['large', 'Large']].forEach(([value, label]) => iconSize.append(el('option', { value, textContent: label })));
+      iconSize.value = store.get('iconSize', 'normal');
+      const dockPosition = el('select', { className: 'field', value: store.get('dockPosition', 'bottom') });
+      [['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']].forEach(([value, label]) => dockPosition.append(el('option', { value, textContent: label })));
+      dockPosition.value = store.get('dockPosition', 'bottom');
+      const motion = el('select', { className: 'field', value: store.get('motion', 'on') });
+      [['on', 'Motion on'], ['off', 'Reduce motion']].forEach(([value, label]) => motion.append(el('option', { value, textContent: label })));
+      motion.value = store.get('motion', 'on');
+      const tabCloakSettings = store.get(TAB_CLOAKER_KEY, { enabled: false, url: '' });
+      const tabCloakURL = el('input', {
+        className: 'field',
+        type: 'url',
+        placeholder: 'https://www.google.com/',
+        value: tabCloakSettings.url || ''
+      });
+      const tabCloakEnabled = el('input', { type: 'checkbox', checked: Boolean(tabCloakSettings.enabled) });
+      const panic = el('input', {
+        className: 'field',
+        type: 'url',
+        placeholder: PANIC_URL,
+        value: store.get('panicURL', PANIC_URL) || ''
+      });
+
+      const save = el('button', { className: 'btn', type: 'button', textContent: 'Apply' });
+      save.addEventListener('click', () => {
+        store.set('wallpaper', input.value.trim());
+        store.set('clock24', clock24.checked);
+        store.set('idkUIColorTheme', uiColor.value);
+        store.set('theme', theme.value);
+        store.set(CUSTOM_THEME_KEY, readCustomTheme());
+        store.set('iconSize', iconSize.value);
+        store.set('dockPosition', dockPosition.value);
+        store.set('motion', motion.value);
+        store.set('panicURL', panic.value.trim());
+        store.set(TAB_CLOAKER_KEY, { enabled: tabCloakEnabled.checked, url: tabCloakURL.value.trim() });
+        applyTabCloaker();
+        applyWallpaper(input.value.trim());
+        applyTheme(theme.value);
+        if (window.IDKBackgroundTheme?.applyChoice) window.IDKBackgroundTheme.applyChoice(uiColor.value, input.value.trim());
+        applyIconSize(iconSize.value);
+        applyDockPosition(dockPosition.value);
+        applyMotion(motion.value);
+        OS.tickClock();
+        OS.notify('Settings', 'Appearance updated.');
+      });
+
+      const reset = el('button', { className: 'btn', type: 'button', textContent: 'Reset wallpaper' });
+      reset.addEventListener('click', () => {
+        input.value = DEFAULT_WALLPAPER;
+        wallpaperPreset.value = DEFAULT_WALLPAPER;
+        store.set('wallpaper', DEFAULT_WALLPAPER);
+        applyWallpaper(DEFAULT_WALLPAPER);
+      });
+
+      const restoreWorkspace = el('button', { className: 'btn tab', type: 'button', textContent: 'Restore workspace' });
+      restoreWorkspace.addEventListener('click', () => OS.restoreWorkspace());
+      const clearWorkspace = el('button', { className: 'btn tab', type: 'button', textContent: 'Forget saved workspace' });
+      clearWorkspace.addEventListener('click', () => OS.clearWorkspace());
+
+      body.append(
+        el('h2', { textContent: 'Settings' }),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Wallpaper preset' }),
+          wallpaperPreset
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Wallpaper URL or CSS gradient' }),
+          input
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: '24-hour clock' }),
+          clock24
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'UI color' }),
+          uiColor,
+          el('small', { className: 'sub', textContent: 'Choose the accent, panels, text, and related interface colors. Auto follows the selected wallpaper.' })
+        ]),
+        el('div', { className: 'settings-row settings-grid' }, [
+           el('label', { textContent: 'Theme' }), theme,
+           el('label', { textContent: 'Desktop icon size' }), iconSize,
+           el('label', { textContent: 'Dock position' }), dockPosition,
+           el('label', { textContent: 'Animations' }), motion
+         ]),
+        customTheme,
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Tab Cloaker' }),
+          el('small', { className: 'sub', textContent: 'Changes the browser tab title and favicon to the site you choose. Browsers do not allow a web app to change the real address bar to another domain.' }),
+          el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' }, [
+            tabCloakEnabled,
+            el('span', { textContent: 'Enable cloak' }),
+            tabCloakURL
+          ])
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Power button redirects to' }),
+          panic
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Workspace' }),
+          el('small', { className: 'sub', textContent: 'Open apps and window layouts are saved automatically. Shortcut: Ctrl + Alt + R.' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [restoreWorkspace, clearWorkspace])
+        ]),
+        el('div', { style: 'display:flex; gap:8px;' }, [save, reset])
+      );
+      const existingSettings = [...body.children];
+      const general = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'general' });
+      const appearance = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'appearance', hidden: true });
+      appearance.append(el('h2', { textContent: 'Appearance' }));
+      const appearanceKeywords = ['Wallpaper', 'UI color', 'Theme', 'Custom theme', 'Tab Cloaker'];
+      existingSettings.forEach((node, index) => {
+        const text = node.textContent || '';
+        if (index === 0 || !appearanceKeywords.some(keyword => text.includes(keyword))) general.append(node);
+        else appearance.append(node);
+      });
+      body.replaceChildren(general, appearance);
+
+      const system = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'system', hidden: true });
+      system.innerHTML = '<h2>System & Recovery</h2><p class="sub">Status, sync, recovery, updates, accounts, and desktop controls.</p><div class="idk-settings-action-grid"></div><p class="idk-settings-status" data-settings-status>Ready.</p>';
+      const systemGrid = system.querySelector('.idk-settings-action-grid');
+      const status = system.querySelector('[data-settings-status]');
+      const settingAction = (title, detail, run) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = async () => { button.disabled = true; try { await run(); status.textContent = title + ' completed.'; } catch (error) { status.textContent = title + ' failed: ' + (error?.message || 'Try again.'); } finally { button.disabled = false; } }; return button; };
+      systemGrid.append(
+        settingAction('Sync now', 'Push changes and retry queued work.', async () => { await window.IDKOffline?.flush?.(); await window.IDKDataLayer?.syncNow?.(); window.OS?.notify?.('Settings', 'Sync requested.'); }),
+        settingAction('Backup & Recovery', 'Protect local settings and files.', () => window.IDKPlatformPolish?.openRecoveryCenter?.() || window.IDKBackup?.open?.()),
+        settingAction('Security & Privacy', 'Account safety and local data.', () => window.IDKPlatformPolish?.openSecurityCenter?.() || window.OS?.open?.('privacy')),
+        settingAction('Account & Devices', 'Profiles, sessions, and handoff.', () => window.IDKAccountsDevices?.open?.('security') || window.IDKAccountsDevices?.open?.('profiles')),
+        settingAction('Delete account & restart setup', 'Permanently delete your IDK account and return to the original setup.', async () => {
+          if (!window.confirm('Delete your IDK account and all account data? This cannot be undone. You will be returned to the original setup.')) throw new Error('Account deletion cancelled.');
+          const response = await fetch('/api/account', { method: 'DELETE', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || 'Could not delete the account.');
+          try { localStorage.clear(); sessionStorage.clear(); } catch {}
+          window.location.replace('/');
+        }),
+        settingAction('Check for updates', 'Check the installed IDK shell for updates.', async () => { const registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration) throw new Error('Update checks are unavailable in this browser.'); await registration.update().catch(() => {}); if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' }); }),
+        settingAction('System Health', 'Storage, performance, and diagnostics.', () => window.OS?.open?.('system-monitor') || window.OS?.open?.('reliability')),
+        settingAction('AI Setup', 'Choose local, cloud, or offline AI.', () => window.OS?.open?.('aiModes') || window.OS?.open?.('ai')),
+        settingAction('Profiles', 'Switch local workspaces and profiles.', () => window.IDKAccountsDevices?.open?.('profiles') || window.IDKConnectivitySuite?.openProfiles?.()),
+        settingAction('Smart Workspaces', 'Save or activate desktop setups.', () => window.IDKOSNext?.workspaceView?.()),
+        settingAction('Activity Center', 'Notifications and recent activity.', () => window.OS?.open?.('activity')),
+        settingAction('Share Sheet', 'Send text to IDK apps.', () => window.IDKOSNext?.openShareSheet?.()),
+        settingAction('Reset icon size', 'Return desktop icon size to Normal.', () => { store.set('iconSize','normal'); applyIconSize('normal'); })
+      );
+      const privacy = el('section', { className: 'idk-settings-panel', 'data-settings-panel': 'privacy', hidden: true });
+      privacy.innerHTML = '<h2>Privacy & Security</h2><p class="sub">Security and privacy controls now live in the main Settings app.</p><div class="idk-settings-action-grid"></div>';
+      const privacyGrid = privacy.querySelector('.idk-settings-action-grid');
+      const openPrivacy = (title, detail, action) => { const button = el('button', { className: 'idk-settings-action', type: 'button' }, [el('strong', { textContent: title }), el('small', { textContent: detail })]); button.onclick = action; return button; };
+      privacyGrid.append(
+        openPrivacy('App Permissions', 'Review microphone, camera, storage, and network access.', () => window.OS?.open?.('permissions')),
+        openPrivacy('Lock & PIN', 'Configure the local lock screen and PIN.', () => root._showSettingsTab?.('privacy')),
+        openPrivacy('Safety Center', 'Review recovery and safety controls.', () => window.IDKPlatformNext?.openSafetyCenter?.()),
+        openPrivacy('Backup local data', 'Export a backup of local IDK data.', () => window.IDKBackup?.open?.())
+      );
+      // Legacy Control Center abilities now live directly in Settings.
+      const featureState = () => window.IDKFeaturePack?.getState?.() || {};
+      const feature = window.IDKFeaturePack;
+      const systemTools = el('section', { className: 'idk-settings-panel-section' });
+      systemTools.innerHTML = '<h3>Desktop & device</h3><p class="sub">Desktop, device, and recovery controls are managed here.</p>';
+      const healthRow = el('div', { className: 'settings-row' }, [
+        el('label', { textContent: 'System status' }),
+        el('span', { className: 'sub', textContent: 'Checking…' }),
+        el('button', { className: 'btn', type: 'button', textContent: 'Refresh' })
+      ]);
+      feature?.systemStatus?.(healthRow.children[1]);
+      healthRow.children[2].onclick = () => feature?.systemStatus?.(healthRow.children[1]);
+      const brightness = el('input', { type: 'range', min: '20', max: '100', value: String(featureState().brightness ?? 100) });
+      const volume = el('input', { type: 'range', min: '0', max: '100', value: String(featureState().volume ?? 70) });
+      brightness.oninput = () => feature?.setBrightness?.(brightness.value);
+      volume.oninput = () => feature?.setVolume?.(volume.value);
+      systemTools.append(
+        healthRow,
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Brightness' }), brightness]),
+        el('div', { className: 'settings-row' }, [el('label', { textContent: 'Volume' }), volume]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Virtual desktops' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [1,2,3].map(space => {
+            const b=el('button',{className:'btn tab',type:'button',textContent:'Desktop '+space});
+            b.onclick=()=>feature?.switchSpace?.(space); return b;
+          }))
+        ]),
+        el('div', { className: 'settings-row' }, [
+          el('label', { textContent: 'Desktop tools' }),
+          el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' }, [
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Toggle widgets'});b.onclick=()=>feature?.toggleWidgets?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Save screenshot'});b.onclick=()=>feature?.saveScreenshot?.();return b;})(),
+            (()=>{const b=el('button',{className:'btn',type:'button',textContent:'Move focused window'});b.onclick=()=>feature?.moveFocusedWindow?.((featureState().space||1)===3?1:(featureState().space||1)+1);return b;})()
+          ])
+        ])
+      );
+      const launcherSection = el('section', { className: 'idk-settings-panel-section' });
+      launcherSection.innerHTML = '<h3>Built-in apps</h3><p class="sub">Open common IDK apps directly from Settings.</p>';
+      const launcherGrid = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;' });
+      [['files','Files'],['proxy','Browser'],['chat','Messenger'],['games','Games'],['music','Music'],['apps','App Store'],['search','Search']].forEach(([id,label]) => {
+        const b=el('button',{className:'btn tab',type:'button',textContent:label});
+        b.onclick=()=>window.OS?.open?.(id); launcherGrid.append(b);
+      });
+      launcherSection.append(launcherGrid);
+      system.append(launcherSection);
+
+      const backupSection = el('section', { className: 'idk-settings-panel-section' });
+      backupSection.innerHTML = '<h3>Backup & portability</h3><p class="sub">Export or restore your local IDK settings and app data.</p>';
+      const backupStatus = el('p', { className: 'idk-settings-status', textContent: '' });
+      const exportBackup = el('button', { className: 'btn', type: 'button', textContent: 'Export local backup' });
+      const importLabel = el('label', { className: 'btn', textContent: 'Import local backup' });
+      const importInput = el('input', { type: 'file', accept: 'application/json', hidden: true });
+      importLabel.append(importInput);
+      exportBackup.onclick = () => {
+        const values = Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]));
+        const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([JSON.stringify(values,null,2)],{type:'application/json'})); link.download='idk-10-backup.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+        backupStatus.textContent='Backup exported.';
+      };
+      importInput.onchange = async () => {
+        const file=importInput.files?.[0]; if(!file) return;
+        try { const values=JSON.parse(await file.text()); if(!values || typeof values!=='object') throw new Error('Invalid backup'); Object.entries(values).forEach(([key,value])=>localStorage.setItem(key,String(value))); backupStatus.textContent='Backup imported. Reloading…'; setTimeout(()=>location.reload(),500); }
+        catch { backupStatus.textContent='That backup file could not be read.'; }
+      };
+      backupSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[exportBackup,importLabel]),backupStatus);
+      system.append(backupSection);
+
+      const privacyTools = el('section', { className: 'idk-settings-panel-section' });
+      privacyTools.innerHTML = '<h3>Local privacy & lock</h3><p class="sub">Guest mode and the optional local lock stay on this device.</p>';
+      const guest = el('input', { type:'checkbox', checked:Boolean(featureState().guest) });
+      guest.onchange=()=>feature?.setGuest?.(guest.checked);
+      const pin = el('input',{className:'field',type:'password',inputMode:'numeric',maxlength:'12',placeholder:'New PIN'});
+      const savePin=el('button',{className:'btn',type:'button',textContent:'Save PIN'});
+      const clearPin=el('button',{className:'btn',type:'button',textContent:'Clear PIN'});
+      const lock=el('button',{className:'btn',type:'button',textContent:'Lock now'});
+      const privacyStatus=el('p',{className:'idk-settings-status'});
+      savePin.onclick=async()=>{await feature?.setPIN?.(pin.value.trim());pin.value='';privacyStatus.textContent='Lock PIN saved.';};
+      clearPin.onclick=()=>{feature?.clearPIN?.();pin.value='';privacyStatus.textContent='Lock PIN cleared.';};
+      lock.onclick=()=>feature?.lockScreen?.();
+      privacyTools.append(el('div',{className:'settings-row'},[el('label',{textContent:'Guest mode'}),guest]),el('div',{className:'settings-row'},[el('label',{textContent:'Lock PIN'}),pin,savePin,clearPin,lock]),privacyStatus);
+      privacy.append(privacyTools);
+
+      const bookmarkSection = el('section',{className:'idk-settings-panel-section'});
+      bookmarkSection.innerHTML='<h3>Bookmarks</h3><p class="sub">Manage saved browser bookmarks from Settings.</p>';
+      const bookmarkTitle=el('input',{className:'field',placeholder:'Bookmark name'});
+      const bookmarkURL=el('input',{className:'field',type:'url',placeholder:'https://example.com'});
+      const bookmarkList=el('div',{className:'settings-row'});
+      const refreshBookmarks=()=>{bookmarkList.replaceChildren();(feature?.getBookmarks?.()||[]).forEach((item,index)=>{const row=el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;'},[el('span',{textContent:item.title}),el('small',{className:'sub',textContent:item.url})]);const open=el('button',{className:'btn tab',type:'button',textContent:'Open'});open.onclick=()=>window.open(item.url,'_blank','noopener,noreferrer');const del=el('button',{className:'btn tab',type:'button',textContent:'Remove'});del.onclick=()=>{feature?.removeBookmark?.(index);refreshBookmarks();};row.append(open,del);bookmarkList.append(row);});if(!bookmarkList.children.length)bookmarkList.append(el('small',{className:'sub',textContent:'No bookmarks saved.'}));};
+      const addBookmark=el('button',{className:'btn',type:'button',textContent:'Save bookmark'});addBookmark.onclick=()=>{if(feature?.addBookmark?.(bookmarkTitle.value.trim(),bookmarkURL.value.trim())){bookmarkTitle.value='';bookmarkURL.value='';refreshBookmarks();}};
+      bookmarkSection.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;'},[bookmarkTitle,bookmarkURL,addBookmark]),bookmarkList);refreshBookmarks();system.append(bookmarkSection);
+
+      const generalTools = el('section',{className:'idk-settings-panel-section'});
+      generalTools.innerHTML='<h3>Workspace</h3><p class="sub">Quick access to saved desktop layout controls.</p>';
+      const resetLayout=el('button',{className:'btn',type:'button',textContent:'Reset saved layout'});
+      resetLayout.onclick=()=>{localStorage.removeItem('desktopOrder');localStorage.removeItem('idkDesktopIconPositions');notify('Workspace','The desktop layout will reset after reload.');};
+      generalTools.append(resetLayout); general.append(generalTools);
+
+      body.append(system, privacy);
+      [['general','General'],['appearance','Appearance'],['system','System & Recovery'],['privacy','Privacy & Security']].forEach(([id,label]) => { const tab=el('button',{className:'idk-settings-tab',type:'button',role:'tab',textContent:label}); tab.dataset.settingsTab=id; tabs.append(tab); });
+      const showTab = id => { const safe = ['general','appearance','system','privacy'].includes(id) ? id : 'general'; store.set('idkSettingsSection', safe); tabs.querySelectorAll('[data-settings-tab]').forEach(tab => { const active=tab.dataset.settingsTab===safe; tab.classList.toggle('active',active); tab.setAttribute('aria-selected',active?'true':'false'); }); body.querySelectorAll('[data-settings-panel]').forEach(panel => panel.hidden=panel.dataset.settingsPanel!==safe); };
+      tabs.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.onclick=()=>showTab(tab.dataset.settingsTab));
+      root.append(tabs, body);
+      showTab(requestedTab);
+      root._showSettingsTab = showTab;
+      return root;
+    }
+  },
+
+  player: {
+    title: 'Player',
+    glyph: '▶️',
+    desktop: false,
+    dock: false,
+    width: 960,
+    height: 640,
+    multi: true,
+    render(opts = {}) {
+      if (!opts.src) return emptyState('Nothing to play.');
+      if (opts.mediaType?.startsWith('audio/') || opts.mediaType?.startsWith('video/')) {
+        const root = el('div', { className: 'media-player' });
+        const media = el(opts.mediaType.startsWith('video/') ? 'video' : 'audio', { controls: true, autoplay: true, preload: 'metadata', src: opts.src });
+        if (media.tagName === 'VIDEO') media.setAttribute('playsinline', '');
+        root.append(media);
+        root.cleanup = () => { media.pause(); URL.revokeObjectURL(opts.src); };
+        return root;
+      }
+      const frame = el('iframe', {
+        src: opts.src,
+        allow: 'autoplay; fullscreen; gamepad; clipboard-write',
+        allowFullscreen: true
+      });
+      return frame;
+    }
+  }
+};
+
+applyTabCloaker();
+
+window.IDKPermissions = {
+  can(appId, permission) {
+    return appPermissionState(appId)[permission] !== false;
+  },
+  get(appId) {
+    return appPermissionState(appId);
+  },
+  set(appId, permission, allowed) {
+    setAppPermission(appId, permission, allowed);
+  }
+};
+window.IDKGamesUI = { render: APPS.games.render };
