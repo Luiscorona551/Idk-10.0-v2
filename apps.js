@@ -1576,13 +1576,15 @@ function listApp({ items, placeholder, empty, onOpen, subtitle }) {
       tile.addEventListener('click', () => onOpen(item, tile));
       grid.append(tile);
     });
-    if (matches.length > 400) {
-      grid.append(emptyState('Showing the first 400 results — keep typing to narrow it down.'));
+    if (visibleCount < matches.length) {
+      const loadMore = el('button', { className: 'btn tab', type: 'button', textContent: `Load more (${Math.min(PAGE_SIZE, matches.length - visibleCount)})` });
+      loadMore.addEventListener('click', () => { visibleCount = Math.min(visibleCount + PAGE_SIZE, matches.length); render(); });
+      grid.append(loadMore);
     }
     if (!matches.length) grid.append(emptyState('Nothing matched that search.'));
   };
 
-  search.addEventListener('input', render);
+  search.addEventListener('input', () => { visibleCount = PAGE_SIZE; render(); });
   render();
   return root;
 }
