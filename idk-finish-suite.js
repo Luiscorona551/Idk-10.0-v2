@@ -78,6 +78,39 @@
         if(frame.dataset.finishBrowser) return;
         if(!/\/uv\/service\//.test(frame.src||'')) return;
         frame.dataset.finishBrowser='1';
+        frame.setAttribute('allowfullscreen','');
+        frame.allow = frame.allow ? `${frame.allow}; fullscreen` : 'fullscreen';
+        const toolbar = root.querySelector('.toolbar');
+        if (toolbar && !toolbar.querySelector('.idk-browser-save-url')) {
+          const save = document.createElement('button');
+          save.className='btn tab idk-browser-save-url';
+          save.type='button';
+          save.textContent='Save to Files';
+          save.onclick=()=> {
+            const savedURL = frame.src || '';
+            if (!savedURL || savedURL === 'about:blank') return;
+            const source = (() => {
+              try {
+                const parsed = new URL(savedURL, location.href);
+                if (parsed.pathname.includes('/uv/service/')) return savedURL;
+                return parsed.href;
+              } catch { return savedURL; }
+            })();
+            let label = 'Saved Page';
+            try {
+              const parsed = new URL(source, location.href);
+              label = parsed.hostname.replace(/^www\\./i, '') || label;
+            } catch {}
+            const name = `${label.replace(/[^a-z0-9.-]+/gi, '-').replace(/^-+|-+$/g, '') || 'Saved Page'}.idkurl`;
+            const entry = window.IDKFiles?.writeTextFile?.(name, source, '', 'application/x-idk-browser-url');
+            if (entry) {
+              save.textContent='Saved';
+              window.OS?.notify?.('Browser', `${label} was saved to Files.`, 'success');
+              setTimeout(()=>{ save.textContent='Save to Files'; },1400);
+            }
+          };
+          toolbar.append(save);
+        }
         frame.addEventListener('error',()=>{
           if(root.querySelector('.idk-browser-retry')) return;
           const retry=document.createElement('button');
