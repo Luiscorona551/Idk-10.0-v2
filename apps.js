@@ -1669,14 +1669,14 @@ const APPS = {
       const icon = el('div', { className: 'idk-extras-icon', textContent: '▣' });
       const info = el('div', { className: 'idk-extras-info' }, [
         el('strong', { textContent: 'Virtual Machine' }),
-        el('span', { textContent: 'Open the IDK Virtual Machine manager through the Ultraviolet proxy.' })
+        el('span', { textContent: 'Open the Nebula VM through the Ultraviolet proxy.' })
       ]);
       const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
       const status = el('span', { className: 'idk-extras-status', textContent: 'Ready · Ultraviolet' });
 
       const frame = el('iframe', {
         className: 'idk-extras-vm-frame',
-        title: 'IDK Virtual Machine Manager',
+        title: 'Nebula VM',
         src: 'about:blank',
         allow: 'fullscreen'
       });
@@ -1690,7 +1690,7 @@ const APPS = {
           if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') {
             throw new Error('Ultraviolet proxy is not available.');
           }
-          frame.src = await PROXY.encode('https://luiscorona551.github.io/idk-Virtual-Machine/');
+          frame.src = await PROXY.encode('https://nebulavm.online/');
           status.textContent = 'Virtual Machine connected · Ultraviolet';
         } catch (error) {
           frame.src = 'about:blank';
@@ -1713,13 +1713,13 @@ const APPS = {
       const root = el('div', { className: 'idk-extras-app' });
       root.append(el('section', { className: 'idk-extras-hero' }, [el('div', { className: 'idk-extras-badge', textContent: 'IDK EXTRAS' }), el('h2', { textContent: 'Extras' }), el('p', { textContent: 'Additional IDK tools and companion apps.' })]));
       const card = el('article', { className: 'idk-extra-card' });
-      card.append(el('div', { className: 'idk-extra-icon', textContent: '▣' }), el('div', { className: 'idk-extra-copy' }, [el('strong', { textContent: 'Virtual Machine' }), el('span', { textContent: 'Virt-Manager-style VM configuration and management through Ultraviolet.' })]));
+      card.append(el('div', { className: 'idk-extra-icon', textContent: '▣' }), el('div', { className: 'idk-extra-copy' }, [el('strong', { textContent: 'Virtual Machine' }), el('span', { textContent: 'Custom VM configuration and management through Nebula VM.' })]));
       const open = el('button', { className: 'btn', type: 'button', textContent: 'Open Virtual Machine' });
       const status = el('span', { className: 'idk-extra-status', textContent: 'Ready · Ultraviolet' });
-      const frame = el('iframe', { className: 'idk-vm-frame', title: 'IDK Virtual Machine Manager', src: 'about:blank', allow: 'fullscreen' });
+      const frame = el('iframe', { className: 'idk-vm-frame', title: 'Nebula VM', src: 'about:blank', allow: 'fullscreen' });
       frame.setAttribute('allowfullscreen', ''); frame.setAttribute('referrerpolicy', 'no-referrer');
-      open.onclick = async () => { open.disabled = true; status.textContent = 'Connecting through Ultraviolet…'; try { if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.'); const vmUrl = new URL('https://luiscorona551.github.io/idk-Virtual-Machine/'); vmUrl.searchParams.set('idkApi', `${window.location.origin}/api/vm`); frame.src = await PROXY.encode(vmUrl.toString()); status.textContent = 'Virtual Machine Manager connected through Ultraviolet · IDK backend'; } catch (error) { frame.src = 'about:blank'; status.textContent = error?.message || 'Could not connect through Ultraviolet'; window.OS?.notify?.('Virtual Machine', status.textContent, 'error'); } finally { open.disabled = false; } };
-      card.append(open, status); root.append(card, frame, el('p', { className: 'idk-extras-note', textContent: 'The VM manager UI is hosted on GitHub Pages, while its API is served by the existing IDK 10.0 backend through /api/vm.' })); root.cleanup = () => { frame.src = 'about:blank'; }; return root;
+      open.onclick = async () => { open.disabled = true; status.textContent = 'Connecting through Ultraviolet…'; try { if (typeof PROXY === 'undefined' || typeof PROXY.encode !== 'function') throw new Error('Ultraviolet proxy is not available.'); frame.src = await PROXY.encode('https://nebulavm.online/'); status.textContent = 'Nebula VM connected through Ultraviolet'; } catch (error) { frame.src = 'about:blank'; status.textContent = error?.message || 'Could not connect through Ultraviolet'; window.OS?.notify?.('Virtual Machine', status.textContent, 'error'); } finally { open.disabled = false; } };
+      card.append(open, status); root.append(card, frame, el('p', { className: 'idk-extras-note', textContent: 'Nebula VM is hosted at nebulavm.online and opens through the IDK Ultraviolet proxy.' })); root.cleanup = () => { frame.src = 'about:blank'; }; return root;
     }
   },
   search: {
