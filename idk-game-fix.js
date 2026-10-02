@@ -34,7 +34,7 @@
     // Never overwrite a stable renderer with this legacy compatibility patch.
     if (typeof APPS.games.render === 'function') return true;
     APPS.games.render = async () => {
-      const [names, icons] = await Promise.all([loadJSON('games.json'), loadJSON('game-icons.json').catch(() => ({}))]);
+      const [names, icons] = await Promise.all([loadJSON('data/games.json'), loadJSON('data/game-icons.json').catch(() => ({}))]);
       const items = names.map(name => ({ id: name, title: typeof gameTitle === 'function' ? gameTitle(name) : name, iconURL: typeof gameIconURL === 'function' ? gameIconURL(icons[name]) : '', search: `${name} ${typeof gameTitle === 'function' ? gameTitle(name) : name}`.toLowerCase() }));
       return listApp({ items, placeholder: 'Search games…', empty: 'No games found.', async onOpen(item, tile) {
         const title = tile.querySelector('.tile-title'); const label = title.textContent; title.textContent = 'Loading…';

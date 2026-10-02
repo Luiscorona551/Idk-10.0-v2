@@ -159,8 +159,8 @@ function applyMotion(mode) {
 }
 
 const JSON_FALLBACKS = {
-  'games.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/games.json',
-  'game-icons.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/game-icons.json'
+  'data/games.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/games.json',
+  'data/game-icons.json': 'https://raw.githubusercontent.com/Luiscorona551/Idk-10.0-v2/main/game-icons.json'
 };
 async function loadJSON(path) {
   const urls = [path, JSON_FALLBACKS[path]].filter(Boolean);
@@ -1598,8 +1598,8 @@ async function searchApp() {
 
   try {
     const [names, icons] = await Promise.all([
-      loadJSON('games.json'),
-      loadJSON('game-icons.json').catch(() => ({}))
+      loadJSON('data/games.json'),
+      loadJSON('data/game-icons.json').catch(() => ({}))
     ]);
     const apps = Object.entries(APPS)
       .filter(([id]) => !['player', 'panic', 'search'].includes(id))
@@ -1951,8 +1951,8 @@ const APPS = {
       let icons = {};
       let catalogError = '';
       try {
-        names = await loadJSON('games.json');
-        icons = await loadJSON('game-icons.json').catch(() => ({}));
+        names = await loadJSON('data/games.json');
+        icons = await loadJSON('data/game-icons.json').catch(() => ({}));
       } catch (error) {
         catalogError = error?.message || 'The game catalog is unavailable.';
       }
