@@ -1992,29 +1992,93 @@ const APPS = {
       const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
       const recents = () => store.get(GAME_RECENTS_KEY, []);
       const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
+      let visibleLimit = 24;
+      let renderTimer = null;
+      const scheduleRender = () => {
+        clearTimeout(renderTimer);
+        renderTimer = setTimeout(render, 90);
+      };
       const render = () => {
         const query = search.value.trim().toLowerCase();
         const saved = favorites();
         let matches = items.filter(item => !query || item.search.includes(query));
         if (filter.value === 'favorites') matches = matches.filter(item => saved.has(item.id));
-        if (filter.value === 'recent') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches = matches.filter(item => order.has(item.id)).sort((a, b) => order.get(a.id) - order.get(b.id)); }
-        if (!query && filter.value === 'all') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches.sort((a, b) => (order.has(a.id) ? order.get(a.id) : 9999) - (order.has(b.id) ? order.get(b.id) : 9999)); }
-        grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
-        if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
-        matches.slice(0, 80).forEach(item => {
-          const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
+        if (filter.value === 'recent') {
+          const order = new Map(recents().map((entry, index) => [entry.id, index]));
+          matches = matches.filter(item => order.has(item.id)).sort((a, b) => order.get(a.id) - order.get(b.id));
+        }
+        if (!query && filter.value === 'all') {
+          const order = new Map(recents().map((entry, index) => [entry.id, index]));
+          if (order.size) {
+            const recent = [];
+            const rest = [];
+            for (const item of matches) (order.has(item.id) ? recent : rest).push(item);
+            recent.sort((a, b) => order.get(a.id) - order.get(b.id));
+            matches = recent.concat(rest);
+          }
+        }
+        grid.replaceChildren();
+        count.textContent = `${matches.length} of ${items.length}`;
+        if (!matches.length) {
+          grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.'));
+          return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        matches.slice(0, visibleLimit).forEach(item => {
+          const card = el('article', { className: 'game-tile-card' });
+          card.dataset.gameId = item.id;
           const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
           const icon = el('span', { className: 'tile-icon' });
-          if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
-          const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
-          const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
+          if (item.iconURL) {
+            const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' });
+            image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' }));
+            icon.append(image);
+          } else {
+            icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
+          }
+          const title = el('span', { className: 'tile-title', textContent: item.title });
+          tile.append(icon, title);
+          const favorite = el('button', {
+            className: 'game-favorite',
+            type: 'button',
+            textContent: saved.has(item.id) ? '★' : '☆',
+            title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite',
+            'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites`
+          });
           const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
-          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
+          favorite.onclick = event => {
+            event.stopPropagation();
+            const next = favorites();
+            next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+            store.set(GAME_FAVORITES_KEY, [...next]);
+            window.IDKAccount?.sync?.();
+            render();
+          };
           tile.onclick = () => remember(item);
-          card.append(tile, favorite, availability); grid.append(card);
+          card.append(tile, favorite, availability);
+          fragment.append(card);
         });
+        grid.append(fragment);
+
+        if (matches.length > visibleLimit) {
+          const loadMore = el('button', {
+            className: 'btn tab games-load-more',
+            type: 'button',
+            textContent: `Load more games (${Math.min(24, matches.length - visibleLimit)} more)`
+          });
+          loadMore.onclick = () => {
+            visibleLimit += 24;
+            render();
+            requestAnimationFrame(() => loadMore.previousElementSibling?.scrollIntoView?.({ block: 'nearest' }));
+          };
+          grid.append(loadMore);
+        }
       };
-      search.oninput = render; filter.onchange = render; render();
+
+      search.oninput = () => { visibleLimit = 24; scheduleRender(); };
+      filter.onchange = () => { visibleLimit = 24; render(); };
+      render();
       return root;
     }
   },
