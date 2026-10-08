@@ -88,9 +88,11 @@ const PROXY = (() => {
     if (!window.BareMux?.BareMuxConnection) throw new Error('BareMux failed to load.');
 
     const scope = __uv$config.prefix;
+    const swURL = new URL(__uv$config.sw, location.href);
+    swURL.searchParams.set('idk', Date.now().toString());
     let registration;
     try {
-      registration = await navigator.serviceWorker.register(__uv$config.sw, {
+      registration = await navigator.serviceWorker.register(swURL.href, {
         scope,
         updateViaCache: 'none'
       });
