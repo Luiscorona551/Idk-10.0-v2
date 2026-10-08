@@ -45,6 +45,7 @@ const healthHandler = async (req, res) => res.status(200).json({ ok: true, servi
 app.get('/healthz', healthHandler);
 app.get('/api/health', healthHandler);
 setupRoutes(app);
+app.get('/api/session', (req, res) => res.json({ ok: true, session: hasSession(req) }));
 accountRoutes(app);
 friendRoutes(app);
 publicStoreRoutes(app);
