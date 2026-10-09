@@ -296,7 +296,7 @@ async function gamePlayerApp(options = {}) {
   fullscreen.onclick = () => frame.requestFullscreen?.().catch(() => { status.textContent = 'Fullscreen is unavailable in this browser.'; });
   help.onclick = () => { helpText.hidden = !helpText.hidden; };
   await load();
-  root.cleanup = () => { if (generatedSource && source) URL.revokeObjectURL(source); };
+  root.cleanup = () => { if (source && (generatedSource || /^blob:/.test(options.src || ''))) URL.revokeObjectURL(source); };
   return root;
 }
 
@@ -2003,14 +2003,33 @@ const APPS = {
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
         matches.slice(0, 80).forEach(item => {
           const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
-          const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
+          const tile = el('a', { className: 'tile', href: '#', 'aria-label': `Play ${item.title}` });
           const icon = el('span', { className: 'tile-icon' });
           if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
           const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
           const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
           const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
           favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
-          tile.onclick = () => remember(item);
+          tile.addEventListener('click', async event => {
+            event.preventDefault();
+            remember(item);
+            const originalTitle = title.textContent;
+            title.textContent = 'Loading…';
+            availability.textContent = 'Starting…';
+            try {
+              const src = await gameBlobURL(item.id);
+              if (typeof window.OS?.open !== 'function') {
+                URL.revokeObjectURL(src);
+                throw new Error('The IDK game player is unavailable. Reload the desktop and try again.');
+              }
+              window.OS.open('game-player', { title: item.title, src });
+              availability.textContent = 'Opened';
+            } catch (error) {
+              title.textContent = originalTitle;
+              availability.textContent = 'Unavailable';
+              window.OS?.notify?.('Games', error?.message || 'Could not open this game. Please try again.', 'danger');
+            }
+          });
           card.append(tile, favorite, availability); grid.append(card);
         });
       };
