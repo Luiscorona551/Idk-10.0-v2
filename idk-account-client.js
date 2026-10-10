@@ -132,7 +132,11 @@
     let st; try { st = await get('/api/account/status'); } catch { return false; }
     if (!st.configured) return true;
     if (st.authenticated) { await startUser(st.user); return true; }
-    sessionStorage.removeItem(HYDRATED_KEY); window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
+    // The account dialog must not block the desktop. Unauthenticated users can
+    // continue locally; account sign-in should be offered from setup/settings.
+    sessionStorage.removeItem(HYDRATED_KEY);
+    window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
+    return true;
      const o = modal(), form = o.querySelector('#idk-account-form'), toggle = o.querySelector('#idk-account-toggle'), recover = o.querySelector('#idk-account-recover'), title = o.querySelector('#idk-account-title'), copy = o.querySelector('#idk-account-copy'), submit = o.querySelector('#idk-account-submit'), avatar = o.querySelector('#idk-account-avatar-label'), passwordLabel = o.querySelector('#idk-account-password-label'), recoveryLabel = o.querySelector('#idk-account-recovery-label');
      let mode = 'login';
      toggle.onclick = () => { mode = mode === 'register' ? 'login' : 'register'; title.textContent = mode === 'register' ? 'Create your IDK account' : 'Welcome to IDK 10.0'; copy.textContent = mode === 'register' ? 'Your personal desktop will be saved securely to your account.' : 'Sign in to restore your personal desktop, games, Files and Messenger data.'; submit.textContent = mode === 'register' ? 'Create account' : 'Sign in'; toggle.textContent = mode === 'register' ? 'I already have an account' : 'Create account'; avatar.hidden = mode !== 'register'; recoveryLabel.hidden = true; passwordLabel.querySelector('label')?.remove?.(); form.querySelector('#idk-account-pass').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; };
