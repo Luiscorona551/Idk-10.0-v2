@@ -760,6 +760,13 @@ window.SYSTEM_APPS = (() => {
     const ask = async () => {
       const text = prompt.value.trim();
       if (!text || send.disabled) return;
+      if (window.IDKEchoDesktopCommands?.isCommand?.(text)) {
+        addMessage('user', text);
+        prompt.value = '';
+        addMessage('assistant', window.IDKEchoDesktopCommands.run(text));
+        status.textContent = 'Ready';
+        return;
+      }
        const url = endpoint.value.trim();
        if (!url) return;
        const selectedMode = mode.value;
