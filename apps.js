@@ -1957,7 +1957,7 @@ const APPS = {
       const items = names.map(name => ({
         id: name,
         title: gameTitle(name),
-        iconURLs: gameIconURLs(icons[name]),
+        iconURL: gameIconURL(icons[name]),
         search: `${name} ${gameTitle(name)}`.toLowerCase()
       }));
       return listApp({
