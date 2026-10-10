@@ -12,7 +12,8 @@
     clock: { label: 'Clock', icon: '◷', width: 245, height: 150 },
     notes: { label: 'Quick notes', icon: '✎', width: 285, height: 205 },
     system: { label: 'System status', icon: '▣', width: 245, height: 180 },
-    shortcuts: { label: 'Quick actions', icon: '⚡', width: 285, height: 190 }
+    shortcuts: { label: 'Quick actions', icon: '⚡', width: 285, height: 190 },
+    music: { label: 'Music', icon: '♫', width: 285, height: 190 }
   };
 
   const read = (key, fallback) => {
@@ -104,6 +105,13 @@
         body.querySelector('[data-shortcut="files"]').onclick = () => window.OS?.open?.('files');
         body.querySelector('[data-shortcut="lock"]').onclick = () => window.IDKFeaturePack?.lockScreen?.();
         body.querySelector('[data-shortcut="notifications"]').onclick = () => document.getElementById('notification-toggle')?.click();
+      } else if (type === 'music') {
+        const current = read('idkMusicState', {});
+        const title = current.title || current.track || 'No track selected';
+        const artist = current.artist || 'IDK Music';
+        body.innerHTML = `<strong>${esc(title)}</strong><span>${esc(artist)}</span><div class="idk-widget-music-actions"><button type="button" class="idk-widget-inline-action" data-music-open>Open Music</button><button type="button" class="idk-widget-inline-action" data-music-play>Play / Pause</button></div>`;
+        body.querySelector('[data-music-open]').onclick = () => window.OS?.open?.('music');
+        body.querySelector('[data-music-play]').onclick = () => window.OS?.open?.('music');
       } else if (type === 'sports') {
         const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard');
         const data = await response.json();
