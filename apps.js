@@ -242,7 +242,7 @@ function gamingCloudApp() {
   return root;
 }
 
-async function gameBlobURL(name) {
+async async function gameBlobURL(name) {
   const file = gameFileName(name);
   const url = GAME_CDN + encodeURIComponent(file) + "?t=" + Date.now();
   const res = await fetch(url, { cache: "no-store" });
