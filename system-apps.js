@@ -895,7 +895,7 @@ window.SYSTEM_APPS = (() => {
        else if (cmd === 'find' || cmd === 'searchfile') {
          if (!arg) return print('Usage: FIND <file name>');
          const matches = getFiles().filter(item => item.type === 'file' && item.name.toLowerCase().includes(arg.toLowerCase()));
-         print(matches.length ? matches.slice(0, 30).map(item => `${item.name} — ${item.parent ? getFiles().find(folder => folder.id === item.parent)?.name || 'folder' : 'C:\\\\IDK'}`).join('\n') : `No files matched: ${arg}`);
+         print(matches.length ? matches.slice(0, 30).map(item => `${item.name} — ${item.parent ? getFiles().find(folder => folder.id === item.parent)?.name || 'folder' : 'C:\\IDK'}`).join('\n') : `No files matched: ${arg}`);
        }
        else if (cmd === 'joke') print('Why did the computer get cold? It left its Windows open. 😄');
        else if (cmd === 'organize' && /^files?$/i.test(arg)) {
