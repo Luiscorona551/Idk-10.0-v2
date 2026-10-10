@@ -129,15 +129,14 @@
   }
 
   async function auth() {
-    let st; try { st = await get('/api/account/status'); } catch { return false; }
+    let st;
+    try { st = await get('/api/account/status'); } catch { return true; }
     if (!st.configured) return true;
     if (st.authenticated) { await startUser(st.user); return true; }
-    sessionStorage.removeItem(HYDRATED_KEY); window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
-     const o = modal(), form = o.querySelector('#idk-account-form'), toggle = o.querySelector('#idk-account-toggle'), recover = o.querySelector('#idk-account-recover'), title = o.querySelector('#idk-account-title'), copy = o.querySelector('#idk-account-copy'), submit = o.querySelector('#idk-account-submit'), avatar = o.querySelector('#idk-account-avatar-label'), passwordLabel = o.querySelector('#idk-account-password-label'), recoveryLabel = o.querySelector('#idk-account-recovery-label');
-     let mode = 'login';
-     toggle.onclick = () => { mode = mode === 'register' ? 'login' : 'register'; title.textContent = mode === 'register' ? 'Create your IDK account' : 'Welcome to IDK 10.0'; copy.textContent = mode === 'register' ? 'Your personal desktop will be saved securely to your account.' : 'Sign in to restore your personal desktop, games, Files and Messenger data.'; submit.textContent = mode === 'register' ? 'Create account' : 'Sign in'; toggle.textContent = mode === 'register' ? 'I already have an account' : 'Create account'; avatar.hidden = mode !== 'register'; recoveryLabel.hidden = true; passwordLabel.querySelector('label')?.remove?.(); form.querySelector('#idk-account-pass').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; };
-     recover.onclick = () => { mode = 'recover'; title.textContent = 'Reset your password'; copy.textContent = 'Use one unused recovery code generated from a signed-in device.'; submit.textContent = 'Reset password'; toggle.hidden = true; recover.hidden = true; avatar.hidden = true; recoveryLabel.hidden = false; passwordLabel.firstChild.textContent = 'New password'; form.querySelector('#idk-account-pass').autocomplete = 'new-password'; };
-     form.onsubmit = async e => { e.preventDefault(); const err = o.querySelector('#idk-account-error'); err.textContent = ''; submit.disabled = true; const body = { username: o.querySelector('#idk-account-user').value.trim(), password: o.querySelector('#idk-account-pass').value, avatar: o.querySelector('#idk-account-avatar').value.trim() || 'profile-1.jpg', currentPassword: o.querySelector('#idk-account-pass').value, newPassword: o.querySelector('#idk-account-pass').value, recoveryCode: o.querySelector('#idk-account-recovery').value.trim() }; try { const route = mode === 'register' ? '/api/account/register' : mode === 'recover' ? '/api/account/reset-password' : '/api/account/login'; const r = await post(route, mode === 'recover' ? { username: body.username, recoveryCode: body.recoveryCode, newPassword: body.newPassword } : { username: body.username, password: body.password, avatar: body.avatar }); if (!r.ok) { err.textContent = r.error || 'Could not sign in.'; submit.disabled = false; return; } o.remove(); await startUser(r.user); } catch { err.textContent = 'Could not connect to the IDK account service.'; submit.disabled = false; } };
+    // Never block desktop startup with the account overlay. Unauthenticated
+    // users continue locally; account sign-in remains a separate setup/settings flow.
+    sessionStorage.removeItem(HYDRATED_KEY);
+    window.dispatchEvent(new CustomEvent('idk-account-signed-out'));
     return true;
   }
 
