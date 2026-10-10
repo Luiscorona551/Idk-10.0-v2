@@ -194,9 +194,6 @@ function gameIconURL(path) {
   return path ? `${GAME_ICON_CDN}${path.split('/').map(encodeURIComponent).join('/')}` : '';
 }
 
-function gameTabURL(name) {
-  return `game.html?game=${encodeURIComponent(name)}`;
-}
 
 const GAMING_CLOUD_PROVIDERS = [
   { id: 'xbox', title: 'Xbox Cloud Gaming', url: 'https://www.xbox.com/play', glyph: 'X' },
@@ -249,13 +246,19 @@ async function gameBlobURL(name) {
   if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
   return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
 }
-function openGame(name, title) {
-  const popup = window.open(gameTabURL(name), '_blank', 'noopener');
-  if (!popup) {
-    window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
-    return Promise.resolve(false);
+async function openGame(name, title) {
+  const src = await gameBlobURL(name);
+  if (typeof window.OS?.open !== 'function') {
+    URL.revokeObjectURL(src);
+    throw new Error('The IDK game player is unavailable. Reload the desktop and try again.');
   }
-  return Promise.resolve(true);
+  try {
+    window.OS.open('game-player', { title: title || gameTitle(name), src });
+    return true;
+  } catch (error) {
+    URL.revokeObjectURL(src);
+    throw error;
+  }
 }
 
 async function gamePlayerApp(options = {}) {
@@ -1946,95 +1949,35 @@ const APPS = {
     desktop: true,
     width: 900,
     height: 620,
-    render: async function gamesRender() {
-      let names = [];
-      let icons = {};
-      let catalogError = '';
-      try {
-        names = await loadJSON('games.json');
-        icons = await loadJSON('game-icons.json').catch(() => ({}));
-      } catch (error) {
-        catalogError = error?.message || 'The game catalog is unavailable.';
-      }
-      if (!Array.isArray(names)) names = [];
-      if (!icons || typeof icons !== 'object') icons = {};
+    async render() {
+      const [names, icons] = await Promise.all([
+        loadJSON('games.json'),
+        loadJSON('game-icons.json').catch(() => ({}))
+      ]);
       const items = names.map(name => ({
         id: name,
         title: gameTitle(name),
-        iconURL: gameIconURL(icons[name]),
+        iconURLs: gameIconURLs(icons[name]),
         search: `${name} ${gameTitle(name)}`.toLowerCase()
       }));
-      const root = el('div', { className: 'games-app' });
-      const search = el('input', { className: 'field', type: 'search', placeholder: 'Search games…', 'aria-label': 'Search games' });
-      const filter = el('select', { className: 'field', 'aria-label': 'Game list filter' }, [
-        el('option', { value: 'all', textContent: 'All games' }),
-        el('option', { value: 'favorites', textContent: 'Favorites' }),
-        el('option', { value: 'recent', textContent: 'Recently played' })
-      ]);
-      const count = el('span', { className: 'count' });
-      const grid = el('div', { className: 'tile-grid' });
-      const toolbar = el('div', { className: 'toolbar' }, [search, filter, count]);
-      const cloud = gamingCloudApp();
-      const cloudToggle = el('button', { className: 'btn tab games-cloud-toggle', type: 'button', textContent: 'Gaming Cloud' });
-      const gamesToggle = el('button', { className: 'btn tab games-library-toggle', type: 'button', textContent: 'Game Library' });
-      const modeBar = el('div', { className: 'games-mode-bar' }, [gamesToggle, cloudToggle]);
-      cloud.hidden = true;
-      const showGames = () => { grid.hidden = false; toolbar.hidden = false; cloud.hidden = true; gamesToggle.classList.add('active'); cloudToggle.classList.remove('active'); };
-      const showCloud = () => { grid.hidden = true; toolbar.hidden = true; cloud.hidden = false; gamesToggle.classList.remove('active'); cloudToggle.classList.add('active'); };
-      gamesToggle.onclick = showGames; cloudToggle.onclick = showCloud;
-      root.append(modeBar, toolbar, grid, cloud);
-      gamesToggle.classList.add('active');
-      if (catalogError) {
-        root.append(emptyState(`The Games catalog could not be loaded right now.<br><small>${catalogError}</small><br><button class="btn tab" type="button" data-games-retry>Retry</button>`));
-        root.querySelector('[data-games-retry]')?.addEventListener('click', () => window.OS?.open?.('games'));
-        return root;
-      }
-      const favorites = () => new Set(store.get(GAME_FAVORITES_KEY, []));
-      const recents = () => store.get(GAME_RECENTS_KEY, []);
-      const remember = item => { const next = [{ id: item.id, title: item.title, at: Date.now() }, ...recents().filter(entry => entry.id !== item.id)].slice(0, 24); store.set(GAME_RECENTS_KEY, next); window.IDKAccount?.sync?.(); };
-      const render = () => {
-        const query = search.value.trim().toLowerCase();
-        const saved = favorites();
-        let matches = items.filter(item => !query || item.search.includes(query));
-        if (filter.value === 'favorites') matches = matches.filter(item => saved.has(item.id));
-        if (filter.value === 'recent') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches = matches.filter(item => order.has(item.id)).sort((a, b) => order.get(a.id) - order.get(b.id)); }
-        if (!query && filter.value === 'all') { const order = new Map(recents().map((entry, index) => [entry.id, index])); matches.sort((a, b) => (order.has(a.id) ? order.get(a.id) : 9999) - (order.has(b.id) ? order.get(b.id) : 9999)); }
-        grid.replaceChildren(); count.textContent = `${matches.length} of ${items.length}`;
-        if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
-        matches.slice(0, 80).forEach(item => {
-          const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
-          const tile = el('a', { className: 'tile', href: '#', 'aria-label': `Play ${item.title}` });
-          const icon = el('span', { className: 'tile-icon' });
-          if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
-          const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
-          const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
-          const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
-          favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
-          tile.addEventListener('click', async event => {
-            event.preventDefault();
-            remember(item);
-            const originalTitle = title.textContent;
-            title.textContent = 'Loading…';
-            availability.textContent = 'Starting…';
-            try {
-              const src = await gameBlobURL(item.id);
-              if (typeof window.OS?.open !== 'function') {
-                URL.revokeObjectURL(src);
-                throw new Error('The IDK game player is unavailable. Reload the desktop and try again.');
-              }
-              window.OS.open('game-player', { title: item.title, src });
-              availability.textContent = 'Opened';
-            } catch (error) {
-              title.textContent = originalTitle;
-              availability.textContent = 'Unavailable';
-              window.OS?.notify?.('Games', error?.message || 'Could not open this game. Please try again.', 'danger');
-            }
-          });
-          card.append(tile, favorite, availability); grid.append(card);
-        });
-      };
-      search.oninput = render; filter.onchange = render; render();
-      return root;
+      return listApp({
+        items,
+        placeholder: 'Search games…',
+        empty: 'No games found.',
+        async onOpen(item, tile) {
+          const title = tile.querySelector('.tile-title');
+          const label = title.textContent;
+          title.textContent = 'Loading…';
+          try {
+            const src = await gameBlobURL(item.id);
+            OS.open('game-player', { title: item.title, src });
+          } catch (err) {
+            window.OS?.notify?.('Games', err?.message || 'Could not open this game.', 'danger');
+          } finally {
+            title.textContent = label;
+          }
+        }
+      });
     }
   },
 
