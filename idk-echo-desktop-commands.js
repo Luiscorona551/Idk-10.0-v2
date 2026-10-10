@@ -136,8 +136,8 @@
   document.addEventListener('idk-data-changed', event => {
     if (event.detail?.type === 'files') refreshAwareness();
   });
-  const isCommand = value => /^(help|commands|what can you do)\\??$/i.test(String(value || '').trim()) ||
-    /\\b(joke|make me laugh|something funny|fun fact|interesting fact|organize|sort|find|search for|look for|show|list|open|launch|start|how many files|what files do i have)\\b/i.test(String(value || ''));
+  const isCommand = value => /^(help|commands|what can you do)\??$/i.test(String(value || '').trim()) ||
+    /\b(joke|make me laugh|something funny|fun fact|interesting fact|organize|sort|find|search for|look for|show|list|open|launch|start|how many files|what files do i have)\b/i.test(String(value || ''));
   window.IDKEchoDesktopCommands = { open: openPanel, run: runCommand, listFiles, isCommand };
   refreshAwareness();
 })();
