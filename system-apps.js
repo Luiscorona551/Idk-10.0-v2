@@ -871,7 +871,7 @@ window.SYSTEM_APPS = (() => {
        if (cmd === 'help' || cmd === '?') print('HELP  DIR  CD <folder>  CAT <file>  FIND <name>  ORGANIZE FILES  JOKE  OPEN <name>  START <name>  COLOR <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
        else if (cmd === 'dir' || cmd === 'ls' || cmd === 'apps') {
          const items = getFiles().filter(item => item.parent === current).map(item => item.type === 'folder' ? `<DIR> ${item.name}` : item.name);
-         print(cmd === 'apps' ? 'Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings' : (items.join('\\n') || 'Directory is empty.'));
+         print(cmd === 'apps' ? 'Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings' : (items.join('\n') || 'Directory is empty.'));
        }
        else if (cmd === 'cd') {
          if (!arg || arg === '.') return;
@@ -895,14 +895,14 @@ window.SYSTEM_APPS = (() => {
        else if (cmd === 'find' || cmd === 'searchfile') {
          if (!arg) return print('Usage: FIND <file name>');
          const matches = getFiles().filter(item => item.type === 'file' && item.name.toLowerCase().includes(arg.toLowerCase()));
-         print(matches.length ? matches.slice(0, 30).map(item => `${item.name} — ${item.parent ? getFiles().find(folder => folder.id === item.parent)?.name || 'folder' : 'C:\\\\IDK'}`).join('\\n') : `No files matched: ${arg}`);
+         print(matches.length ? matches.slice(0, 30).map(item => `${item.name} — ${item.parent ? getFiles().find(folder => folder.id === item.parent)?.name || 'folder' : 'C:\\\\IDK'}`).join('\n') : `No files matched: ${arg}`);
        }
        else if (cmd === 'joke') print('Why did the computer get cold? It left its Windows open. 😄');
        else if (cmd === 'organize' && /^files?$/i.test(arg)) {
          const files = getFiles();
          const folders = Object.fromEntries(['Documents', 'Pictures', 'Music', 'Videos', 'Downloads'].map(name => [name.toLowerCase(), files.find(item => item.type === 'folder' && item.parent === '' && item.name.toLowerCase() === name.toLowerCase())]));
          const category = name => {
-           const ext = (name.match(/\\.([^.]+)$/)?.[1] || '').toLowerCase();
+           const ext = (name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
            if (/^(png|jpe?g|gif|webp|svg|bmp|heic|avif)$/.test(ext)) return 'pictures';
            if (/^(mp3|wav|ogg|m4a|flac|aac)$/.test(ext)) return 'music';
            if (/^(mp4|mov|webm|mkv|avi)$/.test(ext)) return 'videos';
