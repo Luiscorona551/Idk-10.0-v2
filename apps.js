@@ -249,18 +249,13 @@ async function gameBlobURL(name) {
   if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
   return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
 }
-async function openGame(name, title) {
-  let src = '';
-  try {
-    src = await gameBlobURL(name);
-    if (typeof window.OS?.open !== 'function') throw new Error('The IDK game player is unavailable. Reload the desktop and try again.');
-    window.OS.open('game-player', { title: title || gameTitle(name), src });
-    return true;
-  } catch (error) {
-    if (src) URL.revokeObjectURL(src);
-    window.OS?.notify?.('Games', error?.message || 'This game could not be opened. Please try again.', 'danger');
-    return false;
+function openGame(name, title) {
+  const popup = window.open(gameTabURL(name), '_blank', 'noopener');
+  if (!popup) {
+    window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
+    return Promise.resolve(false);
   }
+  return Promise.resolve(true);
 }
 
 async function gamePlayerApp(options = {}) {
@@ -2008,14 +2003,14 @@ const APPS = {
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
         matches.slice(0, 80).forEach(item => {
           const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
-          const tile = el('button', { className: 'tile game-launch-button', type: 'button', title: `Play ${item.title}` });
+          const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
           const icon = el('span', { className: 'tile-icon' });
           if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
           const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
           const favorite = el('button', { className: 'game-favorite', type: 'button', textContent: saved.has(item.id) ? '★' : '☆', title: saved.has(item.id) ? 'Remove favorite' : 'Add favorite', 'aria-label': saved.has(item.id) ? `Remove ${item.title} from favorites` : `Add ${item.title} to favorites` });
           const availability = el('span', { className: 'game-availability', textContent: 'Ready' });
           favorite.onclick = event => { event.stopPropagation(); const next = favorites(); next.has(item.id) ? next.delete(item.id) : next.add(item.id); store.set(GAME_FAVORITES_KEY, [...next]); window.IDKAccount?.sync?.(); render(); };
-          tile.onclick = async () => { remember(item); availability.textContent = 'Loading…'; availability.classList.add('loading'); tile.disabled = true; try { const opened = await openGame(item.id, item.title); availability.textContent = opened ? 'Opened' : 'Could not open'; } finally { tile.disabled = false; availability.classList.remove('loading'); } };
+          tile.onclick = () => remember(item);
           card.append(tile, favorite, availability); grid.append(card);
         });
       };
@@ -2040,42 +2035,16 @@ const APPS = {
     width: 1000,
     height: 660,
     render() {
-      const root = el('div', { className: 'app soundboard-hub' });
-      const heading = el('div', { className: 'app-heading' }, [
-        el('div', {}, [el('h2', { textContent: 'Soundboard' }), el('p', { textContent: 'Choose a sound library. Sites open through the IDK browser instead of being embedded in a fragile frame.' })])
-      ]);
-      const status = el('p', { className: 'count', textContent: 'Choose a library to continue.' });
-      const list = el('div', { className: 'tile-grid soundboard-grid' });
       const sites = [
-        { title: 'SoundboardMax', url: 'https://soundboardmax.com/', detail: 'Browse community sound clips', glyph: '🔊' },
-        { title: 'Realm of Darkness', url: 'https://www.realmofdarkness.net/sb/soundboards/', detail: 'Soundboards and effects', glyph: '🌑' },
-        { title: 'iMyFone Soundboards', url: 'https://filme.imyfone.com/soundboards/?search=csgo', detail: 'Search soundboard collections', glyph: '🎧' }
+        { title: 'SoundboardMax', url: 'https://soundboardmax.com/' },
+        { title: 'Realm of Darkness', url: 'https://www.realmofdarkness.net/sb/soundboards/' },
+        { title: 'iMyFone Soundboards', url: 'https://filme.imyfone.com/soundboards/?search=csgo', embeddable: false }
       ];
-      sites.forEach(site => {
-        const button = el('button', { className: 'tile soundboard-card', type: 'button' }, [
-          el('span', { className: 'tile-icon', textContent: site.glyph }),
-          el('span', { className: 'tile-title', textContent: site.title }),
-          el('span', { className: 'soundboard-description', textContent: site.detail })
-        ]);
-        button.onclick = () => {
-          status.textContent = 'Opening ' + site.title + '…';
-          try {
-            if (typeof PROXY !== 'undefined' && typeof PROXY.encode === 'function') {
-              OS.open('proxy', { title: site.title, url: site.url });
-              status.textContent = site.title + ' opened in the IDK browser.';
-            } else {
-              OS.open('proxy', { title: site.title, url: site.url });
-              status.textContent = 'Opening ' + site.title + ' in the IDK browser.';
-            }
-          } catch (error) {
-            status.textContent = error?.message || 'Could not open this sound library.';
-            window.OS?.notify?.('Soundboard', status.textContent, 'danger');
-          }
-        };
-        list.append(button);
-      });
-      root.append(heading, status, list);
-      return root;
+
+      return tabbedApp(sites.map(site => ({
+        title: site.title,
+        render: () => externalSite(site.url, site.title, { embeddable: site.embeddable !== false })
+      })));
     }
   },
 
@@ -2113,23 +2082,7 @@ const APPS = {
     width: 1000,
     height: 660,
     render() {
-      const root = el('div', { className: 'app blooket-app' });
-      const heading = el('div', { className: 'app-heading' }, [
-        el('div', {}, [el('h2', { textContent: 'Blooket' }), el('p', { textContent: 'Open the official Blooket learning platform. The launcher stays lightweight and avoids embedding a third-party page that can break the app window.' })])
-      ]);
-      const status = el('p', { className: 'count', textContent: 'Ready to open Blooket.' });
-      const open = el('button', { className: 'btn primary', type: 'button', textContent: 'Open Official Blooket' });
-      open.onclick = () => {
-        try {
-          OS.open('proxy', { title: 'Blooket', url: 'https://www.blooket.com/' });
-          status.textContent = 'Opening the official Blooket site in the IDK browser.';
-        } catch (error) {
-          status.textContent = error?.message || 'Could not open Blooket.';
-          window.OS?.notify?.('Blooket', status.textContent, 'danger');
-        }
-      };
-      root.append(heading, status, open);
-      return root;
+      return externalSite('https://blooketbot.schoolcheats.net/', 'Blooket Bot', { embeddable: false });
     }
   },
 
