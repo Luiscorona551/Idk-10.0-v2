@@ -9,7 +9,57 @@ const gameURL=async name=>{const file=name.includes('.')&&name.lastIndexOf('.')>
 const result=(item,open)=>{const b=el('button',{className:'search-result',type:'button'}),i=el('span',{className:'search-result-icon'});const urls=item.iconURLs||[];if(urls.length){const img=el('img',{src:urls[0],alt:'',loading:'lazy'});let x=1;img.onerror=()=>{if(x<urls.length)img.src=urls[x++];else i.textContent=item.kind==='game'?'🎮':'▦'};i.append(img)}else i.innerHTML=item.glyph||'▦';b.append(i,el('span',{className:'search-result-copy'},[el('strong',{textContent:item.title}),el('small',{textContent:item.kind==='game'?'Game':'IDK app'})]));b.onclick=()=>open(item);return b};
 async function index(){const [names,icons]=await Promise.all([loadJSON('games.json'),loadJSON('game-icons.json').catch(()=>({}))]);const apps=Object.entries(window.APPS||{}).filter(([id,a])=>!['player','panic','search'].includes(id)&&a?.title).map(([id,a])=>({kind:'app',id,title:String(a.title),glyph:a.glyph,search:String(a.title).toLowerCase()}));const games=(Array.isArray(names)?names:[]).map(id=>({kind:'game',id,title:title(id),iconURLs:iconURLs(icons[id]),search:(id+' '+title(id)).toLowerCase()}));return{apps,games}};
 async function searchApp(){const root=el('div',{className:'search-app idk-search-v3'}),input=el('input',{className:'field',type:'search',placeholder:'Search apps, games, files…',autocomplete:'off'}),status=el('span',{className:'count',textContent:'Loading…'}),list=el('div',{className:'search-results'});root.append(el('div',{className:'toolbar'},[input,status]),list);let data={apps:[],games:[]};try{data=await index()}catch(e){status.textContent='Search index unavailable';list.append(el('div',{className:'empty-state'},[el('strong',{textContent:'Search is still available for apps.'}),el('p',{textContent:String(e.message||e)})]));data.apps=Object.entries(window.APPS||{}).filter(([id,a])=>id!=='search'&&a?.title).map(([id,a])=>({kind:'app',id,title:a.title,glyph:a.glyph,search:String(a.title).toLowerCase()}))}const render=()=>{const q=input.value.trim().toLowerCase();let all=q?[...data.apps,...data.games].filter(x=>x.search.includes(q)):data.apps.slice(0,120);const files=q?(()=>{try{return JSON.parse(localStorage.getItem('idkFileSystem')||'[]').filter(x=>x?.name&&String(x.name).toLowerCase().includes(q)).slice(0,40).map(x=>({kind:'file',id:x.id,title:x.name,search:String(x.name).toLowerCase()}))}catch{return[]}})():[];all=[...all,...files];list.replaceChildren();status.textContent=q?all.length+' result'+(all.length===1?'':'s'):data.games.length+' games · '+data.apps.length+' apps';if(!all.length){list.append(el('div',{className:'empty-state'},[el('strong',{textContent:'Nothing matched.'}),el('p',{textContent:'Try an app, game, or file name.'})]));return}all.slice(0,160).forEach(item=>list.append(result(item,x=>{if(x.kind==='app'){try{window.OS?.open(x.id)}catch(e){window.OS?.notify?.('Search',e.message||'Could not open app.','danger')}}else if(x.kind==='game'){const old=window.__IDK_GAME_LOAD;window.__IDK_GAME_LOAD=true;gameURL(x.id).then(src=>window.OS?.open('player',{title:x.title,src})).catch(e=>window.OS?.notify?.('Games',e.message||'Could not load game.','danger')).finally(()=>window.__IDK_GAME_LOAD=old)}else{window.OS?.open('files')}})))};input.oninput=render;render();setTimeout(()=>input.focus(),0);return root}
-async function gamesApp(){const root=el('div',{className:'app idk-games-v3'}),bar=el('div',{className:'toolbar'}),input=el('input',{className:'field',type:'search',placeholder:'Search games…'}),status=el('span',{className:'count',textContent:'Loading games…'}),grid=el('div',{className:'search-results'});bar.append(input,status);root.append(bar,grid);let data=[];try{const[n,ic]=await Promise.all([loadJSON('games.json'),loadJSON('game-icons.json').catch(()=>({}))]);data=n.map(id=>({id,title:title(id),iconURLs:iconURLs(ic[id]),search:(id+' '+title(id)).toLowerCase()}))}catch(e){grid.append(el('div',{className:'empty-state'},[el('strong',{textContent:'Games could not load.'}),el('p',{textContent:'The desktop is still running. Try again later.'})]));status.textContent='Games unavailable';return root}const render=()=>{const q=input.value.trim().toLowerCase(),items=data.filter(x=>!q||x.search.includes(q));grid.replaceChildren();status.textContent=items.length+' game'+(items.length===1?'':'s');items.slice(0,180).forEach(item=>grid.append(result({...item,kind:'game'},async x=>{const tile=grid.querySelector('.loading-game');try{grid.querySelectorAll('.loading-game').forEach(n=>n.classList.remove('loading-game'));const src=await gameURL(x.id);window.OS?.open('player',{title:x.title,src})}catch(e){window.OS?.notify?.('Games',e.message||'Could not load that game.','danger')}})))};input.oninput=render;render();return root}
+async function gamesApp(){
+  const root=el('div',{className:'app idk-games-v3'});
+  const bar=el('div',{className:'toolbar'});
+  const input=el('input',{className:'field',type:'search',placeholder:'Search games…',autocomplete:'off'});
+  const status=el('span',{className:'count',textContent:'Loading games…'});
+  const grid=el('div',{className:'search-results'});
+  bar.append(input,status);root.append(bar,grid);
+  let data=[];
+  try{
+    const[n,ic]=await Promise.all([loadJSON('games.json'),loadJSON('game-icons.json').catch(()=>({}))]);
+    if(!Array.isArray(n))throw Error('The games catalog has an unexpected format.');
+    data=n.map(id=>({id,title:title(id),iconURLs:iconURLs(ic[id]),search:(id+' '+title(id)).toLowerCase()}));
+  }catch(e){
+    grid.append(el('div',{className:'empty-state'},[el('strong',{textContent:'Games could not load.'}),el('p',{textContent:String(e.message||'Check the games catalog and try again.')})]));
+    status.textContent='Games unavailable';
+    return root;
+  }
+  const render=()=>{
+    const q=input.value.trim().toLowerCase();
+    const items=data.filter(x=>!q||x.search.includes(q));
+    grid.replaceChildren();
+    status.textContent=items.length+' game'+(items.length===1?'':'s');
+    if(!items.length)grid.append(el('div',{className:'empty-state'},[el('strong',{textContent:'No games found.'}),el('p',{textContent:'Try another search.'})]));
+    items.slice(0,180).forEach(item=>{
+      const tile=result({...item,kind:'game'},async x=>{
+        if(tile.disabled)return;
+        tile.disabled=true;
+        tile.classList.add('loading-game');
+        status.textContent='Loading '+x.title+'…';
+        let src='';
+        try{
+          src=await gameURL(x.id);
+          if(!window.OS||typeof window.OS.open!=='function')throw Error('The desktop app launcher is not ready. Close this window and try again.');
+          await window.OS.open('game-player',{title:x.title,src});
+          status.textContent='Opened '+x.title;
+        }catch(e){
+          if(src)URL.revokeObjectURL(src);
+          status.textContent='Could not open '+x.title;
+          window.OS?.notify?.('Games',e.message||'Could not load game.','danger');
+        }finally{
+          tile.disabled=false;
+          tile.classList.remove('loading-game');
+        }
+      });
+      grid.append(tile);
+    });
+  };
+  input.oninput=render;
+  render();
+  return root;
+}
 function install(){if(!window.APPS)return false;window.APPS.search=window.APPS.search||{};window.APPS.games=window.APPS.games||{};window.APPS.search.render=searchApp;window.APPS.games.render=gamesApp;return true}
 if(!install()){let n=0,t=setInterval(()=>{if(install()||++n>100)clearInterval(t)},50)}
 })();
