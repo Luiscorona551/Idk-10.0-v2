@@ -760,6 +760,13 @@ window.SYSTEM_APPS = (() => {
     const ask = async () => {
       const text = prompt.value.trim();
       if (!text || send.disabled) return;
+      if (window.IDKEchoDesktopCommands?.isCommand?.(text)) {
+        addMessage('user', text);
+        prompt.value = '';
+        addMessage('assistant', window.IDKEchoDesktopCommands.run(text));
+        status.textContent = 'Ready';
+        return;
+      }
        const url = endpoint.value.trim();
        if (!url) return;
        const selectedMode = mode.value;
@@ -861,10 +868,10 @@ window.SYSTEM_APPS = (() => {
        const [raw, ...rest] = value.split(/\s+/);
        const cmd = raw.toLowerCase();
        const arg = rest.join(' ');
-       if (cmd === 'help' || cmd === '?') print('HELP  DIR  CD <folder>  CAT <file>  OPEN <name>  START <name>  COLOR <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
+       if (cmd === 'help' || cmd === '?') print('HELP  DIR  CD <folder>  CAT <file>  FIND <name>  ORGANIZE FILES  JOKE  OPEN <name>  START <name>  COLOR <name>  NOTES  FILES  CALC  CALENDAR  TODO  IMAGES  TIMER  WEATHER  AI  PAINT  SPEAKER  SEARCH  CLS  VER  DATE  TIME  ECHO <text>');
        else if (cmd === 'dir' || cmd === 'ls' || cmd === 'apps') {
          const items = getFiles().filter(item => item.parent === current).map(item => item.type === 'folder' ? `<DIR> ${item.name}` : item.name);
-         print(cmd === 'apps' ? 'Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings' : (items.join('\\n') || 'Directory is empty.'));
+         print(cmd === 'apps' ? 'Apps  Search  Files  Notes  Calculator  Calendar  To-do  Images  Stopwatch  Speaker  Paint  Weather  AI  Terminal  Games  Movies  Music  Soundboard  Browser  Settings' : (items.join('\n') || 'Directory is empty.'));
        }
        else if (cmd === 'cd') {
          if (!arg || arg === '.') return;
@@ -884,6 +891,32 @@ window.SYSTEM_APPS = (() => {
            try { print(await blobFor(file).then(blob => blob ? blob.text() : '(file unavailable)')); }
            catch { print('(file unavailable)'); }
          } else print('(binary file)');
+       }
+       else if (cmd === 'find' || cmd === 'searchfile') {
+         if (!arg) return print('Usage: FIND <file name>');
+         const matches = getFiles().filter(item => item.type === 'file' && item.name.toLowerCase().includes(arg.toLowerCase()));
+         print(matches.length ? matches.slice(0, 30).map(item => `${item.name} — ${item.parent ? getFiles().find(folder => folder.id === item.parent)?.name || 'folder' : 'C:\\IDK'}`).join('\n') : `No files matched: ${arg}`);
+       }
+       else if (cmd === 'joke') print('Why did the computer get cold? It left its Windows open. 😄');
+       else if (cmd === 'organize' && /^files?$/i.test(arg)) {
+         const files = getFiles();
+         const folders = Object.fromEntries(['Documents', 'Pictures', 'Music', 'Videos', 'Downloads'].map(name => [name.toLowerCase(), files.find(item => item.type === 'folder' && item.parent === '' && item.name.toLowerCase() === name.toLowerCase())]));
+         const category = name => {
+           const ext = (name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
+           if (/^(png|jpe?g|gif|webp|svg|bmp|heic|avif)$/.test(ext)) return 'pictures';
+           if (/^(mp3|wav|ogg|m4a|flac|aac)$/.test(ext)) return 'music';
+           if (/^(mp4|mov|webm|mkv|avi)$/.test(ext)) return 'videos';
+           if (/^(pdf|docx?|txt|md|rtf|odt|csv|xlsx?|pptx?|json|html?|css|js|ts)$/.test(ext)) return 'documents';
+           if (/^(zip|rar|7z|tar|gz|exe|msi|dmg|iso|apk)$/.test(ext)) return 'downloads';
+           return '';
+         };
+         const movable = files.filter(item => item.type === 'file' && !item.parent && category(item.name) && folders[category(item.name)]);
+         if (!movable.length) return print('No root files matched the built-in file categories.');
+         if (!window.confirm(`Move ${movable.length} file(s) into their matching IDK folders? Nothing will be deleted.`)) return print('Organization cancelled.');
+         movable.forEach(item => { item.parent = folders[category(item.name)].id; item.updated = Date.now(); });
+         localStorage.setItem('idkFileSystem', JSON.stringify(files));
+         window.dispatchEvent(new CustomEvent('idk-data-changed', { detail: { type: 'files', command: 'organize' } }));
+         print(`Organized ${movable.length} file(s) into matching folders. No files were deleted.`);
        }
        else if (cmd === 'color') {
          const color = arg.toLowerCase();
