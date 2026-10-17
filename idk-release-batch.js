@@ -126,7 +126,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installRelease, { once: true }); else installRelease();
   window.addEventListener('error', event => { if (event?.message) notify('IDK', 'Something went wrong. Try the action again.', 'error'); });
   window.addEventListener('unhandledrejection', event => { if (event?.reason) notify('IDK', 'A background task failed. Try again.', 'error'); });
-  window.IDKReleaseBatch.openEchoPanel = openEchoPanel;
+  
   window.IDKReleaseBatch = { scan, openEchoPanel };
   const install = () => { scan(); new MutationObserver(scan).observe(document.body, { childList: true, subtree: true }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
