@@ -192,7 +192,7 @@ const PROXY = (() => {
   }
 
   const files = [
-    '/idk-gaming-cloud.css', '/idk-batch-fourteen.css', '/idk-game-fix.js',
+    '/idk-gaming-cloud.css', '/idk-batch-fourteen.css',
     '/idk-batch-fourteen.js', '/idk-batch-sixteen.js', '/idk-release-batch.css',
     '/idk-release-next.js', '/idk-redesign.css', '/idk-redesign.js',
     '/idk-all-six.css', '/idk-all-six.js', '/idk-rooms.css', '/idk-rooms.js',
