@@ -16,6 +16,7 @@ import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
 import { databaseStatus } from './idk-db-health.js';
 import { publicStoreRoutes } from './idk-public-store-server.js';
 import { vmBackendStatus, vmRoutes, handleVmUpgrade } from './idk-vm-backend.js';
+import { mountVmUi } from './idk-vm-ui.js';
 
 const require = createRequire(import.meta.url);
 const epoxyPath = join(dirname(require.resolve('@mercuryworkshop/epoxy-transport')), '../dist');
@@ -52,6 +53,7 @@ publicStoreRoutes(app);
 const vmRouter = express.Router();
 vmRoutes(vmRouter);
 app.use('/api/vm', vmRouter);
+mountVmUi(app);
 app.get('/api/status', async (req, res) => res.json({ ok: true, vmApi: process.env.IDK_VM_API || '/api/vm', ...(await backendStatus()) }));
 app.get('/api/deploy/status', async (req, res) => res.json({
   ok: true,
