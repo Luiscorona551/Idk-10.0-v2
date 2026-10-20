@@ -5,9 +5,15 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { WebSocketServer } from 'ws';
 
-const DATA_DIR = process.env.IDK_VM_DATA_DIR || path.resolve(process.cwd(), 'data');
-const VM_DATA_FILE = path.join(DATA_DIR, 'idk-vms.json');
-const DISK_DIR = path.join(DATA_DIR, 'vm-disks');
+const DATA_DIR_CANDIDATES = [
+  process.env.IDK_VM_DATA_DIR ? String(process.env.IDK_VM_DATA_DIR) : null,
+  '/data/idk-vm',
+  path.resolve(process.cwd(), 'data'),
+].filter(Boolean);
+let DATA_DIR = DATA_DIR_CANDIDATES[DATA_DIR_CANDIDATES.length - 1];
+let VM_DATA_FILE = path.join(DATA_DIR, 'idk-vms.json');
+let DISK_DIR = path.join(DATA_DIR, 'vm-disks');
+let storeReady = false;
 const QEMU_BINARY = process.env.QEMU_BINARY || 'qemu-system-x86_64';
 const QEMU_IMG_BINARY = process.env.QEMU_IMG_BINARY || 'qemu-img';
 const ENABLE_QEMU = process.env.ENABLE_QEMU !== 'false';
@@ -35,7 +41,18 @@ const allowedFirmwares = new Set(['bios', 'uefi']);
 const allowedAdapters = new Set(['virtio', 'e1000', 'rtl8139']);
 
 async function ensureStore() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  if (!storeReady) {
+    let chosen = null, lastError = null;
+    for (const candidate of DATA_DIR_CANDIDATES) {
+      try { await fs.mkdir(candidate, { recursive: true }); chosen = candidate; break; }
+      catch (error) { lastError = error; }
+    }
+    if (!chosen) throw lastError || new Error('No writable VM data directory available');
+    DATA_DIR = chosen;
+    VM_DATA_FILE = path.join(DATA_DIR, 'idk-vms.json');
+    DISK_DIR = path.join(DATA_DIR, 'vm-disks');
+    storeReady = true;
+  }
   await fs.mkdir(DISK_DIR, { recursive: true });
   try { await fs.access(VM_DATA_FILE); } catch { await fs.writeFile(VM_DATA_FILE, '[]'); }
 }
