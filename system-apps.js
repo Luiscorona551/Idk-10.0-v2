@@ -197,6 +197,18 @@ window.SYSTEM_APPS = (() => {
   function filesApp() {
     const root = ui('div', { className: 'system-app files-app' });
     const entries = getFiles();
+    entries.forEach(folder => {
+      if (folder.type !== 'folder') return;
+      const seen = new Set();
+      let cursor = folder.id;
+      let steps = 0;
+      while (cursor && steps < 512) {
+        if (seen.has(cursor)) { folder.parent = ''; break; }
+        seen.add(cursor);
+        cursor = entries.find(item => item.id === cursor)?.parent || '';
+        steps += 1;
+      }
+    });
     let current = '';
     const history = [''];
     let historyIndex = 0;
@@ -294,6 +306,7 @@ window.SYSTEM_APPS = (() => {
       if (destination === null) return;
       const folder = folders.find(item => item.name.toLowerCase() === destination.trim().toLowerCase());
       if (destination.trim() && !folder) return window.OS?.notify('Files', 'That folder was not found.');
+      if (folder && entry.type === 'folder' && isDescendant(folder.id, entry.id)) return window.OS?.notify('Files', 'A folder cannot be moved inside itself.');
       entry.parent = folder?.id || '';
       entry.updated = Date.now();
       persist();
@@ -308,9 +321,14 @@ window.SYSTEM_APPS = (() => {
 
     const isDescendant = (folderId, parentId) => {
       let cursor = folderId;
-      while (cursor) {
+      const seen = new Set();
+      let steps = 0;
+      while (cursor && steps < 512) {
+        if (seen.has(cursor)) return false;
+        seen.add(cursor);
         if (cursor === parentId) return true;
         cursor = entries.find(item => item.id === cursor)?.parent || '';
+        steps += 1;
       }
       return false;
     };
@@ -1137,7 +1155,7 @@ window.SYSTEM_APPS = (() => {
   function webAgentApp() {
     const root = ui('div', { className: 'system-app web-agent-app' });
     const log = ui('div', { className: 'web-agent-log', role: 'log', 'aria-live': 'polite' });
-    const prompt = ui('textarea', { className: 'web-agent-prompt', rows: 2, placeholder: 'Ask Echo to open an app, list files, organize the desktop, tell a joke, or give a fun fact…' });
+    const prompt = ui('textarea', { className: 'web-agent-prompt', rows: 2, placeholder: 'Ask Echo anything, or say “open Games”, “organize desktop”, “list my files”…' });
     const send = ui('button', { className: 'btn', type: 'button', textContent: 'Ask Echo' });
     const status = ui('span', { className: 'count', textContent: 'Ready' });
 
@@ -1156,6 +1174,24 @@ window.SYSTEM_APPS = (() => {
       icons.forEach(icon => layer?.append(icon));
       window.OS?.notify?.('IDK Echo', 'Desktop organized alphabetically.', 'success');
       return 'Done — I organized the desktop alphabetically.';
+    };
+
+    const askEchoAI = async question => {
+      const fileNames = getFiles().filter(item => item.type === 'file' && item.parent === '').slice(0, 12).map(item => item.name);
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'chat',
+          messages: [
+            { role: 'system', content: 'You are IDK Echo, the web agent inside the IDK 10.0 desktop. Answer clearly and briefly in plain text. Desktop actions such as opening apps, organizing the desktop, and listing files are handled by the local command layer, so never claim you performed an OS action yourself.' },
+            { role: 'user', content: `${question}\n\nDesktop context: ${fileNames.length ? `Files on the desktop: ${fileNames.join(', ')}.` : 'No files on the desktop yet.'}` }
+          ]
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || 'The AI service is unavailable right now.');
+      return data.choices?.[0]?.message?.content || data.output_text || 'I could not get an answer from the AI service.';
     };
 
     const localAction = value => {
@@ -1181,15 +1217,15 @@ window.SYSTEM_APPS = (() => {
     const ask = async () => {
       const text = prompt.value.trim();
       if (!text) return;
-      add('user', text); prompt.value = ''; send.disabled = true; status.textContent = 'Working…';
+      add('user', text); prompt.value = ''; send.disabled = true; status.textContent = 'Thinking…';
       try {
         const result = localAction(text);
         if (result) { add('assistant', result); status.textContent = 'Ready'; return; }
-        add('assistant', 'I can help with the IDK desktop. Try “organize desktop”, “list my files”, “open Files”, “tell me a joke”, or “fun fact”.');
+        add('assistant', await askEchoAI(text));
         status.textContent = 'Ready';
       } catch (error) {
         add('assistant', error?.message || 'I could not complete that action.');
-        status.textContent = 'Error';
+        status.textContent = 'Ready';
       } finally { send.disabled = false; prompt.focus(); }
     };
 
