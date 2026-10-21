@@ -130,4 +130,124 @@
   window.IDKReleaseBatch = { scan, openEchoPanel };
   const install = () => { scan(); new MutationObserver(scan).observe(document.body, { childList: true, subtree: true }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
+
+  const SMART_UNDO_KEY = 'idkSmartDesktopUndo';
+  const SMART_SUGGESTION_KEY = 'idkSmartDesktopSuggestion';
+  const SMART_FOLDERS = { image:'Pictures', audio:'Music', video:'Videos', document:'Documents', other:'Downloads' };
+  const smartRead = (key, fallback) => { try { const value=localStorage.getItem(key); return value===null?fallback:JSON.parse(value); } catch { return fallback; } };
+  const smartWrite = (key,value) => { try { localStorage.setItem(key,JSON.stringify(value)); } catch {} };
+  const smartNotify = (title,message,kind='info') => window.OS?.notify?.(title,message,kind);
+  const smartFiles = () => {
+    const files=window.IDKFiles?.getFiles?.();
+    if(Array.isArray(files)) return files;
+    const stored=smartRead('idkFileSystem',[]);
+    return Array.isArray(stored)?stored:[];
+  };
+  const smartKind = file => {
+    const name=String(file?.name||''), mime=String(file?.mime||'').toLowerCase();
+    if(mime.startsWith('image/')||/\.(png|jpe?g|gif|webp|svg|bmp|avif|heic)$/i.test(name)) return 'image';
+    if(mime.startsWith('audio/')||/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(name)) return 'audio';
+    if(mime.startsWith('video/')||/\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(name)) return 'video';
+    if(mime.startsWith('text/')||/\.(txt|md|pdf|docx?|xlsx?|pptx?|csv|json|xml|html?|css|js|ts|rtf)$/i.test(name)) return 'document';
+    return 'other';
+  };
+  const smartRootFiles = () => smartFiles().filter(item=>item?.type==='file'&&!item.parent);
+  const smartFolderId = (files,name) => files.find(item=>item?.type==='folder'&&!item.parent&&String(item.name).toLowerCase()===name.toLowerCase())?.id;
+  let smartPanel=null;
+  function refreshSmartPanel(){
+    if(!smartPanel?.isConnected)return;
+    const files=smartFiles().filter(item=>item?.type==='file').sort((a,b)=>(b.updated||0)-(a.updated||0)).slice(0,8);
+    const list=smartPanel.querySelector('[data-smart-recent]');
+    list?.replaceChildren(...files.map(file=>{
+      const row=document.createElement('button'); row.type='button'; row.className='idk-smart-file-row';
+      row.innerHTML=`<span class="idk-smart-file-icon">📄</span><span><strong>${String(file.name||'File').replace(/[&<>"]/g,'')}</strong><small>${file.parent?'Stored in IDK Files':'On Desktop'} · ${file.updated?new Date(file.updated).toLocaleString():'Recently added'}</small></span>`;
+      row.onclick=()=>window.OS?.open?.('files');
+      return row;
+    }));
+    if(!files.length) list?.append(Object.assign(document.createElement('p'),{className:'idk-smart-empty',textContent:'No files yet.'}));
+    const count=smartRootFiles().length;
+    const summary=smartPanel.querySelector('[data-smart-root-count]');
+    if(summary)summary.textContent=`${count} file${count===1?'':'s'} on the desktop`;
+    const undo=smartPanel.querySelector('[data-smart-undo]');
+    if(undo)undo.disabled=!smartRead(SMART_UNDO_KEY,null)?.changes?.length;
+  }
+  function smartUndo(){
+    const snapshot=smartRead(SMART_UNDO_KEY,null);
+    if(!snapshot?.changes?.length){smartNotify('Smart Desktop','There is no recent organization to undo.','warning');return false;}
+    const files=smartFiles(); let restored=0;
+    snapshot.changes.forEach(change=>{const file=files.find(item=>item.id===change.id);if(!file)return;file.parent=change.parent||'';file.updated=Date.now();restored++;});
+    smartWrite('idkFileSystem',files); smartWrite(SMART_UNDO_KEY,null);
+    window.dispatchEvent(new CustomEvent('idk-files-changed'));
+    smartNotify('Smart Desktop',`Restored ${restored} file${restored===1?'':'s'} to the previous locations.`,'success');
+    refreshSmartPanel(); return true;
+  }
+  function smartOrganize(fileIds=null){
+    const files=smartFiles(), target=fileIds?new Set(fileIds):null, changes=[];
+    files.filter(item=>item?.type==='file'&&(!target||target.has(item.id))).forEach(file=>{
+      if(target&&file.parent) return;
+      const folderId=smartFolderId(files,SMART_FOLDERS[smartKind(file)]);
+      if(!folderId||file.parent===folderId)return;
+      changes.push({id:file.id,parent:file.parent||''}); file.parent=folderId; file.updated=Date.now();
+    });
+    if(!changes.length){smartNotify('Smart Desktop','Your selected files are already organized.','info');return 0;}
+    smartWrite(SMART_UNDO_KEY,{at:Date.now(),changes}); smartWrite('idkFileSystem',files);
+    window.dispatchEvent(new CustomEvent('idk-files-changed'));
+    smartNotify('Smart Desktop',`Organized ${changes.length} file${changes.length===1?'':'s'} by type. Undo is available.`,'success');
+    refreshSmartPanel(); return changes.length;
+  }
+  function openSmartDesktop(){
+    smartPanel?.remove();
+    smartPanel=document.createElement('section'); smartPanel.id='idk-smart-desktop-panel'; smartPanel.setAttribute('role','dialog');
+    smartPanel.innerHTML='<div class="idk-smart-desktop-card"><button type="button" class="idk-smart-close" data-close aria-label="Close Smart Desktop">×</button><span class="idk-smart-kicker">IDK SMART DESKTOP 2.0</span><h2>Keep your desktop organized</h2><p>Echo can organize local IDK files by type without deleting anything.</p><div class="idk-smart-actions"><button type="button" data-organize>Organize desktop files</button><button type="button" data-undo>Undo last organization</button><button type="button" data-files>Open Files</button></div><div class="idk-smart-summary"><strong data-smart-root-count></strong><span>Drop files onto Echo for a quick organize suggestion.</span></div><h3>Recently added</h3><div data-smart-recent class="idk-smart-recent"></div><p class="idk-smart-tip">Nothing is deleted. Every automatic move can be undone once.</p></div>';
+    document.body.append(smartPanel);
+    smartPanel.querySelector('[data-close]').onclick=()=>{smartPanel.remove();smartPanel=null;};
+    smartPanel.onclick=e=>{if(e.target===smartPanel){smartPanel.remove();smartPanel=null;}};
+    smartPanel.querySelector('[data-organize]').onclick=()=>smartOrganize();
+    smartPanel.querySelector('[data-undo]').onclick=smartUndo;
+    smartPanel.querySelector('[data-files]').onclick=()=>window.OS?.open?.('files');
+    refreshSmartPanel();
+  }
+  function addSmartEchoControls(){
+    const panel=document.getElementById('idk-echo-action-center');
+    if(panel&&!panel.querySelector('[data-echo-action="smart"]')){
+      const grid=panel.querySelector('.idk-echo-action-grid'), button=document.createElement('button');
+      button.type='button'; button.dataset.echoAction='smart'; button.textContent='🧠 Smart Desktop'; grid?.append(button);
+      button.onclick=()=>{openSmartDesktop();panel.remove();};
+    }
+    const echo=document.getElementById('echo-companion');
+    if(!echo||echo.dataset.idkSmartEcho)return;
+    echo.dataset.idkSmartEcho='1';
+    echo.addEventListener('dragover',e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();e.stopPropagation();echo.classList.add('idk-echo-drop-ready');}});
+    echo.addEventListener('dragleave',()=>echo.classList.remove('idk-echo-drop-ready'));
+    echo.addEventListener('drop',async e=>{
+      const files=[...(e.dataTransfer?.files||[])]; if(!files.length)return;
+      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();echo.classList.remove('idk-echo-drop-ready');
+      try{
+        const entries=await window.SYSTEM_APPS?.importFiles?.(files),ids=(entries||[]).map(item=>item.id).filter(Boolean);
+        smartNotify('IDK Echo',`Added ${files.length} file${files.length===1?'':'s'} to IDK Files.`,'success'); openSmartDesktop();
+        if(ids.length){smartPanel.querySelector('[data-organize]').onclick=()=>smartOrganize(ids);smartPanel.querySelector('.idk-smart-summary span').textContent='These files are ready to organize by type.';}
+      }catch(error){smartNotify('IDK Echo',error?.message||'Could not import the dropped files.','error');}
+    },true);
+  }
+  function smartCleanupSuggestion(){
+    const count=smartRootFiles().length,last=smartRead(SMART_SUGGESTION_KEY,0);
+    if(count<12||count===last)return;
+    smartWrite(SMART_SUGGESTION_KEY,count);
+    setTimeout(()=>{
+      if(document.getElementById('idk-smart-cleanup-toast'))return;
+      const toast=document.createElement('div');toast.id='idk-smart-cleanup-toast';toast.className='idk-smart-cleanup-toast';
+      toast.innerHTML=`<strong>Desktop is getting busy</strong><span>${count} files are on your desktop. Want Echo to organize them?</span><div><button type="button" data-yes>Organize</button><button type="button" data-no>Not now</button></div>`;
+      document.body.append(toast);toast.querySelector('[data-yes]').onclick=()=>{toast.remove();smartOrganize();};toast.querySelector('[data-no]').onclick=()=>toast.remove();
+    },700);
+  }
+  function installSmartDesktop(){
+    if(window.__IDKSmartDesktopInstalled)return; window.__IDKSmartDesktopInstalled=true;
+    addSmartEchoControls(); smartCleanupSuggestion();
+    window.addEventListener('idk-files-changed',()=>{refreshSmartPanel();setTimeout(smartCleanupSuggestion,120);});
+    window.IDKSmartDesktop={open:openSmartDesktop,organize:smartOrganize,undo:smartUndo,recent:smartRecentFiles};
+  }
+  const smartRecentFiles=()=>smartFiles().filter(item=>item?.type==='file').sort((a,b)=>(b.updated||0)-(a.updated||0)).slice(0,8);
+  const previousScan=scan; scan=function(){previousScan();addSmartEchoControls();};
+  installSmartDesktop();
+
 })();
