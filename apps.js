@@ -2082,7 +2082,7 @@ const APPS = {
     width: 1000,
     height: 660,
     render() {
-      return externalSite('https://blooketbot.schoolcheats.net/', 'Blooket Bot', { embeddable: false });
+      return externalSite('https://www.blooket.com/', 'Blooket', { embeddable: false });
     }
   },
 
