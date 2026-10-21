@@ -249,13 +249,10 @@ async function gameBlobURL(name) {
   if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
   return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
 }
-function openGame(name, title) {
-  const popup = window.open(gameTabURL(name), '_blank', 'noopener');
-  if (!popup) {
-    window.OS?.notify?.('Games', 'Allow pop-ups to open games in a new tab.', 'danger');
-    return Promise.resolve(false);
-  }
-  return Promise.resolve(true);
+async function openGame(name, title) {
+  const src = await gameBlobURL(name);
+  window.OS?.open('player', { title: title || gameTitle(name), src });
+  return true;
 }
 
 async function gamePlayerApp(options = {}) {
@@ -2003,7 +2000,16 @@ const APPS = {
         if (!matches.length) { grid.append(emptyState(filter.value === 'favorites' ? 'No favorite games yet.' : filter.value === 'recent' ? 'Games you open will appear here.' : 'No games found.')); return; }
         matches.slice(0, 80).forEach(item => {
           const card = el('article', { className: 'game-tile-card' }); card.dataset.gameId = item.id;
-          const tile = el('a', { className: 'tile', href: gameTabURL(item.id), target: '_blank', rel: 'noopener' });
+          const tile = el('a', { className: 'tile', href: '#' });
+          tile.addEventListener('click', event => {
+            event.preventDefault();
+            const label = tile.querySelector('.tile-title');
+            const before = label?.textContent || item.title;
+            if (label) label.textContent = 'Loading…';
+            openGame(item.id, item.title)
+              .catch(error => window.OS?.notify?.('Games', error?.message || 'Could not load the game.', 'danger'))
+              .finally(() => { if (label) label.textContent = before; });
+          });
           const icon = el('span', { className: 'tile-icon' });
           if (item.iconURL) { const image = el('img', { src: item.iconURL, alt: '', loading: 'lazy', decoding: 'async' }); image.onerror = () => icon.replaceChildren(el('span', { className: 'tile-fallback', textContent: '🎮' })); icon.append(image); } else icon.append(el('span', { className: 'tile-fallback', textContent: '🎮' }));
           const title = el('span', { className: 'tile-title', textContent: item.title }); tile.append(icon, title);
@@ -2108,7 +2114,18 @@ const APPS = {
         value: opts.url || ''
       });
       const go = el('button', { className: 'btn tab', type: 'button', textContent: 'Go' });
-      bar.append(url, go, scopeToggle, status);
+      const fullscreen = el('button', { className: 'btn tab', type: 'button', textContent: 'Fullscreen' });
+      fullscreen.addEventListener('click', () => {
+        if (document.fullscreenElement) { document.exitFullscreen?.(); return; }
+        try {
+          const request = frame.requestFullscreen?.();
+          if (request && typeof request.catch === 'function') request.catch(() => window.OS?.notify?.('Browser', 'Fullscreen was blocked.', 'danger'));
+        } catch (error) {
+          window.OS?.notify?.('Browser', 'Fullscreen is unavailable here.', 'danger');
+        }
+      });
+      document.addEventListener('fullscreenchange', () => { fullscreen.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+      bar.append(url, go, fullscreen, scopeToggle, status);
 
       if (!await PROXY.backendAvailable()) {
         root.append(bar, emptyState(

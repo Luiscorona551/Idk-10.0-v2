@@ -156,33 +156,113 @@
     root.id = 'idk-mail-app';
     let folder = 'inbox';
     let selected = null;
+    let query = '';
     const data = () => { const value = read(MAIL_KEY, []); return Array.isArray(value) ? value : []; };
-    root.innerHTML = `<header class="idk-mail-top"><strong>Mail</strong><small>Simple email workspace</small></header><nav class="idk-mail-tabs"><button type="button" data-folder="inbox" class="active">Inbox</button><button type="button" data-folder="sent">Sent</button><button type="button" data-compose>Compose</button></nav><div class="idk-mail-body"><aside class="idk-mail-list"></aside><main class="idk-mail-content"></main></div>`;
-    const list = root.querySelector('.idk-mail-list');
+    root.innerHTML = `<header class="idk-mail-top"><strong>Idk Express</strong><small>Express email workspace</small></header><nav class="idk-mail-tabs"><button type="button" data-folder="inbox" class="active">Inbox</button><button type="button" data-folder="starred">Starred</button><button type="button" data-folder="drafts">Drafts</button><button type="button" data-folder="sent">Sent</button><button type="button" data-compose>Compose</button></nav><div class="idk-mail-body"><aside class="idk-mail-list"><input class="idk-mail-search" type="search" placeholder="Search mail…" aria-label="Search mail" style="width:calc(100% - 12px);margin:8px 6px;padding:8px 10px;border-radius:10px;border:1px solid rgba(110,160,230,.25);background:rgba(255,255,255,.06);color:inherit"><div class="idk-mail-items"></div></aside><main class="idk-mail-content"></main></div>`;
+    const list = root.querySelector('.idk-mail-items');
     const content = root.querySelector('.idk-mail-content');
+    const searchBox = root.querySelector('.idk-mail-search');
+    searchBox.oninput = () => { query = searchBox.value.trim().toLowerCase(); renderList(); };
+    const matches = (item, text) => !text || `${item.from || ''} ${item.to || ''} ${item.subject || ''} ${item.body || ''}`.toLowerCase().includes(text);
     const renderList = () => {
       list.replaceChildren();
-      const messages = data().filter(item => item.folder === folder);
-      if (!messages.length) { list.append(Object.assign(document.createElement('p'), { className: 'idk-mail-status', textContent: folder === 'inbox' ? 'No messages yet.' : 'Nothing sent yet.' })); return; }
-      messages.forEach(item => { const button = document.createElement('button'); button.className = `idk-mail-item${selected === item.id ? ' active' : ''}`; button.type = 'button'; button.innerHTML = `<strong>${esc(folder === 'sent' ? item.to : item.from || 'IDK')}</strong><small>${esc(item.subject || '(no subject)')}</small>`; button.onclick = () => { selected = item.id; renderList(); renderMessage(item); }; list.append(button); });
+      const messages = data().filter(item => (folder === 'starred' ? Boolean(item.star) : item.folder === folder) && matches(item, query));
+      const emptyText = folder === 'starred' ? 'No starred messages yet.' : folder === 'drafts' ? 'No drafts yet.' : folder === 'sent' ? 'Nothing sent yet.' : 'No messages yet.';
+      if (!messages.length) { list.append(Object.assign(document.createElement('p'), { className: 'idk-mail-status', textContent: emptyText })); return; }
+      messages.forEach(item => {
+        const button = document.createElement('button');
+        button.className = `idk-mail-item${selected === item.id ? ' active' : ''}`;
+        button.type = 'button';
+        const who = folder === 'sent' || folder === 'drafts' ? item.to : item.from || 'IDK';
+        button.innerHTML = `<strong>${esc(who || '(no recipient)')}</strong><small>${esc(item.subject || '(no subject)')}</small>${item.star ? ' <span title="Starred">★</span>' : ''}`;
+        button.onclick = () => { selected = item.id; if (folder === 'drafts') renderCompose(item); else renderMessage(item); renderList(); };
+        list.append(button);
+      });
     };
-    const renderMessage = item => { content.innerHTML = `<article class="idk-mail-message"><h3>${esc(item.subject || '(no subject)')}</h3><small>${esc(item.from || 'You')} → ${esc(item.to || 'You')} · ${new Date(item.at).toLocaleString()}</small><p>${esc(item.body)}</p></article>`; };
-    const renderCompose = () => { selected = null; content.innerHTML = `<form class="idk-mail-compose"><label>To<input type="email" required placeholder="name@example.com"></label><label>Subject<input required placeholder="Subject"></label><label>Message<textarea required placeholder="Write your message..."></textarea></label><div class="idk-mail-actions"><button class="btn" type="submit">Send</button><span class="idk-mail-status" data-status></span></div><p class="idk-mail-status">Messages are saved in Sent on this desktop. Use the delivery link after sending to open your email provider.</p></form>`; content.querySelector('form').onsubmit = event => { event.preventDefault(); const inputs = content.querySelectorAll('input,textarea'); const message = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, folder: 'sent', to: inputs[0].value.trim(), subject: inputs[1].value.trim(), body: inputs[2].value.trim(), at: Date.now() }; const messages = data(); messages.unshift(message); write(MAIL_KEY, messages); const status = content.querySelector('[data-status]'); status.textContent = 'Saved to Sent.'; const delivery = document.createElement('a'); delivery.className = 'btn tab'; delivery.href = `mailto:${encodeURIComponent(message.to)}?subject=${encodeURIComponent(message.subject)}&body=${encodeURIComponent(message.body)}`; delivery.textContent = 'Open in email provider'; content.querySelector('.idk-mail-actions').append(delivery); renderList(); notify('Mail', `Message saved for ${message.to}.`); }; };
-    const render = () => { renderList(); if (selected) renderMessage(data().find(item => item.id === selected)); else renderCompose(); };
-    root.querySelectorAll('[data-folder]').forEach(button => button.onclick = () => { folder = button.dataset.folder; root.querySelectorAll('[data-folder]').forEach(item => item.classList.toggle('active', item === button)); render(); });
-    root.querySelector('[data-compose]').onclick = () => { folder = 'sent'; root.querySelectorAll('[data-folder]').forEach(item => item.classList.remove('active')); renderCompose(); };
+    const renderMessage = item => {
+      content.innerHTML = `<article class="idk-mail-message"><h3>${esc(item.subject || '(no subject)')}</h3><small>${esc(item.from || 'You')} → ${esc(item.to || 'You')} · ${new Date(item.at).toLocaleString()}</small><p>${esc(item.body)}</p></article>`;
+      const actions = document.createElement('div');
+      actions.className = 'idk-mail-actions';
+      actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';
+      const star = document.createElement('button');
+      star.type = 'button'; star.className = 'btn tab'; star.textContent = item.star ? '★ Starred' : '☆ Star';
+      star.onclick = () => { item.star = !item.star; write(MAIL_KEY, data()); renderMessage(item); renderList(); };
+      const reply = document.createElement('button');
+      reply.type = 'button'; reply.className = 'btn tab'; reply.textContent = 'Reply';
+      reply.onclick = () => renderCompose({ to: item.from || '', subject: item.subject ? `Re: ${item.subject}` : '', body: `\n\n----------\n${new Date(item.at).toLocaleString()}, ${item.from || 'them'} wrote:\n${item.body || ''}` });
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'btn tab'; remove.textContent = 'Delete';
+      remove.onclick = () => {
+        if (!window.confirm(`Delete "${item.subject || 'this message'}"?`)) return;
+        write(MAIL_KEY, data().filter(entry => entry.id !== item.id));
+        selected = null;
+        renderList(); renderCompose();
+        notify('Idk Express', 'Message deleted.');
+      };
+      const delivery = document.createElement('a');
+      delivery.className = 'btn tab'; delivery.textContent = 'Open in email provider';
+      delivery.href = `mailto:${encodeURIComponent(item.to || '')}?subject=${encodeURIComponent(item.subject || '')}&body=${encodeURIComponent(item.body || '')}`;
+      actions.append(star, reply, remove, delivery);
+      content.querySelector('.idk-mail-message').append(actions);
+    };
+    const renderCompose = (draft = null) => {
+      selected = draft ? draft.id : null;
+      content.innerHTML = `<form class="idk-mail-compose"><label>To<input type="email" required placeholder="name@example.com" value="${esc(draft?.to || '')}"></label><label>Subject<input required placeholder="Subject" value="${esc(draft?.subject || '')}"></label><label>Message<textarea required placeholder="Write your message...">${esc(draft?.body || '')}</textarea></label><div class="idk-mail-actions"><button class="btn" type="submit">Send</button><button class="btn tab" type="button" data-save-draft>Save draft</button><span class="idk-mail-status" data-status></span></div><p class="idk-mail-status">Messages are saved in Sent on this desktop. Use the delivery link after sending to open your email provider.</p></form>`;
+      const form = content.querySelector('form');
+      form.onsubmit = event => {
+        event.preventDefault();
+        const inputs = form.querySelectorAll('input,textarea');
+        const messages = data();
+        if (draft) {
+          const index = messages.findIndex(entry => entry.id === draft.id);
+          if (index >= 0) messages.splice(index, 1);
+        }
+        const message = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, folder: 'sent', to: inputs[0].value.trim(), subject: inputs[1].value.trim(), body: inputs[2].value.trim(), at: Date.now(), star: false };
+        messages.unshift(message);
+        write(MAIL_KEY, messages);
+        const status = form.querySelector('[data-status]');
+        status.textContent = 'Saved to Sent.';
+        const delivery = document.createElement('a');
+        delivery.className = 'btn tab';
+        delivery.href = `mailto:${encodeURIComponent(message.to)}?subject=${encodeURIComponent(message.subject)}&body=${encodeURIComponent(message.body)}`;
+        delivery.textContent = 'Open in email provider';
+        form.querySelector('.idk-mail-actions').append(delivery);
+        renderList();
+        notify('Idk Express', `Message saved for ${message.to}.`);
+      };
+      form.querySelector('[data-save-draft]').onclick = () => {
+        const inputs = form.querySelectorAll('input,textarea');
+        const messages = data();
+        const savedDraft = { id: draft ? draft.id : `${Date.now()}-${Math.random().toString(36).slice(2)}`, folder: 'drafts', to: inputs[0].value.trim(), subject: inputs[1].value.trim(), body: inputs[2].value.trim(), at: Date.now(), star: false };
+        const index = draft ? messages.findIndex(entry => entry.id === draft.id) : -1;
+        if (index >= 0) messages[index] = savedDraft; else messages.unshift(savedDraft);
+        write(MAIL_KEY, messages);
+        form.querySelector('[data-status]').textContent = 'Draft saved.';
+        renderList();
+        notify('Idk Express', 'Draft saved.');
+      };
+    };
+    const render = () => {
+      renderList();
+      const current = selected ? data().find(item => item.id === selected) : null;
+      if (current && current.folder === 'drafts') renderCompose(current);
+      else if (current) renderMessage(current);
+      else renderCompose();
+    };
+    root.querySelectorAll('[data-folder]').forEach(button => button.onclick = () => { folder = button.dataset.folder; selected = null; root.querySelectorAll('[data-folder]').forEach(item => item.classList.toggle('active', item === button)); render(); });
+    root.querySelector('[data-compose]').onclick = () => { folder = 'sent'; selected = null; root.querySelectorAll('[data-folder]').forEach(item => item.classList.remove('active')); renderCompose(); };
     render();
     return root;
   }
 
   function installMail() {
     if (typeof APPS === 'undefined') return;
-    APPS.mail = { title: 'Mail', glyph: '✉', desktop: false, dock: false, width: 860, height: 600, render: mailApp };
+    APPS.mail = { title: 'Idk Express', glyph: '✉', desktop: false, dock: false, width: 860, height: 600, render: mailApp };
     const icons = document.getElementById('icons');
     if (icons && !icons.querySelector('[data-final-app="mail"]')) {
       const icon = document.createElement('button');
       icon.type = 'button'; icon.className = 'idk-final-desktop-icon'; icon.dataset.finalApp = 'mail';
-      icon.innerHTML = '<span>✉</span><label>Mail</label>';
+      icon.innerHTML = '<span>✉</span><label>Idk Express</label>';
       icon.onclick = () => window.OS?.open?.('mail');
       icons.append(icon);
     }
