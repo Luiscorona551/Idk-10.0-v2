@@ -2044,12 +2044,12 @@ const APPS = {
       const sites = [
         { title: 'SoundboardMax', url: 'https://soundboardmax.com/' },
         { title: 'Realm of Darkness', url: 'https://www.realmofdarkness.net/sb/soundboards/' },
-        { title: 'iMyFone Soundboards', url: 'https://filme.imyfone.com/soundboards/?search=csgo', embeddable: false }
+        { title: 'iMyFone Soundboards', url: 'https://filme.imyfone.com/soundboards/?search=csgo' }
       ];
 
       return tabbedApp(sites.map(site => ({
         title: site.title,
-        render: () => externalSite(site.url, site.title, { embeddable: site.embeddable !== false })
+        render: () => externalSite(site.url, site.title, { embeddable: false })
       })));
     }
   },
@@ -2088,7 +2088,7 @@ const APPS = {
     width: 1000,
     height: 660,
     render() {
-      return externalSite('https://blooketbot.schoolcheats.net/', 'Blooket Bot', { embeddable: false });
+      return externalSite('https://www.blooket.com/', 'Blooket', { embeddable: false });
     }
   },
 

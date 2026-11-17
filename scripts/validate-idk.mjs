@@ -31,6 +31,8 @@ const apps = readFileSync(join(root, 'apps.js'), 'utf8');
 if (!apps.includes('https://open.spotify.com/')) { console.error('Official Spotify entry is missing.'); process.exitCode = 1; }
 if (/7reels\.cc/i.test(apps)) { console.error('Unapproved movie source found.'); process.exitCode = 1; }
 if (!apps.includes('GAME_FAVORITES_KEY') || !apps.includes('game-player-toolbar')) { console.error('Game quality controls are missing.'); process.exitCode = 1; }
+if (!apps.includes("https://www.blooket.com/")) { console.error('Official Blooket entry is missing.'); process.exitCode = 1; }
+if (!apps.includes('soundboard:') || !apps.includes('render: () => externalSite(site.url, site.title, { embeddable: false })')) { console.error('Soundboard sources must use the safe external launch flow.'); process.exitCode = 1; }
 const server = readFileSync(join(root, 'server.js'), 'utf8');
 if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
 if (process.argv.includes('--smoke')) {
