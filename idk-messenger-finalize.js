@@ -69,8 +69,16 @@
     document.addEventListener('click', routeMessengerIcon, true);
     removeLegacyLaunchers();
     style();
-    const observer = new MutationObserver(refineMessenger);
-    observer.observe(document.body, { childList: true, subtree: true });
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; refineMessenger(); });
+    });
+    const targets = ['windows', 'icons', 'start-apps', 'start-recent']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    targets.forEach(target => observer.observe(target, { childList: true, subtree: true }));
     refineMessenger();
     setTimeout(() => observer.disconnect(), 15000);
   };
