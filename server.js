@@ -171,7 +171,7 @@ app.get('/uv/uv.sw.js', (req, res) => serviceWorkerResponse(res, uvServiceWorker
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
-const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-account-server\.js|idk-friends-server\.js|idk-db-health\.js|Dockerfile|render\.yaml|\.env)/;
+const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-friends-server\.js|idk-db-health\.js|Dockerfile|render\.yaml|\.env)/;
 app.use((req, res, next) => (PRIVATE.test(req.path) ? res.sendStatus(404) : next()));
 app.use(express.static(root, { extensions: ['html'], dotfiles: 'ignore' }));
 const httpsKey = process.env.HTTPS_KEY_FILE, httpsCert = process.env.HTTPS_CERT_FILE;
@@ -202,7 +202,7 @@ server.listen(port, host, () => {
   Promise.resolve()
     .then(() => initFriendsDb())
     .then(() => {
-      console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
+      console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'}`);
     })
     .catch(error => {
       console.error('IDK database initialization failed; server will remain available:', error);
