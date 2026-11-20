@@ -69,7 +69,18 @@
   function boot() {
     installStyle();
     document.querySelectorAll('.chat-app').forEach(watch);
-    new MutationObserver(() => document.querySelectorAll('.chat-app').forEach(watch)).observe(document.body,{childList:true,subtree:true});
+    const layer = document.getElementById('windows');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          layer.querySelectorAll('.chat-app').forEach(watch);
+        });
+      }).observe(layer, { childList: true, subtree: true });
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
 })();
