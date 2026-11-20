@@ -91,28 +91,6 @@ $('install-now-btn').addEventListener('click', () => {
   }, 5000);
 });
 
-$('reg-next').addEventListener('click', () => {
-  if ($('reg-no').checked) {
-    alert('Closing Setup...');
-    window.close();
-    window.location.href = 'about:blank';
-    return;
-  }
-  show('setup2');
-});
-
-$('accounts-next').addEventListener('click', () => {
-  const name = $('account-name').value.trim();
-  if (name) {
-    try {
-      localStorage.setItem('chatName', JSON.stringify(name));
-    } catch (e) {
-      // Continue setup when private browsing or browser storage blocks saving.
-    }
-  }
-  show('setup3');
-});
-
 $('key-next').addEventListener('click', async () => {
   const button = $('key-next');
   button.disabled = true;
