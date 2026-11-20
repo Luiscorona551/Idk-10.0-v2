@@ -31,6 +31,8 @@ const apps = readFileSync(join(root, 'apps.js'), 'utf8');
 if (!apps.includes('https://open.spotify.com/')) { console.error('Official Spotify entry is missing.'); process.exitCode = 1; }
 if (/7reels\.cc/i.test(apps)) { console.error('Unapproved movie source found.'); process.exitCode = 1; }
 if (!apps.includes('GAME_FAVORITES_KEY') || !apps.includes('game-player-toolbar')) { console.error('Game quality controls are missing.'); process.exitCode = 1; }
+if (!apps.includes("names = await loadJSON('games.json')") || !apps.includes('function gameHTMLURL(name)') || !apps.includes('return GAME_CDN + encodeURIComponent(file);') || !apps.includes("const src = gameHTMLURL(name);")) { console.error('Games app must load games.json and open each game through its matching HTML URL.'); process.exitCode = 1; }
+if (apps.includes('gameBlobURL(') || apps.includes('URL.createObjectURL(new Blob([await res.text()]')) { console.error('Games must open the original HTML URL directly, not a generated blob URL.'); process.exitCode = 1; }
 if (!apps.includes("https://www.blooket.com/")) { console.error('Official Blooket entry is missing.'); process.exitCode = 1; }
 if (!apps.includes('soundboard:') || !apps.includes('render: () => externalSite(site.url, site.title, { embeddable: false })')) { console.error('Soundboard sources must use the safe external launch flow.'); process.exitCode = 1; }
 const server = readFileSync(join(root, 'server.js'), 'utf8');
