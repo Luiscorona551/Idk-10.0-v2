@@ -2086,83 +2086,189 @@ const APPS = {
     }
   },
 
-   proxy: {
-     title: 'Browser',
+  proxy: {
+    title: 'Browser',
     glyph: '🌐',
     desktop: true,
     multi: true,
-    width: 1040,
-    height: 680,
+    width: 1100,
+    height: 720,
     async render(opts = {}) {
-      const root = el('div', { className: 'site-frame' });
-      const frame = el('iframe', { allow: 'autoplay; fullscreen; clipboard-write' });
-      const status = el('span', { className: 'count', textContent: 'Checking browser server…' });
-      const scopePanel = el('section', { className: 'idk-browser-scope', hidden: true });
-      const scopeToggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Server scope' });
-
-      const bar = el('div', { className: 'toolbar' });
-      const url = el('input', {
-        className: 'field',
-        type: 'text',
-        placeholder: 'Search or enter a URL',
-        value: opts.url || ''
-      });
+      const root = el('div', { className: 'site-frame idk-browser-v2' });
+      const tabsBar = el('div', { className: 'idk-browser-tabs', role: 'tablist', 'aria-label': 'Browser tabs' });
+      const toolbar = el('div', { className: 'toolbar idk-browser-v2-toolbar' });
+      const back = el('button', { className: 'btn tab', type: 'button', textContent: '←', title: 'Back', 'aria-label': 'Back' });
+      const forward = el('button', { className: 'btn tab', type: 'button', textContent: '→', title: 'Forward', 'aria-label': 'Forward' });
+      const reload = el('button', { className: 'btn tab', type: 'button', textContent: '↻', title: 'Reload', 'aria-label': 'Reload' });
+      const home = el('button', { className: 'btn tab', type: 'button', textContent: '⌂', title: 'Home', 'aria-label': 'Home' });
+      const url = el('input', { className: 'field idk-browser-address', type: 'text', inputMode: 'url', autocomplete: 'url', spellcheck: false, placeholder: 'Search or enter a URL', 'aria-label': 'Search or enter a URL', value: opts.url || '' });
       const go = el('button', { className: 'btn tab', type: 'button', textContent: 'Go' });
-      const fullscreen = el('button', { className: 'btn tab', type: 'button', textContent: 'Fullscreen' });
-      fullscreen.addEventListener('click', () => {
-        if (document.fullscreenElement) { document.exitFullscreen?.(); return; }
-        try {
-          const request = frame.requestFullscreen?.();
-          if (request && typeof request.catch === 'function') request.catch(() => window.OS?.notify?.('Browser', 'Fullscreen was blocked.', 'danger'));
-        } catch (error) {
-          window.OS?.notify?.('Browser', 'Fullscreen is unavailable here.', 'danger');
+      const bookmark = el('button', { className: 'btn tab', type: 'button', textContent: '☆', title: 'Bookmark page', 'aria-label': 'Bookmark page' });
+      const bookmarks = el('button', { className: 'btn tab', type: 'button', textContent: 'Bookmarks' });
+      const historyButton = el('button', { className: 'btn tab', type: 'button', textContent: 'History' });
+      const newTab = el('button', { className: 'btn tab', type: 'button', textContent: '+', title: 'New tab', 'aria-label': 'New tab' });
+      const fullscreen = el('button', { className: 'btn tab', type: 'button', textContent: '⛶ Fullscreen' });
+      const status = el('span', { className: 'count idk-browser-status', role: 'status', textContent: 'Checking browser server…' });
+      toolbar.append(back, forward, reload, home, url, go, bookmark, bookmarks, historyButton, fullscreen, status);
+      const scopePanel = el('section', { className: 'idk-browser-scope', hidden: true });
+      const content = el('div', { className: 'idk-browser-v2-content' });
+      const library = el('section', { className: 'idk-browser-v2-library', hidden: true });
+      const tabs = [];
+      let activeId = '';
+      let scopeToggle;
+      const readList = key => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value.filter(item => item && typeof item.url === 'string' && /^https?:/i.test(item.url)) : []; } catch { return []; } };
+      const writeList = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { status.textContent = 'Browser storage is unavailable'; } };
+      const active = () => tabs.find(tab => tab.id === activeId);
+      const safeTitle = value => { try { return new URL(value).hostname.replace(/^www\./, '') || 'New tab'; } catch { return 'New tab'; } };
+      const normalize = value => {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^(https?:\/\/|about:blank)/i.test(raw)) return raw;
+        if (/^(localhost|[\w.-]+\.[a-z]{2,})(:\d+)?([/?#].*)?$/i.test(raw)) return 'https://' + raw;
+        return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+      };
+      const renderTabs = () => {
+        tabsBar.replaceChildren();
+        tabs.forEach(tab => {
+          const button = el('button', { className: 'idk-browser-tab' + (tab.id === activeId ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': String(tab.id === activeId), title: tab.url || 'New tab' });
+          const label = el('span', { textContent: tab.title || 'New tab' });
+          const close = el('b', { textContent: '×', title: 'Close tab', role: 'button', tabindex: '0' });
+          close.addEventListener('click', event => { event.stopPropagation(); closeTab(tab.id); });
+          close.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); closeTab(tab.id); } });
+          button.append(label, close);
+          button.addEventListener('click', () => activate(tab.id));
+          tabsBar.append(button);
+        });
+        newTab.disabled = tabs.length >= 12;
+      };
+      const updateNav = () => {
+        const tab = active();
+        back.disabled = !tab || tab.index <= 0;
+        forward.disabled = !tab || tab.index >= tab.history.length - 1;
+        reload.disabled = !tab || !tab.url;
+        bookmark.disabled = !tab || !tab.url;
+        bookmark.textContent = tab && readList('idkBrowserBookmarks-v2').some(item => item.url === tab.url) ? '★' : '☆';
+        url.value = tab?.url || '';
+      };
+      const activate = id => {
+        activeId = id;
+        tabs.forEach(tab => { tab.frame.hidden = tab.id !== id; });
+        library.hidden = true;
+        renderTabs();
+        updateNav();
+      };
+      const closeTab = id => {
+        const index = tabs.findIndex(tab => tab.id === id);
+        if (index < 0) return;
+        const [tab] = tabs.splice(index, 1);
+        tab.frame.remove();
+        if (!tabs.length) createTab();
+        else if (activeId === id) activate(tabs[Math.max(0, index - 1)].id);
+        renderTabs();
+      };
+      const navigate = async (target, options = {}) => {
+        const tab = active();
+        const destination = normalize(target);
+        if (!tab || !destination) return;
+        status.textContent = 'Loading…';
+        tab.title = safeTitle(destination);
+        tab.url = destination;
+        const visits = readList('idkBrowserHistory-v2').filter(item => item.url !== destination);
+        visits.unshift({ url: destination, title: tab.title, visitedAt: Date.now() });
+        writeList('idkBrowserHistory-v2', visits.slice(0, 100));
+        if (options.history !== false) {
+          tab.history = tab.history.slice(0, tab.index + 1);
+          tab.history.push(destination);
+          tab.index = tab.history.length - 1;
         }
-      });
-      document.addEventListener('fullscreenchange', () => { fullscreen.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
-      bar.append(url, go, fullscreen, scopeToggle, status);
-
-      if (!await PROXY.backendAvailable()) {
-        root.append(bar, emptyState(
-           'The Browser server is not running.<br>Start the site with <code>npm start</code> ' +
-          '(or deploy it to a Node host) instead of opening the files directly.'
-        ));
-        url.disabled = true;
-        go.disabled = true;
-        return root;
-      }
-
-      const scope = await PROXY.serverScope();
-      status.textContent = scope.scope ? `Server scope ${scope.scope} · Ready` : 'Ready';
-      const scopeHeading = el('div', { className: 'idk-browser-scope-heading' }, [
-        el('strong', { textContent: 'Browser Server Scope' }),
-        el('small', { textContent: 'The server routes browser traffic through this scope.' })
-      ]);
-      const scopeGrid = el('div', { className: 'idk-browser-scope-grid' }, [
-        el('div', {}, [el('small', { textContent: 'Status' }), el('strong', { textContent: scope.proxy ? 'Ready' : 'Unavailable' })]),
-        el('div', {}, [el('small', { textContent: 'Scope' }), el('strong', { textContent: scope.scope || 'Unavailable' })]),
-        el('div', {}, [el('small', { textContent: 'Transport' }), el('strong', { textContent: scope.transport || 'Unavailable' })]),
-        el('div', {}, [el('small', { textContent: 'Origin' }), el('strong', { textContent: scope.origin || location.origin })])
-      ]);
-      scopePanel.append(scopeHeading, scopeGrid);
-      scopeToggle.addEventListener('click', () => { scopePanel.hidden = !scopePanel.hidden; scopeToggle.textContent = scopePanel.hidden ? 'Server scope' : 'Hide scope'; });
-       const navigate = async () => {
-        if (!url.value.trim()) return;
-        status.textContent = 'Connecting…';
+        url.value = destination;
+        renderTabs();
+        updateNav();
         try {
-          frame.src = await PROXY.encode(url.value);
-          status.textContent = 'Connected';
-        } catch (err) {
-          status.textContent = err.message;
+          tab.frame.src = await PROXY.encode(destination);
+          status.textContent = 'Loading ' + safeTitle(destination) + '…';
+        } catch (error) {
+          status.textContent = error?.message || 'Could not open this page';
         }
       };
-
-      go.addEventListener('click', navigate);
-      url.addEventListener('keydown', event => {
-        if (event.key === 'Enter') navigate();
+      const createTab = (initial = '') => {
+        if (tabs.length >= 12) { status.textContent = 'You can have up to 12 tabs open'; return; }
+        const frame = el('iframe', { className: 'idk-browser-frame', title: 'Browser page', allow: 'autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture' });
+        frame.addEventListener('load', () => { if (activeId === frame.dataset.tabId) status.textContent = 'Page loaded'; });
+        frame.addEventListener('error', () => { if (activeId === frame.dataset.tabId) status.textContent = 'This page could not be loaded'; });
+        const tab = { id: 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), title: 'New tab', url: '', history: [], index: -1, frame };
+        frame.dataset.tabId = tab.id;
+        tabs.push(tab);
+        content.append(frame);
+        activate(tab.id);
+        if (initial) navigate(initial);
+        else status.textContent = 'Ready';
+      };
+      const showLibrary = mode => {
+        library.replaceChildren();
+        library.hidden = false;
+        const heading = el('strong', { textContent: mode === 'history' ? 'Recently visited' : 'Bookmarks' });
+        const entries = readList(mode === 'history' ? 'idkBrowserHistory-v2' : 'idkBrowserBookmarks-v2');
+        const list = el('div', { className: 'idk-browser-v2-list' });
+        entries.slice(0, 30).forEach(item => {
+          const row = el('div', { className: 'idk-browser-v2-list-row' }, [
+            el('span', { textContent: item.title || safeTitle(item.url), title: item.url }),
+            el('button', { className: 'btn tab', type: 'button', textContent: 'Open' })
+          ]);
+          row.querySelector('button').addEventListener('click', () => { library.hidden = true; navigate(item.url); });
+          list.append(row);
+        });
+        if (!entries.length) list.append(el('span', { textContent: mode === 'history' ? 'No browsing history yet.' : 'No bookmarks saved yet.' }));
+        const close = el('button', { className: 'btn tab', type: 'button', textContent: 'Close' });
+        close.addEventListener('click', () => { library.hidden = true; });
+        library.append(heading, close, list);
+      };
+      back.addEventListener('click', () => { const tab = active(); if (tab?.index > 0) { tab.index--; navigate(tab.history[tab.index], { history: false }); } });
+      forward.addEventListener('click', () => { const tab = active(); if (tab && tab.index < tab.history.length - 1) { tab.index++; navigate(tab.history[tab.index], { history: false }); } });
+      reload.addEventListener('click', () => { const tab = active(); if (tab?.url) navigate(tab.url, { history: false }); });
+      home.addEventListener('click', () => navigate('https://www.google.com/'));
+      go.addEventListener('click', () => navigate(url.value));
+      url.addEventListener('keydown', event => { if (event.key === 'Enter') navigate(url.value); });
+      newTab.addEventListener('click', () => createTab());
+      bookmark.addEventListener('click', () => {
+        const tab = active(); if (!tab?.url) return;
+        const entries = readList('idkBrowserBookmarks-v2').filter(item => item.url !== tab.url);
+        entries.unshift({ url: tab.url, title: tab.title, savedAt: Date.now() });
+        writeList('idkBrowserBookmarks-v2', entries.slice(0, 100));
+        updateNav(); status.textContent = 'Bookmark saved';
       });
-
-       root.append(bar, scopePanel, frame);
-      if (opts.url) await navigate();
+      bookmarks.addEventListener('click', () => showLibrary('bookmarks'));
+      historyButton.addEventListener('click', () => showLibrary('history'));
+      fullscreen.addEventListener('click', async () => {
+        try {
+          if (document.fullscreenElement) await document.exitFullscreen();
+          else await root.requestFullscreen();
+        } catch { status.textContent = 'Fullscreen is unavailable in this browser'; }
+      });
+      const onFullscreen = () => { if (!root.isConnected) { document.removeEventListener('fullscreenchange', onFullscreen); return; } fullscreen.textContent = document.fullscreenElement === root ? 'Exit fullscreen' : '⛶ Fullscreen'; };
+      document.addEventListener('fullscreenchange', onFullscreen);
+      if (!await PROXY.backendAvailable()) {
+        root.append(toolbar, emptyState('The Browser server is not running. Start the site with npm start (or deploy it to a Node host) instead of opening the files directly.'));
+        url.disabled = go.disabled = true;
+        return root;
+      }
+      let scope = {};
+      try { scope = await PROXY.serverScope(); } catch { scope = {}; }
+      status.textContent = scope.scope ? 'Server scope ' + scope.scope + ' · Ready' : 'Ready';
+      scopeToggle = el('button', { className: 'btn tab', type: 'button', textContent: 'Server scope' });
+      scopeToggle.addEventListener('click', () => { scopePanel.hidden = !scopePanel.hidden; scopeToggle.textContent = scopePanel.hidden ? 'Server scope' : 'Hide scope'; });
+      scopePanel.append(
+        el('div', { className: 'idk-browser-scope-heading' }, [el('strong', { textContent: 'Browser server' }), el('small', { textContent: 'Connection and routing information' })]),
+        el('div', { className: 'idk-browser-scope-grid' }, [
+          el('div', {}, [el('small', { textContent: 'Status' }), el('strong', { textContent: scope.proxy ? 'Ready' : 'Unavailable' })]),
+          el('div', {}, [el('small', { textContent: 'Scope' }), el('strong', { textContent: scope.scope || 'Unavailable' })]),
+          el('div', {}, [el('small', { textContent: 'Transport' }), el('strong', { textContent: scope.transport || 'Unavailable' })]),
+          el('div', {}, [el('small', { textContent: 'Origin' }), el('strong', { textContent: scope.origin || location.origin })])
+        ])
+      );
+      toolbar.append(scopeToggle, newTab);
+      root.append(tabsBar, toolbar, scopePanel, library, content);
+      createTab(opts.url || '');
       return root;
     }
   },

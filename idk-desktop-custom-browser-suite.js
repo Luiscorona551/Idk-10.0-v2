@@ -31,7 +31,7 @@
   }
 
   function enhanceBrowser(root) {
-    if (!root || root.dataset.idkPowerBrowser) return;
+    if (!root || root.dataset.idkPowerBrowser || root.classList.contains('idk-browser-v2')) return;
     root.dataset.idkPowerBrowser = '1';
     const tools = document.createElement('div');
     tools.className = 'idk-browser-tools';
