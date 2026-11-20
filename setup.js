@@ -13,37 +13,11 @@ const screens = document.querySelectorAll('.screen');
 const installMusic = $('install-audio');
 const shutdownAudio = $('shutdown-audio');
 const keyField = $('key-field');
-const profileForm = $('profile-form');
-const profileNameField = $('desired-account-name');
-const profilePasswordField = $('profile-password');
-const profilePasswordConfirm = $('profile-password-confirm');
-const profileHintField = $('profile-password-hint');
-const profileError = $('profile-error');
-const profileSaveButton = $('profile-save-btn');
-const profileSkipButton = $('profile-skip-btn');
-const profileLoginButton = $('profile-login-button');
-const profileLoginPanel = $('profile-login-panel');
-const profileLoginForm = $('profile-login-form');
-const profileLoginUsername = $('profile-login-username');
-const profileLoginPassword = $('profile-login-password');
-const profileLoginSubmit = $('profile-login-submit');
-const profileLoginCancel = $('profile-login-cancel');
-const profileLoginError = $('profile-login-error');
 const PANIC_URL = 'https://classroom.google.com/';
 const TIMEZONE_KEY = 'timezone';
 const TIMEZONE_OFFSET_KEY = 'timezoneOffset';
 const TIMEZONE_DST_KEY = 'timezoneDST';
-const PROFILE_KEY = 'idkProfile';
-const PROFILE_IMAGES = [
-  'profile-1.jpg',
-  'profile-2.jpg',
-  'profile-3.jpg',
-  'profile-4.jpg'
-];
-const DEFAULT_PROFILE_IMAGE = PROFILE_IMAGES[0];
-
 let unlocked = false;
-let selectedProfileImage = DEFAULT_PROFILE_IMAGE;
 
 function show(id) {
   screens.forEach(screen => screen.classList.remove('show'));
@@ -77,58 +51,6 @@ async function sha256(value) {
   return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function readProfile() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(PROFILE_KEY));
-    if (!saved || typeof saved !== 'object') return null;
-    return {
-      displayName: String(saved.displayName || '').trim().slice(0, 32),
-      avatar: PROFILE_IMAGES.includes(saved.avatar) ? saved.avatar : DEFAULT_PROFILE_IMAGE,
-      passwordHash: String(saved.passwordHash || ''),
-      hint: String(saved.hint || '').trim().slice(0, 80)
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-function savedAccountName() {
-  try {
-    return String(JSON.parse(localStorage.getItem('chatName')) || '').trim().slice(0, 32);
-  } catch (e) {
-    return '';
-  }
-}
-
-function writeProfile(profile) {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    localStorage.setItem('chatName', JSON.stringify(profile.displayName));
-  } catch (e) {
-    // Continue when private browsing or storage limits block saving.
-  }
-}
-
-function setSelectedAvatar(avatar) {
-  selectedProfileImage = PROFILE_IMAGES.includes(avatar) ? avatar : DEFAULT_PROFILE_IMAGE;
-  document.querySelectorAll('.profile-avatar-button').forEach(button => {
-    const selected = button.dataset.avatar === selectedProfileImage;
-    button.classList.toggle('selected', selected);
-    button.setAttribute('aria-selected', String(selected));
-  });
-}
-
-function prepareProfileSetup() {
-  const profile = readProfile();
-  profileNameField.value = profile?.displayName || savedAccountName();
-  profilePasswordField.value = '';
-  profilePasswordConfirm.value = '';
-  profileHintField.value = '';
-  profileError.textContent = '';
-  setSelectedAvatar(profile?.avatar || DEFAULT_PROFILE_IMAGE);
-  profileSkipButton.textContent = profile?.passwordHash ? 'Keep existing password' : 'Skip password setup';
-}
-
 function normalizeKey(value) {
   return String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, KEY_MAX_LENGTH);
 }
@@ -140,10 +62,6 @@ function formatKey(value) {
 
 keyField.addEventListener('input', () => {
   keyField.value = formatKey(keyField.value);
-});
-
-document.querySelectorAll('.profile-avatar-button').forEach(button => {
-  button.addEventListener('click', () => setSelectedAvatar(button.dataset.avatar));
 });
 
 // Returns true when the key is accepted. The server sets the session cookie;
@@ -168,31 +86,9 @@ $('install-now-btn').addEventListener('click', () => {
   installMusic.play().catch(() => {});
   show('startup-screen');
   setTimeout(() => {
-    show('setup1');
+    show('setup3');
     $('help-ui').classList.remove('hide');
   }, 5000);
-});
-
-$('reg-next').addEventListener('click', () => {
-  if ($('reg-no').checked) {
-    alert('Closing Setup...');
-    window.close();
-    window.location.href = 'about:blank';
-    return;
-  }
-  show('setup2');
-});
-
-$('accounts-next').addEventListener('click', () => {
-  const name = $('account-name').value.trim();
-  if (name) {
-    try {
-      localStorage.setItem('chatName', JSON.stringify(name));
-    } catch (e) {
-      // Continue setup when private browsing or browser storage blocks saving.
-    }
-  }
-  show('setup3');
 });
 
 $('key-next').addEventListener('click', async () => {
@@ -206,58 +102,6 @@ $('key-next').addEventListener('click', async () => {
     return;
   }
   $('error-text').style.display = 'none';
-  prepareProfileSetup();
-  show('profile-setup-screen');
-});
-
-profileForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  const name = profileNameField.value.trim().slice(0, 32);
-  const password = profilePasswordField.value;
-  const confirmation = profilePasswordConfirm.value;
-  const existing = readProfile();
-  profileError.textContent = '';
-
-  if (!name) {
-    profileError.textContent = 'Enter an account name first.';
-    profileNameField.focus();
-    return;
-  }
-  if (password !== confirmation) {
-    profileError.textContent = 'The passwords do not match.';
-    profilePasswordConfirm.focus();
-    return;
-  }
-  if (!password && profileHintField.value.trim() && !existing?.passwordHash) {
-    profileError.textContent = 'Add a password before adding a password hint.';
-    profilePasswordField.focus();
-    return;
-  }
-
-  profileSaveButton.disabled = true;
-  try {
-    const profile = {
-      displayName: name,
-      avatar: selectedProfileImage,
-      passwordHash: password ? await sha256(password) : (existing?.passwordHash || ''),
-      hint: password ? profileHintField.value.trim().slice(0, 80) : (existing?.hint || '')
-    };
-    writeProfile(profile);
-    show('timezone-screen');
-  } finally {
-    profileSaveButton.disabled = false;
-  }
-});
-
-profileSkipButton.addEventListener('click', () => {
-  const existing = readProfile();
-  const profile = {
-    displayName: profileNameField.value.trim().slice(0, 32) || existing?.displayName || savedAccountName() || 'Guest',
-    avatar: selectedProfileImage || existing?.avatar || DEFAULT_PROFILE_IMAGE,
-    passwordHash: existing?.passwordHash || '',
-    hint: existing?.hint || ''
-  };
-  writeProfile(profile);
   show('timezone-screen');
 });
 
@@ -391,55 +235,6 @@ function enterDesktop() {
   window.location.replace(new URL('desktop.html', document.baseURI).href);
 }
 
-profileLoginButton.addEventListener('click', () => {
-  profileLoginPanel.hidden = false;
-  profileLoginButton.hidden = true;
-  profileLoginError.textContent = '';
-  profileLoginUsername.focus();
-});
-
-profileLoginCancel.addEventListener('click', () => {
-  profileLoginPanel.hidden = true;
-  profileLoginButton.hidden = false;
-  profileLoginForm.reset();
-  profileLoginError.textContent = '';
-});
-
-profileLoginForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  profileLoginError.textContent = '';
-  profileLoginSubmit.disabled = true;
-  try {
-    const response = await fetch(new URL('api/account/login', document.baseURI), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({
-        username: profileLoginUsername.value.trim(),
-        password: profileLoginPassword.value
-      })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.ok) {
-      profileLoginError.textContent = result.error || 'Could not sign in to the IDK account.';
-      return;
-    }
-    if (result.user) {
-      writeProfile({
-        displayName: String(result.user.username || '').slice(0, 32),
-        avatar: PROFILE_IMAGES.includes(result.user.avatar) ? result.user.avatar : DEFAULT_PROFILE_IMAGE,
-        passwordHash: '',
-        hint: ''
-      });
-    }
-    enterDesktop();
-  } catch (error) {
-    profileLoginError.textContent = 'The IDK account service could not be reached.';
-  } finally {
-    profileLoginSubmit.disabled = false;
-  }
-});
-
 $('region-btn').addEventListener('click', () => {
   $('help-ui').classList.add('hide');
   show('welcome-screen');
@@ -455,10 +250,7 @@ if (new URLSearchParams(window.location.search).get('shutdown') === '1') {
 
 $('help-ui').addEventListener('click', () => {
   const help = {
-    setup1: 'This is the registration screen. Choose whether you want to register now or later.',
-    setup2: 'Please enter your name and alt accounts.',
     setup3: 'Enter the product key. Ask the owner for it.',
-    'profile-setup-screen': 'Choose your account name and profile picture. A password is recommended but optional.',
     setup4: "Your time zone is saved. Click 'Continue' to proceed to region settings.",
     'timezone-screen': 'Choose a global time zone and decide whether the clock should follow daylight saving changes.',
     'region-screen': 'Select your region and state to set your preferred language.'

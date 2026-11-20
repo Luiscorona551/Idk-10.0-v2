@@ -11,7 +11,6 @@ import { baremuxPath } from '@mercuryworkshop/bare-mux/node';
 import { chat } from './chat.js';
 import { aiRequest, aiStatus } from './ai.js';
 import { hasSession, setupRoutes } from './setup-gate.js';
-import { accountRoutes, initAccountDb, accountDbEnabled } from './idk-account-server.js';
 import { friendRoutes, initFriendsDb } from './idk-friends-server.js';
 import { databaseStatus } from './idk-db-health.js';
 import { publicStoreRoutes } from './idk-public-store-server.js';
@@ -47,7 +46,6 @@ app.get('/healthz', healthHandler);
 app.get('/api/health', healthHandler);
 setupRoutes(app);
 app.get('/api/session', (req, res) => res.json({ ok: true, session: hasSession(req) }));
-accountRoutes(app);
 friendRoutes(app);
 publicStoreRoutes(app);
 const vmRouter = express.Router();
@@ -173,7 +171,7 @@ app.get('/uv/uv.sw.js', (req, res) => serviceWorkerResponse(res, uvServiceWorker
 app.use('/uv/', express.static(uvPath));
 app.use('/baremux/', express.static(baremuxPath));
 app.use('/epoxy/', express.static(epoxyPath));
-const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-account-server\.js|idk-friends-server\.js|idk-db-health\.js|Dockerfile|render\.yaml|\.env)/;
+const PRIVATE = /^\/(node_modules|public|package(-lock)?\.json|server\.js|chat\.js|ai\.js|setup-gate\.js|idk-friends-server\.js|idk-db-health\.js|Dockerfile|render\.yaml|\.env)/;
 app.use((req, res, next) => (PRIVATE.test(req.path) ? res.sendStatus(404) : next()));
 app.use(express.static(root, { extensions: ['html'], dotfiles: 'ignore' }));
 const httpsKey = process.env.HTTPS_KEY_FILE, httpsCert = process.env.HTTPS_CERT_FILE;
@@ -197,15 +195,14 @@ server.on('upgrade', (req, socket, head) => {
 const port = Number(process.env.PORT) || 8080, host = process.env.HOST || '0.0.0.0', protocol = httpsKey && httpsCert ? 'https' : 'http';
 server.listen(port, host, () => {
   console.log(`UGS listening on ${protocol}://${host}:${port}`);
-  console.log(`Backends starting: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
+  console.log(`Backends starting: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'}`);
 
   // Start database initialization after the HTTP listener is ready so
   // deployment health checks can reach /healthz without waiting on the DB.
   Promise.resolve()
-    .then(() => initAccountDb())
     .then(() => initFriendsDb())
     .then(() => {
-      console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'} | DB ${accountDbEnabled() ? 'configured' : 'not configured'}`);
+      console.log(`Backends ready: Proxy | Chat | AI ${aiStatus().configured ? 'configured' : 'waiting for AI_API_KEY'}`);
     })
     .catch(error => {
       console.error('IDK database initialization failed; server will remain available:', error);
