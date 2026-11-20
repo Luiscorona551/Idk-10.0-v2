@@ -51,6 +51,7 @@ const bootScreen = readFileSync(join(root, 'idk-boot-screen.js'), 'utf8');
 if (!bootScreen.includes('try { seen = window.localStorage?.getItem(KEY)') || !bootScreen.includes('try { window.localStorage?.setItem(KEY, \'1\'); }')) { console.error('Boot screen must tolerate unavailable browser storage.'); process.exitCode = 1; }
 const stability = readFileSync(join(root, 'idk-production-stability.js'), 'utf8');
 if (!stability.includes("try{localStorage.setItem('idkProductionVersion',VERSION)}catch{}")) { console.error('Production stability boot must tolerate unavailable browser storage.'); process.exitCode = 1; }
+if (!stability.includes("Boolean(d.ai?.configured)") || !stability.includes("Boolean(d.vm?.enabled&&d.vm?.qemu?.enabled)") || !stability.includes("try{storage=Boolean(window.localStorage&&window.indexedDB)}catch{}")) { console.error('System Health must report actual AI/VM configuration and tolerate blocked storage.'); process.exitCode = 1; }
 const server = readFileSync(join(root, 'server.js'), 'utf8');
 if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
 if (process.argv.includes('--smoke')) {
