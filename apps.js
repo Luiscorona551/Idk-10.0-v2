@@ -2173,6 +2173,9 @@ const APPS = {
         status.textContent = 'Loading…';
         tab.title = safeTitle(destination);
         tab.url = destination;
+        const visits = readList('idkBrowserHistory-v2').filter(item => item.url !== destination);
+        visits.unshift({ url: destination, title: tab.title, visitedAt: Date.now() });
+        writeList('idkBrowserHistory-v2', visits.slice(0, 100));
         if (options.history !== false) {
           tab.history = tab.history.slice(0, tab.index + 1);
           tab.history.push(destination);
