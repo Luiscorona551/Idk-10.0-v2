@@ -146,7 +146,15 @@
     document.addEventListener('pointerdown', event => { if (!event.target.closest('#idk-advanced-context')) document.getElementById('idk-advanced-context')?.remove(); });
     const scan = () => document.querySelectorAll('.rich-notes-app').forEach(enhanceRichNotes);
     scan();
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    const layer = document.getElementById('windows');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scan(); });
+      }).observe(layer, { childList: true, subtree: true });
+    }
   }
 
   window.IDKAdvancedPolish = { openFile, createEntry };
