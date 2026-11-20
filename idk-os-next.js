@@ -398,7 +398,15 @@
       document.querySelectorAll('#idk-public-publisher').forEach(enhancePublisher);
     };
     scan();
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    const layer = document.getElementById('windows');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scan(); });
+      }).observe(layer, { childList: true, subtree: true });
+    }
     document.addEventListener('keydown', event => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'v') { event.preventDefault(); openShareSheet(); }
       if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'w') { event.preventDefault(); workspaceView(); }
