@@ -242,15 +242,12 @@ function gamingCloudApp() {
   return root;
 }
 
-async function gameBlobURL(name) {
+function gameHTMLURL(name) {
   const file = gameFileName(name);
-  const url = GAME_CDN + encodeURIComponent(file) + "?t=" + Date.now();
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Could not fetch game (" + res.status + ")");
-  return URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
+  return GAME_CDN + encodeURIComponent(file);
 }
 async function openGame(name, title) {
-  const src = await gameBlobURL(name);
+  const src = gameHTMLURL(name);
   window.OS?.open('player', { title: title || gameTitle(name), src });
   return true;
 }
@@ -274,26 +271,23 @@ async function gamePlayerApp(options = {}) {
   frame.addEventListener('error', () => { status.textContent = 'Game frame failed to load.'; });
   toolbar.append(status, reload, fullscreen, help);
   root.append(toolbar, helpText, frame);
-  let source = options.src || '', generatedSource = false;
+  const source = options.src || (options.gameName ? gameHTMLURL(options.gameName) : '');
   const load = async () => {
     status.textContent = 'Loading game…';
-    try {
-      if (generatedSource && source) URL.revokeObjectURL(source);
-      source = options.src || await gameBlobURL(options.gameName);
-      generatedSource = !options.src;
-      frame.src = source;
-      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
-    } catch (error) {
-      status.textContent = error?.message || 'Game unavailable.';
+    if (!source) {
+      status.textContent = 'No game HTML link was provided.';
       frame.removeAttribute('src');
-      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message: error?.message || 'Game unavailable.' } }));
+      window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: false, message: status.textContent } }));
+      return;
     }
+    frame.src = source;
+    window.dispatchEvent(new CustomEvent('idk-game-availability', { detail: { name: options.gameName, ok: true } }));
   };
   reload.onclick = load;
   fullscreen.onclick = () => frame.requestFullscreen?.().catch(() => { status.textContent = 'Fullscreen is unavailable in this browser.'; });
   help.onclick = () => { helpText.hidden = !helpText.hidden; };
   await load();
-  root.cleanup = () => { if (generatedSource && source) URL.revokeObjectURL(source); };
+  root.cleanup = () => { frame.src = 'about:blank'; };
   return root;
 }
 
