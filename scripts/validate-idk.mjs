@@ -37,6 +37,27 @@ if (!apps.includes("https://www.blooket.com/")) { console.error('Official Blooke
 if (!apps.includes('soundboard:') || !apps.includes('render: () => externalSite(site.url, site.title, { embeddable: false })')) { console.error('Soundboard sources must use the safe external launch flow.'); process.exitCode = 1; }
 const server = readFileSync(join(root, 'server.js'), 'utf8');
 if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
+
+const gamesHub = readFileSync(join(root, 'idk-gaming-hub-2.js'), 'utf8');
+const gamesCatalog = JSON.parse(readFileSync(join(root, 'games.json'), 'utf8'));
+const gameIcons = JSON.parse(readFileSync(join(root, 'game-icons.json'), 'utf8'));
+if (!Array.isArray(gamesCatalog) || !gamesCatalog.length || gamesCatalog.some(id => typeof id !== 'string' || !id || /[\\/\u0000-\u001f]/.test(id) || id.includes('..'))) {
+  console.error('Gaming Hub catalog contains invalid game IDs.');
+  process.exitCode = 1;
+}
+if (new Set(gamesCatalog.map(id => id.toLowerCase())).size !== gamesCatalog.length) {
+  console.error('Gaming Hub catalog contains duplicate game IDs.');
+  process.exitCode = 1;
+}
+if (!gamesHub.includes("APPS.games.render = renderGamingHub") || !gamesHub.includes("window.OS.open('player'") || !gamesHub.includes("idkGameFavorites") || !gamesHub.includes("idkGameRecents") || !gamesHub.includes('PAGE_SIZE = 60')) {
+  console.error('Gaming Hub 2.0 integration, player launch, saved data, or pagination is missing.');
+  process.exitCode = 1;
+}
+if (!gameIcons || typeof gameIcons !== 'object' || !desktop.includes('idk-gaming-hub-2.css') || !desktop.includes('idk-gaming-hub-2.js')) {
+  console.error('Gaming Hub 2.0 assets are not fully connected to desktop.html.');
+  process.exitCode = 1;
+}
+
 if (process.argv.includes('--smoke')) {
   const base = String(process.env.IDK_BASE_URL || '').replace(/\/$/, '');
   if (!base) { console.error('Set IDK_BASE_URL when using --smoke.'); process.exitCode = 1; }
