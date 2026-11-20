@@ -35,6 +35,8 @@ if (!apps.includes("names = await loadJSON('games.json')") || !apps.includes('fu
 if (apps.includes('gameBlobURL(') || apps.includes('URL.createObjectURL(new Blob([await res.text()]')) { console.error('Games must open the original HTML URL directly, not a generated blob URL.'); process.exitCode = 1; }
 if (!apps.includes("https://www.blooket.com/")) { console.error('Official Blooket entry is missing.'); process.exitCode = 1; }
 if (!apps.includes('soundboard:') || !apps.includes('render: () => externalSite(site.url, site.title, { embeddable: false })')) { console.error('Soundboard sources must use the safe external launch flow.'); process.exitCode = 1; }
+const accountClient = readFileSync(join(root, 'idk-account-client.js'), 'utf8');
+if (!accountClient.includes("catch { return true; }") || accountClient.includes("const o = modal()")) { console.error('Account auth must not block unauthenticated desktop startup.'); process.exitCode = 1; }
 const server = readFileSync(join(root, 'server.js'), 'utf8');
 if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
 if (process.argv.includes('--smoke')) {
