@@ -122,12 +122,20 @@
     improveStates();
   };
 
-  const installRelease = () => { scan(); new MutationObserver(scan).observe(document.body, { childList: true, subtree: true }); };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installRelease, { once: true }); else installRelease();
+  function install() {
+    scan();
+    const layer = document.getElementById('windows');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scan(); });
+      }).observe(layer, { childList: true, subtree: true });
+    }
+  }
   window.addEventListener('error', event => { if (event?.message) notify('IDK', 'Something went wrong. Try the action again.', 'error'); });
   window.addEventListener('unhandledrejection', event => { if (event?.reason) notify('IDK', 'A background task failed. Try again.', 'error'); });
-  
   window.IDKReleaseBatch = { scan, openEchoPanel };
-  const install = () => { scan(); new MutationObserver(scan).observe(document.body, { childList: true, subtree: true }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();

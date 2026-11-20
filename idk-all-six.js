@@ -103,7 +103,15 @@
     installCallQuality();
     enhanceAccount();
     installPanelTrigger();
-    new MutationObserver(() => { enhanceAccount(); installPanelTrigger(); }).observe(document.body, { childList: true, subtree: true });
+    const desktop = document.getElementById('desktop');
+    if (desktop) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; installPanelTrigger(); });
+      }).observe(desktop, { childList: true });
+    }
     document.addEventListener('keydown', event => { if (event.key === 'Escape') panel?.remove(); }, true);
     window.addEventListener('online', renderPanel); window.addEventListener('offline', renderPanel); window.addEventListener('idk-sync-status', renderPanel); window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; renderPanel(); }); window.addEventListener('appinstalled', () => { installPrompt = null; notify('IDK', 'IDK is installed as an app.', 'success'); renderPanel(); });
     window.IDKAllSix = { openPanel, refresh: renderPanel };

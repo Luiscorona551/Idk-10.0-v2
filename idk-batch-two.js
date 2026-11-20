@@ -58,11 +58,8 @@
   }
 
   function install() {
-    const observer = new MutationObserver(() => {
-      enhanceAccountOverlay();
-      coordinateOnboarding();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    // The account overlay is no longer a boot-time desktop gate. Keep its
+    // optional enhancement callable, but do not watch the entire document.
     enhanceAccountOverlay();
     setTimeout(coordinateOnboarding, 2000);
     const idle = task => window.requestIdleCallback ? requestIdleCallback(task, { timeout: 1600 }) : setTimeout(task, 0);

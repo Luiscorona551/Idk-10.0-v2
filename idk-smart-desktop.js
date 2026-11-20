@@ -252,8 +252,15 @@
   function install() {
     scan();
     window.addEventListener('idk-data-changed', scan);
-    new MutationObserver(scan).observe(document.getElementById('desktop') || document.body, {childList:true,subtree:true});
-    setInterval(scan, 2500);
+    const layer = document.getElementById('icons');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scan(); });
+      }).observe(layer, { childList: true });
+    }
     window.IDKSmartDesktop = { open: openPanel, organize: organizeByType, undo: undoOrganization, command: runCommand, recent: () => [...recent] };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true}); else install();

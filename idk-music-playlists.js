@@ -266,5 +266,13 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan, { once: true });
   else scan();
 
-  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  const layer = document.getElementById('windows');
+  if (layer) {
+    let queued = false;
+    new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; scan(); });
+    }).observe(layer, { childList: true, subtree: true });
+  }
 })();

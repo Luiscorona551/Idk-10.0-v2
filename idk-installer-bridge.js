@@ -1,11 +1,11 @@
 (() => {
   'use strict';
 
-  function removeLegacyInstaller() {
+  function removeLegacyInstaller(root = document) {
     // Keep the shared APPS registry intact. The rebuilt installer owns the
     // visible installer shortcut; only remove the legacy desktop/start-menu UI.
-    document.querySelectorAll('[data-app="installer"]').forEach(node => node.remove());
-    document.querySelectorAll('#start-apps .start-app, #start-recent .recent-app').forEach(node => {
+    root.querySelectorAll('[data-app="installer"]').forEach(node => node.remove());
+    root.querySelectorAll('.start-app, .recent-app').forEach(node => {
       const text = node.textContent || '';
       if (/program installer/i.test(text)) node.remove();
     });
@@ -25,8 +25,14 @@
   function init() {
     removeLegacyInstaller();
     document.addEventListener('click', openInstallerFromMenu, true);
-    const observer = new MutationObserver(removeLegacyInstaller);
-    observer.observe(document.body, { childList: true, subtree: true });
+    const targets = ['icons', 'start-apps', 'start-recent']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    const observer = new MutationObserver(records => {
+      const changed = new Set(records.map(record => record.target.closest?.('#icons,#start-apps,#start-recent')).filter(Boolean));
+      changed.forEach(removeLegacyInstaller);
+    });
+    targets.forEach(target => observer.observe(target, { childList: true, subtree: true }));
     setTimeout(removeLegacyInstaller, 0);
     setTimeout(removeLegacyInstaller, 500);
     setTimeout(removeLegacyInstaller, 1500);
