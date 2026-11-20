@@ -60,7 +60,7 @@ const observerFiles = [
 ];
 for (const name of observerFiles) {
   const source = readFileSync(join(root, name), 'utf8');
-  if (/observe\\(document\\.body/.test(source)) {
+  if (/observe(document.body/.test(source)) {
     console.error(`Desktop feature ${name} must not install a document-wide mutation observer.`);
     process.exitCode = 1;
   }
@@ -71,7 +71,7 @@ if (messengerCleanup.includes("querySelectorAll('*')")) {
   process.exitCode = 1;
 }
 const smartDesktop = readFileSync(join(root, 'idk-smart-desktop.js'), 'utf8');
-if (smartDesktop.includes('setInterval(scan, 2500)') || /observe\\(document\\.body/.test(smartDesktop)) {
+if (smartDesktop.includes('setInterval(scan, 2500)') || /observe(document.body/.test(smartDesktop)) {
   console.error('Smart Desktop must not poll or watch the entire page.');
   process.exitCode = 1;
 }
