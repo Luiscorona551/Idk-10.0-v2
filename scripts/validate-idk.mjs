@@ -52,6 +52,34 @@ if (!bootScreen.includes('try { seen = window.localStorage?.getItem(KEY)') || !b
 const stability = readFileSync(join(root, 'idk-production-stability.js'), 'utf8');
 if (!stability.includes("try{localStorage.setItem('idkProductionVersion',VERSION)}catch{}")) { console.error('Production stability boot must tolerate unavailable browser storage.'); process.exitCode = 1; }
 if (!stability.includes("Boolean(d.ai?.configured)") || !stability.includes("Boolean(d.vm?.enabled&&d.vm?.qemu?.enabled)") || !stability.includes("try{storage=Boolean(window.localStorage&&window.indexedDB)}catch{}")) { console.error('System Health must report actual AI/VM configuration and tolerate blocked storage.'); process.exitCode = 1; }
+const observerFiles = [
+  'idk-friendly-dm.js', 'idk-calls-friendly.js', 'idk-release-batch.js',
+  'idk-finish-suite.js', 'idk-all-six.js', 'idk-os-next.js',
+  'idk-media-mail-polish.js', 'idk-advanced-polish.js',
+  'idk-music-playlists.js', 'idk-desktop-custom-browser-suite.js'
+];
+for (const name of observerFiles) {
+  const source = readFileSync(join(root, name), 'utf8');
+  if (/observe\\(document\\.body/.test(source)) {
+    console.error(`Desktop feature ${name} must not install a document-wide mutation observer.`);
+    process.exitCode = 1;
+  }
+}
+const messengerCleanup = readFileSync(join(root, 'idk-messenger-cleanup.js'), 'utf8');
+if (messengerCleanup.includes("querySelectorAll('*')")) {
+  console.error('Messenger cleanup must not traverse every DOM element.');
+  process.exitCode = 1;
+}
+const smartDesktop = readFileSync(join(root, 'idk-smart-desktop.js'), 'utf8');
+if (smartDesktop.includes('setInterval(scan, 2500)') || /observe\\(document\\.body/.test(smartDesktop)) {
+  console.error('Smart Desktop must not poll or watch the entire page.');
+  process.exitCode = 1;
+}
+const releaseBatch = readFileSync(join(root, 'idk-release-batch.js'), 'utf8');
+if ((releaseBatch.match(/new MutationObserver/g) || []).length !== 1) {
+  console.error('Release Batch must install only one scoped mutation observer.');
+  process.exitCode = 1;
+}
 const server = readFileSync(join(root, 'server.js'), 'utf8');
 if (!server.includes('IDK_ICE_SERVERS') || !server.includes('hasTurn')) { console.error('TURN-ready call configuration is missing.'); process.exitCode = 1; }
 if (process.argv.includes('--smoke')) {
