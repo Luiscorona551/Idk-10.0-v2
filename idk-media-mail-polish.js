@@ -56,10 +56,18 @@
   }
   function boot() {
     installStyle();
-    new MutationObserver(() => {
-      document.querySelectorAll('.idk-live-messenger').forEach(enhanceMessenger);
-      enhanceAttachmentViews(document);
-    }).observe(document.body,{childList:true,subtree:true});
+    const layer = document.getElementById('windows');
+    if (layer) {
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          layer.querySelectorAll('.idk-live-messenger').forEach(enhanceMessenger);
+        });
+      }).observe(layer, { childList: true, subtree: true });
+    }
     document.querySelectorAll('.idk-live-messenger').forEach(enhanceMessenger);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
