@@ -41,22 +41,9 @@
   </div>
 
   <div id="setup1" class="screen setup-bg">
-    <h1 class="setup-h1">Ready to register?</h1>
-    <p class="setup-p">Registering helps us keep this site secure.</p>
-    <label><input type="radio" name="r" id="reg-yes" checked> Yes, I'd like to register now</label><br><br>
-    <label><input type="radio" name="r" id="reg-no"> No, not at this time</label>
-    <button class="win-btn" id="reg-next" type="button">Next</button>
-  </div>
-
-  <div id="setup2" class="screen setup-bg">
-    <h1 class="setup-h1">Who will use this site?</h1>
-    <p class="setup-p">Type the name of each account who will use this site.</p>
-    <div class="input-group"><label>Your name:</label><input type="text" id="account-name"></div>
-    <div class="input-group"><label>2nd Acc:</label><input type="text"></div>
-    <div class="input-group"><label>3rd Acc:</label><input type="text"></div>
-    <div class="input-group"><label>4th Acc:</label><input type="text"></div>
-    <div class="input-group"><label>5th Acc:</label><input type="text"></div>
-    <button class="win-btn" id="accounts-next" type="button">Next</button>
+    <h1 class="setup-h1">Welcome to IDK 10.0</h1>
+    <p class="setup-p">No account or sign-in is required. Your profile stays on this device.</p>
+    <button class="win-btn" id="reg-next" type="button">Continue</button>
   </div>
 
   <div id="setup3" class="screen setup-bg" style="background: #1e005d;">
@@ -70,26 +57,14 @@
   <div id="profile-setup-screen" class="screen setup-bg profile-setup-bg">
     <div class="profile-setup-card">
       <div class="profile-kicker">Personal profile</div>
-      <h1 class="setup-h1">Create your account</h1>
+      <h1 class="setup-h1">Set up your local profile</h1>
       <p class="setup-p">Choose how you will appear on this desktop.</p>
       <form id="profile-form" class="profile-form">
         <div class="profile-form-grid">
           <div class="profile-fields">
             <label class="profile-field" for="desired-account-name">
-              <span>Desired account name</span>
-              <input id="desired-account-name" type="text" maxlength="32" autocomplete="username" placeholder="Enter your name" required>
-            </label>
-            <label class="profile-field" for="profile-password">
-              <span>Type a password (recommended)</span>
-              <input id="profile-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Secret phrase">
-            </label>
-            <label class="profile-field" for="profile-password-confirm">
-              <span>Type your password again</span>
-              <input id="profile-password-confirm" type="password" maxlength="128" autocomplete="new-password" placeholder="Repeat password">
-            </label>
-            <label class="profile-field" for="profile-password-hint">
-              <span>Type a password hint</span>
-              <input id="profile-password-hint" type="text" maxlength="80" autocomplete="off" placeholder="A reminder for later">
+              <span>Display name</span>
+              <input id="desired-account-name" type="text" maxlength="32" autocomplete="name" placeholder="Enter your name" required>
             </label>
           </div>
           <div class="profile-avatar-section">
@@ -113,31 +88,9 @@
         <p id="profile-error" class="profile-error" role="alert"></p>
         <div class="profile-actions">
           <button class="profile-primary" id="profile-save-btn" type="submit">Save profile</button>
-          <button class="profile-skip" id="profile-skip-btn" type="button">Skip password setup</button>
+          <button class="profile-skip" id="profile-skip-btn" type="button">Continue</button>
         </div>
       </form>
-      <div class="profile-account-login">
-        <button class="profile-login-button" id="profile-login-button" type="button">Already have an IDK account? Log in</button>
-        <div id="profile-login-panel" class="profile-login-panel" hidden>
-          <div class="login-kicker">IDK 10.0 account</div>
-          <p class="login-subtitle">Sign in with the account stored in the IDK database.</p>
-          <form id="profile-login-form" class="login-form">
-            <label class="profile-field" for="profile-login-username">
-              <span>Account name</span>
-              <input id="profile-login-username" type="text" autocomplete="username" placeholder="Enter your account name" required>
-            </label>
-            <label class="profile-field" for="profile-login-password">
-              <span>Password</span>
-              <input id="profile-login-password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-            </label>
-            <div class="profile-actions">
-              <button class="profile-primary" id="profile-login-submit" type="submit">Log in</button>
-              <button class="profile-skip" id="profile-login-cancel" type="button">Cancel</button>
-            </div>
-            <p id="profile-login-error" class="profile-error" role="alert"></p>
-          </form>
-        </div>
-      </div>
     </div>
   </div>
 
